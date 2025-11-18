@@ -1,0 +1,44 @@
+package ru.hopes.workouttimer.data.dao
+
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.Query
+import androidx.room.Transaction
+import kotlinx.coroutines.flow.Flow
+import ru.hopes.workouttimer.data.entity.ExerciseEntity
+import ru.hopes.workouttimer.data.entity.WorkoutEntity
+
+@Dao
+interface WorkoutDao {
+    @Transaction
+    @Query("SELECT * FROM workouts")
+    fun getAllWorkoutsWithExercises(): Flow<List<WorkoutWithExercises>>
+
+    @Query("SELECT * FROM workouts")
+    fun getAllWorkouts(): Flow<List<WorkoutEntity>>
+
+    @Insert
+    suspend fun insertWorkout(workout: WorkoutEntity): Long
+
+    @Insert
+    suspend fun insertExercises(exercises: List<ExerciseEntity>)
+
+    @Delete
+    fun deleteWorkout(workout: WorkoutEntity)
+
+    @Query("SELECT * FROM workouts WHERE id = :id")
+    suspend fun getWorkoutById(id: Int): WorkoutEntity?
+
+    @Transaction
+    @Query(
+        """
+        SELECT DISTINCT workouts.* FROM workouts JOIN exercises
+        ON workouts.id == exercises.workoutId
+        WHERE workouts.name LIKE '%' || :query || '%'
+        OR exercises.name LIKE '%' || :query || '%' 
+        ORDER BY orderInWorkout DESC
+        """
+    )
+    fun searchWorkouts(query: String): Flow<List<WorkoutEntity>>
+}
