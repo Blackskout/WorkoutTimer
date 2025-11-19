@@ -14,14 +14,28 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.domain.model.Exercise
+import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.presentation.utils.SoundPlayer
 import javax.inject.Inject
 
 @HiltViewModel
 class WorkoutExecutionViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
     private val soundPlayer: SoundPlayer
 ) : ViewModel() {
+
+
+    private var exercises: List<Exercise> = listOf(
+        Exercise(0, "Жим лежа", 80, 3, 12, 60_000L, 1),
+        Exercise(1, "Разводка гантелей", 12, 3, 15, 45_000L, 2)
+    )
+    private val workout = Workout(
+        name = "день груди",
+        exercises = exercises,
+        lastUseAt = System.currentTimeMillis()
+    )
+
+    private var exerciseIndex = 0
+
 
     private val _uiState = MutableStateFlow<WorkoutExecutionState>(
         WorkoutExecutionState.Rest(
@@ -32,6 +46,12 @@ class WorkoutExecutionViewModel @Inject constructor(
     val uiState: StateFlow<WorkoutExecutionState> = _uiState.asStateFlow()
 
     private var timerJob: Job? = null
+
+    init {
+        if (_uiState.value is WorkoutExecutionState.Rest) {
+            startRestTimer()
+        }
+    }
 
     fun skipRest() {
         timerJob?.cancel()
@@ -56,8 +76,9 @@ class WorkoutExecutionViewModel @Inject constructor(
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
             while (_uiState.value is WorkoutExecutionState.Rest) {
-                val restState = _uiState.value as WorkoutExecutionState.Rest
-                if (restState.exercise.restTimeMillis <= 0L) {
+                val currentState = _uiState.value as WorkoutExecutionState.Rest
+
+                if (currentState.restTimeMillis <= 0L) {
                     onRestFinished()
                     break
                 }
@@ -65,17 +86,8 @@ class WorkoutExecutionViewModel @Inject constructor(
                 _uiState.update { state ->
                     when (state) {
                         is WorkoutExecutionState.Rest -> {
-                            val curExercise = state.exercise
                             state.copy(
-                                exercise = Exercise(
-                                    id = curExercise.id,
-                                    name = curExercise.name,
-                                    weight = curExercise.weight,
-                                    sets = curExercise.sets,
-                                    reps = curExercise.reps,
-                                    restTimeMillis = curExercise.restTimeMillis - 1000L,
-                                    order = curExercise.order
-                                )
+                                restTimeMillis = state.restTimeMillis - 1000L
                             )
                         }
 
@@ -89,20 +101,6 @@ class WorkoutExecutionViewModel @Inject constructor(
     private fun onRestFinished() {
         timerJob?.cancel()
         soundPlayer.playSound(R.raw.soundgong) // <-- Воспроизводим звук
-        _uiState.update { state ->
-            when (state) {
-                is WorkoutExecutionState.Rest -> {
-                    WorkoutExecutionState.Active(
-                        exercise = state.exercise,
-                        currentSet = state.currentSet,
-                        totalSets = state.totalSets,
-                        weight = state.exercise.weight,
-                        reps = state.exercise.reps
-                    )
-                }
-                else -> state
-            }
-        }
     }
 
     override fun onCleared() {
@@ -113,25 +111,34 @@ class WorkoutExecutionViewModel @Inject constructor(
     fun onExerciseFinished() {
         // Здесь можно перейти к следующему подходу или завершить упражнение
         // Для простоты — просто вернемся в режим отдыха (если есть еще подходы)
+
+        var shouldStartTimer = false
+
         _uiState.update { state ->
             when (state) {
                 is WorkoutExecutionState.Active -> {
                     if (state.currentSet < state.totalSets) {
+
+                        shouldStartTimer = true
+
                         WorkoutExecutionState.Rest(
                             exercise = state.exercise,
                             currentSet = state.currentSet + 1,
                             totalSets = state.totalSets
                         )
                     } else {
-                        // Завершение упражнения — можно отправить событие навигации
-                        // Например: navigateToNextScreen()
-                        state // пока оставим как есть
+                        //Логика завершения всего упражнения— можно отправить событие навигации
+                        state
                     }
                 }
 
                 else -> state
             }
         }
+        if (shouldStartTimer) {
+            startRestTimer()
+        }
+
     }
 }
 
@@ -141,6 +148,7 @@ sealed class WorkoutExecutionState {
         val exercise: Exercise,
         val currentSet: Int,
         val totalSets: Int = exercise.sets,
+        val restTimeMillis: Long = exercise.restTimeMillis
         // нужно еще количество всех тренировок также тотал и текущее но я тут осознал что не использую Workout так что получается собсна я говнокодю или делаючто то не так
     ) : WorkoutExecutionState()
 
