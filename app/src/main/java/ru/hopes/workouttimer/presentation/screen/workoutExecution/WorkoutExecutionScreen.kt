@@ -21,6 +21,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -33,16 +34,30 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 @Composable
 fun WorkoutExecutionScreen(
     viewModel: WorkoutExecutionViewModel = hiltViewModel(),
-    onExerciseCompleted: () -> Unit // для навигации назад или к следующему упражнению
+    onExerciseCompleted: () -> Unit, // для навигации назад или к следующему упражнению
+    workoutId: Int
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val workoutName = viewModel.workoutName
+
+    // Загружаем тренировку при первом запуске
+    LaunchedEffect(workoutId) {
+        viewModel.loadWorkout(workoutId)
+    }
+
+    // Обрабатываем завершение тренировки
+    LaunchedEffect(uiState) {
+        if (uiState is WorkoutExecutionState.Finished) {
+            onExerciseCompleted()
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(text = "День груди") },
+                title = { Text(text = workoutName.ifEmpty { "Тренировка" }) },
                 navigationIcon = {
-                    IconButton(onClick = { /* Вернуться к списку тренировок */ }) {
+                    IconButton(onClick = { onExerciseCompleted() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
                     }
                 }
@@ -56,18 +71,81 @@ fun WorkoutExecutionScreen(
                 .padding(16.dp)
         ) {
             when (val currentState = uiState) {
+                is WorkoutExecutionState.Loading -> {
+                    LoadingState()
+                }
+                is WorkoutExecutionState.Error -> {
+                    ErrorState(
+                        message = currentState.message,
+                        onRetry = { viewModel.loadWorkout(workoutId) }
+                    )
+                }
                 is WorkoutExecutionState.Rest -> {
                     RestTimerContent(
                         restState = currentState,
+                        currentExerciseNumber = viewModel.currentExerciseNumber,
+                        totalExercises = viewModel.totalExercises,
                         onSkipTimer = { viewModel.skipRest() },
                     )
                 }
                 is WorkoutExecutionState.Active -> {
                     ActiveExerciseContent(
                         activeState = currentState,
+                        currentExerciseNumber = viewModel.currentExerciseNumber,
+                        totalExercises = viewModel.totalExercises,
                         onExerciseFinished = { viewModel.onExerciseFinished() }
                     )
                 }
+                is WorkoutExecutionState.Finished -> {
+                    // Это состояние обрабатывается в LaunchedEffect выше
+                    LoadingState()
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+fun LoadingState() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            CircularProgressIndicator()
+            Text(
+                text = "Загрузка тренировки, пожалуйста подождите...",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
+@Composable
+fun ErrorState(
+    message: String,
+    onRetry: () -> Unit
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.error
+            )
+            Button(onClick = onRetry) {
+                Text("Повторить")
             }
         }
     }
@@ -76,6 +154,8 @@ fun WorkoutExecutionScreen(
 @Composable
 fun RestTimerContent(
     restState: WorkoutExecutionState.Rest,
+    currentExerciseNumber: Int,
+    totalExercises: Int,
     onSkipTimer: () -> Unit,
 ) {
     Column(
@@ -85,19 +165,20 @@ fun RestTimerContent(
     ) {
 
         Text(
-            text = "Упражнение 1/8",
+            text = "Упражнение $currentExerciseNumber/$totalExercises",
             style = MaterialTheme.typography.bodyMedium
         )
 
         Text(
-            text = "Подход ${restState.currentSet}/${restState.totalSets}",
+            text = "Далее: подход ${restState.currentSet}",
             style = MaterialTheme.typography.titleMedium
         )
 
         Spacer(modifier = Modifier.height(32.dp))
 
         CircularTimer(
-            timeLeftMillis = restState.restTimeMillis
+            timeLeftMillis = restState.restTimeMillis,
+            totalTimeMillis = restState.totalRestTimeMillis
         )
 
         Text(
@@ -128,7 +209,8 @@ fun RestTimerContent(
 
 @Composable
 fun CircularTimer(
-    timeLeftMillis: Long
+    timeLeftMillis: Long,
+    totalTimeMillis: Long
 ) {
     val timeLeftSeconds = (timeLeftMillis / 1000).toInt()
     val formattedTime = String.format("%02d:%02d", timeLeftSeconds / 60, timeLeftSeconds % 60)
@@ -137,8 +219,14 @@ fun CircularTimer(
         contentAlignment = Alignment.Center,
         modifier = Modifier.size(200.dp)
     ) {
+        val progress = if (totalTimeMillis > 0L) {
+            (timeLeftMillis.toFloat() / totalTimeMillis.toFloat()).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+
         CircularProgressIndicator(
-            progress = (timeLeftMillis.toFloat() / timeLeftMillis).coerceIn(0f, 1f),
+            progress = progress,
             modifier = Modifier.fillMaxSize()
         )
         Text(
@@ -151,6 +239,8 @@ fun CircularTimer(
 @Composable
 fun ActiveExerciseContent(
     activeState: WorkoutExecutionState.Active,
+    currentExerciseNumber: Int,
+    totalExercises: Int,
     onExerciseFinished: () -> Unit
 ) {
     Column(
@@ -160,7 +250,7 @@ fun ActiveExerciseContent(
     ) {
 
         Text(
-            text = "Упражнение 1/8",
+            text = "Упражнение $currentExerciseNumber/$totalExercises",
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -221,6 +311,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment

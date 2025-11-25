@@ -54,7 +54,7 @@ class WorkoutRepositoryImpl @Inject constructor(
                 weight = ex.weight,
                 sets = ex.sets,
                 reps = ex.reps,
-                restTimeMillis = ex.restTimeMillis,
+                restTimeMillis = ex.timeMillis,
                 orderInWorkout = ex.order
             )
         }

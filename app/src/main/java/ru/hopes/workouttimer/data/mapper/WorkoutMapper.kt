@@ -13,7 +13,7 @@ fun WorkoutWithExercises.toDomain(): Workout {
                 name = e.name,
                 sets = e.sets,
                 reps = e.reps,
-                restTimeMillis = e.restTimeMillis,
+                timeMillis = e.restTimeMillis,
                 order = e.orderInWorkout,
                 weight = e.weight
             )

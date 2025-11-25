@@ -7,7 +7,7 @@ import ru.hopes.workouttimer.data.entity.WorkoutEntity
 
 @Database(
     entities = [WorkoutEntity::class, ExerciseEntity::class],
-    version = 2,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

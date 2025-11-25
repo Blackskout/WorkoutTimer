@@ -58,8 +58,8 @@ fun ListWorkoutScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddWorkoutClick,
-                contentColor = Color.DarkGray,
-                containerColor = Color.LightGray,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                containerColor = MaterialTheme.colorScheme.primary,
                 shape = CircleShape
             ) {
                 Icon(
@@ -75,7 +75,7 @@ fun ListWorkoutScreen(
             contentPadding = innerPadding,
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.LightGray)
+                .background(MaterialTheme.colorScheme.background)
         ) {
 
             item {
@@ -115,7 +115,7 @@ fun ListWorkoutScreen(
                     onLongClick = {
                         onLongClick(workout)
                     },
-                    backgroundColor = Color.LightGray
+                    backgroundColor = MaterialTheme.colorScheme.surface
                 )
 
             }
@@ -188,7 +188,7 @@ fun WorkoutCard(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, Color.DarkGray, RoundedCornerShape(16.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
             .background(backgroundColor)
             .combinedClickable(
                 onClick = {

@@ -37,17 +37,26 @@ class ListWorkoutViewModel @Inject constructor(
     val state = _state.asStateFlow()
 
     init {
-
-        viewModelScope.launch {
-            addWorkoutUseCase(
-                Workout(
-                    0,
-                    "Arm day",
-                    listOf(Exercise(0, "Жим лежа", 3, 80, 12, 120, 1)),
-                    System.currentTimeMillis()
-                )
-            )
-        }
+//        viewModelScope.launch {
+//            var order = 1
+//            addWorkoutUseCase(
+//                Workout(
+//                    0,
+//                    "Пятница",
+//                    listOf(
+//                        Exercise(0, "Жим ног", 180, 3, 12, 150_000, order),
+//                        Exercise(0, "Жим лежа", 35, 3, 12, 90_000, order++),
+//                        Exercise(0, "Спина", 61, 3, 12, 90_000, order),
+//                        Exercise(0, "Сгибание лежа", 50, 3, 12, 120_000, order++),
+//                        Exercise(0, "Плечи", 8, 3, 12, 90_000, order++),
+//                        Exercise(0, "Бицепс", 16, 3, 12, 90_000, order++),
+//                        Exercise(0, "Трицепс велосипедои", 7, 3, 12, 90_000, order++),
+//                        Exercise(0, "Спина в хаммере", 48, 3, 12, 120_000, order++),
+//                    ),
+//                    System.currentTimeMillis()
+//                )
+//            )
+//        }
 
 
         query
@@ -71,86 +80,10 @@ class ListWorkoutViewModel @Inject constructor(
         query.update { newQuery.trim() }
     }
 
-
-    fun processCommand(command: WorkoutCommand) {
-
-        viewModelScope.launch {
-            when (command) {
-                is WorkoutCommand.InputSearchQuery -> {
-                    query.update { command.query.trim() }
-                }
-            }
-        }
-    }
-}
-
-sealed interface WorkoutCommand {
-
-    data class InputSearchQuery(val query: String) : WorkoutCommand
-
 }
 
 data class ListWorkoutState(
     val query: String = "",
     val workouts: List<WorkoutEntity> = listOf()
 )
-
-
-//    private var workout: Workout? = null
-//    private var currentExerciseIndex = 0
-//    private var currentSet = 1
-//
-//
-//    fun onSetCompleted() {
-//        val ex = workout?.exercises?.getOrNull(currentExerciseIndex) ?: return
-//        if (currentSet < ex.sets) {
-//            currentSet++
-//            startRest(ex.restSeconds)
-//            _state.update { it.copy(currentSet = currentSet, isResting = true, restSecondsLeft = ex.restSeconds) }
-//        } else {
-//            // переход к следующему упражнения
-//            currentExerciseIndex++
-//            currentSet = 1
-//            val next = workout?.exercises?.getOrNull(currentExerciseIndex)
-//            val nextNext = workout?.exercises?.getOrNull(currentExerciseIndex + 1)
-//            _state.update { it.copy(
-//                currentExercise = next,
-//                nextExercise = nextNext,
-//                currentSet = currentSet,
-//                isResting = false,
-//                restSecondsLeft = 0
-//            )}
-//        }
-//    }
-//
-//    private var restJob: Job? = null
-//    private fun startRest(seconds: Int) {
-//        restJob?.cancel()
-//        restJob = viewModelScope.launch {
-//            var left = seconds
-//            while (left > 0) {
-//                _state.update { it.copy(restSecondsLeft = left) }
-//                delay(1000)
-//                left--
-//            }
-//            _state.update { it.copy(isResting = false, restSecondsLeft = 0) }
-//        }
-//    }
-//
-//    fun stopRest() {
-//        restJob?.cancel()
-//        _state.update { it.copy(isResting = false, restSecondsLeft = 0) }
-//    }
-//}
-//
-//data class ListWorkoutState(
-//    val query: String = "",
-//    val workouts: List<Workout> = listOf()
-////    val workoutName: String = "",
-////    val currentExercise: Exercise? = null,
-////    val nextExercise: Exercise? = null,
-////    val currentSet: Int = 1,
-////    val isResting: Boolean = false,
-////    val restSecondsLeft: Int = 0
-//)
 

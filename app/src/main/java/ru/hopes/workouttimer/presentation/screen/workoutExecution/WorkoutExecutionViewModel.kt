@@ -1,55 +1,76 @@
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.domain.model.Workout
+import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
 import ru.hopes.workouttimer.presentation.utils.SoundPlayer
 import javax.inject.Inject
 
 @HiltViewModel
 class WorkoutExecutionViewModel @Inject constructor(
-    private val soundPlayer: SoundPlayer
+    private val soundPlayer: SoundPlayer,
+    private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase
 ) : ViewModel() {
 
-
-    private var exercises: List<Exercise> = listOf(
-        Exercise(0, "Жим лежа", 80, 3, 12, 60_000L, 1),
-        Exercise(1, "Разводка гантелей", 12, 3, 15, 45_000L, 2)
-    )
-    private val workout = Workout(
-        name = "день груди",
-        exercises = exercises,
-        lastUseAt = System.currentTimeMillis()
-    )
-
+    private var workout: Workout? = null
+    private var exercises: List<Exercise> = emptyList()
     private var exerciseIndex = 0
 
+    val workoutName: String
+        get() = workout?.name ?: ""
+
+    val totalExercises: Int
+        get() = exercises.size
+
+    val currentExerciseNumber: Int
+        get() = exerciseIndex + 1
 
     private val _uiState = MutableStateFlow<WorkoutExecutionState>(
-        WorkoutExecutionState.Rest(
-            exercise = Exercise(0, "Жим лежа", 80, 3, 12, 12_000L, 1),
-            currentSet = 1,
-        )
+        WorkoutExecutionState.Loading
     )
     val uiState: StateFlow<WorkoutExecutionState> = _uiState.asStateFlow()
 
     private var timerJob: Job? = null
 
-    init {
-        if (_uiState.value is WorkoutExecutionState.Rest) {
-            startRestTimer()
+    fun loadWorkout(workoutId: Int) {
+        viewModelScope.launch {
+            _uiState.value = WorkoutExecutionState.Loading
+            val loadedWorkout = getWorkoutByIdUseCase(workoutId)
+            
+            if (loadedWorkout != null && loadedWorkout.exercises.isNotEmpty()) {
+                workout = loadedWorkout
+                exercises = loadedWorkout.exercises.sortedBy { it.order }
+                exerciseIndex = 0
+                
+                // Начинаем с первого упражнения в состоянии Rest
+                val firstExercise = exercises[0]
+                _uiState.value = WorkoutExecutionState.Rest(
+                    exercise = firstExercise,
+                    currentSet = 1,
+                    totalSets = firstExercise.sets,
+                    restTimeMillis = firstExercise.timeMillis,
+                    totalRestTimeMillis = firstExercise.timeMillis
+                )
+                startRestTimer()
+            } else {
+                _uiState.value = WorkoutExecutionState.Error(
+                    message = "Тренировка не найдена или не содержит упражнений"
+                )
+            }
         }
     }
 
@@ -73,28 +94,23 @@ class WorkoutExecutionViewModel @Inject constructor(
     }
 
     fun startRestTimer() {
+        val currentState = _uiState.value as? WorkoutExecutionState.Rest ?: return
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
-            while (_uiState.value is WorkoutExecutionState.Rest) {
-                val currentState = _uiState.value as WorkoutExecutionState.Rest
-
-                if (currentState.restTimeMillis <= 0L) {
-                    onRestFinished()
-                    break
-                }
-                delay(1000L)
-                _uiState.update { state ->
-                    when (state) {
-                        is WorkoutExecutionState.Rest -> {
-                            state.copy(
-                                restTimeMillis = state.restTimeMillis - 1000L
-                            )
-                        }
-
-                        else -> state
+            countdownFlow(currentState.restTimeMillis)
+                .onCompletion { cause ->
+                    if (cause == null) {
+                        onRestFinished()
                     }
                 }
-            }
+                .collect { timeLeft ->
+                    _uiState.update { state ->
+                        when (state) {
+                            is WorkoutExecutionState.Rest -> state.copy(restTimeMillis = timeLeft)
+                            else -> state
+                        }
+                    }
+                }
         }
     }
 
@@ -103,53 +119,74 @@ class WorkoutExecutionViewModel @Inject constructor(
         soundPlayer.playSound(R.raw.soundgong) // <-- Воспроизводим звук
     }
 
+    private fun countdownFlow(
+        totalMillis: Long,
+        stepMillis: Long = 1_000L
+    ): Flow<Long> = flow {
+        var remaining = totalMillis.coerceAtLeast(0L)
+        emit(remaining)
+        while (remaining > 0L) {
+            delay(stepMillis)
+            remaining = (remaining - stepMillis).coerceAtLeast(0L)
+            emit(remaining)
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         soundPlayer.release() // <-- Освобождаем ресурсы здесь, в нужном месте
     }
 
     fun onExerciseFinished() {
-        // Здесь можно перейти к следующему подходу или завершить упражнение
-        // Для простоты — просто вернемся в режим отдыха (если есть еще подходы)
-
-        var shouldStartTimer = false
-
-        _uiState.update { state ->
-            when (state) {
-                is WorkoutExecutionState.Active -> {
-                    if (state.currentSet < state.totalSets) {
-
-                        shouldStartTimer = true
-
-                        WorkoutExecutionState.Rest(
-                            exercise = state.exercise,
-                            currentSet = state.currentSet + 1,
-                            totalSets = state.totalSets
-                        )
-                    } else {
-                        //Логика завершения всего упражнения— можно отправить событие навигации
-                        state
-                    }
-                }
-
-                else -> state
+        val currentState = _uiState.value
+        if (currentState is WorkoutExecutionState.Active) {
+            if (currentState.currentSet < currentState.totalSets) {
+                // Переход к следующему подходу того же упражнения
+                _uiState.value = WorkoutExecutionState.Rest(
+                    exercise = currentState.exercise,
+                    currentSet = currentState.currentSet + 1,
+                    totalSets = currentState.totalSets,
+                    restTimeMillis = currentState.exercise.timeMillis,
+                    totalRestTimeMillis = currentState.exercise.timeMillis
+                )
+                startRestTimer()
+            } else {
+                // Упражнение завершено, переходим к следующему
+                moveToNextExercise()
             }
         }
-        if (shouldStartTimer) {
-            startRestTimer()
-        }
+    }
 
+    private fun moveToNextExercise() {
+        if (exerciseIndex < exercises.size - 1) {
+            exerciseIndex++
+            val nextExercise = exercises[exerciseIndex]
+            _uiState.value = WorkoutExecutionState.Rest(
+                exercise = nextExercise,
+                currentSet = 1,
+                totalSets = nextExercise.sets,
+                restTimeMillis = nextExercise.timeMillis,
+                totalRestTimeMillis = nextExercise.timeMillis
+            )
+            startRestTimer()
+        } else {
+            // Все упражнения завершены
+            _uiState.value = WorkoutExecutionState.Finished
+        }
     }
 }
 
 sealed class WorkoutExecutionState {
-
+    data object Loading : WorkoutExecutionState()
+    
+    data class Error(val message: String) : WorkoutExecutionState()
+    
     data class Rest(
         val exercise: Exercise,
         val currentSet: Int,
         val totalSets: Int = exercise.sets,
-        val restTimeMillis: Long = exercise.restTimeMillis
-        // нужно еще количество всех тренировок также тотал и текущее но я тут осознал что не использую Workout так что получается собсна я говнокодю или делаючто то не так
+        val restTimeMillis: Long = exercise.timeMillis,
+        val totalRestTimeMillis: Long = exercise.timeMillis
     ) : WorkoutExecutionState()
 
     data class Active(
@@ -159,4 +196,6 @@ sealed class WorkoutExecutionState {
         val weight: Int = exercise.weight,
         val reps: Int = exercise.reps
     ) : WorkoutExecutionState()
+    
+    data object Finished : WorkoutExecutionState()
 }

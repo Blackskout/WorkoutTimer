@@ -6,6 +6,6 @@ package ru.hopes.workouttimer.domain.model
         val weight: Int,
         val sets: Int,
         val reps: Int,
-        val restTimeMillis: Long = 120_000L,
+        val timeMillis: Long = 120_000L,
         val order: Int
     )
