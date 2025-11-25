@@ -1,6 +1,7 @@
 package ru.hopes.workouttimer.presentation.utils
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -20,6 +21,11 @@ class VibrationManager @Inject constructor(
         context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
     }
 
+    private val alarmAudioAttributes: AudioAttributes = AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_ALARM)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+        .build()
+
     fun vibrate(durationMillis: Long = 700L) {
         val vib = vibrator ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -27,7 +33,8 @@ class VibrationManager @Inject constructor(
                 VibrationEffect.createOneShot(
                     durationMillis,
                     VibrationEffect.DEFAULT_AMPLITUDE
-                )
+                ),
+                alarmAudioAttributes
             )
         } else {
             @Suppress("DEPRECATION")
