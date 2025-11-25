@@ -18,12 +18,16 @@ import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
 import ru.hopes.workouttimer.presentation.utils.SoundPlayer
+import ru.hopes.workouttimer.presentation.utils.VibrationManager
+import ru.hopes.workouttimer.presentation.utils.WakeLockHelper
 import javax.inject.Inject
 
 @HiltViewModel
 class WorkoutExecutionViewModel @Inject constructor(
     private val soundPlayer: SoundPlayer,
-    private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase
+    private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
+    private val vibrationManager: VibrationManager,
+    private val wakeLockHelper: WakeLockHelper
 ) : ViewModel() {
 
     private var workout: Workout? = null
@@ -58,14 +62,11 @@ class WorkoutExecutionViewModel @Inject constructor(
                 
                 // Начинаем с первого упражнения в состоянии Rest
                 val firstExercise = exercises[0]
-                _uiState.value = WorkoutExecutionState.Rest(
+                _uiState.value = WorkoutExecutionState.Active(
                     exercise = firstExercise,
                     currentSet = 1,
                     totalSets = firstExercise.sets,
-                    restTimeMillis = firstExercise.timeMillis,
-                    totalRestTimeMillis = firstExercise.timeMillis
                 )
-                startRestTimer()
             } else {
                 _uiState.value = WorkoutExecutionState.Error(
                     message = "Тренировка не найдена или не содержит упражнений"
@@ -76,6 +77,7 @@ class WorkoutExecutionViewModel @Inject constructor(
 
     fun skipRest() {
         timerJob?.cancel()
+        wakeLockHelper.release()
         _uiState.update { state ->
             when (state) {
                 is WorkoutExecutionState.Rest -> {
@@ -96,11 +98,20 @@ class WorkoutExecutionViewModel @Inject constructor(
     fun startRestTimer() {
         val currentState = _uiState.value as? WorkoutExecutionState.Rest ?: return
         timerJob?.cancel()
+
+        wakeLockHelper.acquire()
+
+        val finishTime = System.currentTimeMillis() + currentState.restTimeMillis
+
+
+
         timerJob = viewModelScope.launch {
-            countdownFlow(currentState.restTimeMillis)
+            countdownFlow(finishTime)
                 .onCompletion { cause ->
                     if (cause == null) {
                         onRestFinished()
+                    } else {
+                        wakeLockHelper.release()
                     }
                 }
                 .collect { timeLeft ->
@@ -114,27 +125,33 @@ class WorkoutExecutionViewModel @Inject constructor(
         }
     }
 
-    private fun onRestFinished() {
-        timerJob?.cancel()
-        soundPlayer.playSound(R.raw.soundgong) // <-- Воспроизводим звук
+    private fun countdownFlow(finishTime: Long): Flow<Long> = flow {
+        while (true) {
+            val currentTime = System.currentTimeMillis()
+
+            val remaining = finishTime - currentTime
+
+            if (remaining <= 0) {
+                emit(0L)
+                break
+            }
+
+            emit(remaining)
+            delay(200)
+        }
     }
 
-    private fun countdownFlow(
-        totalMillis: Long,
-        stepMillis: Long = 1_000L
-    ): Flow<Long> = flow {
-        var remaining = totalMillis.coerceAtLeast(0L)
-        emit(remaining)
-        while (remaining > 0L) {
-            delay(stepMillis)
-            remaining = (remaining - stepMillis).coerceAtLeast(0L)
-            emit(remaining)
-        }
+    private fun onRestFinished() {
+        timerJob?.cancel()
+        soundPlayer.playSound(R.raw.timer)
+        vibrationManager.vibrate()
+        wakeLockHelper.release()
     }
 
     override fun onCleared() {
         super.onCleared()
         soundPlayer.release() // <-- Освобождаем ресурсы здесь, в нужном месте
+        wakeLockHelper.release()
     }
 
     fun onExerciseFinished() {
