@@ -42,11 +42,11 @@ class ListWorkoutViewModel @Inject constructor(
 //            addWorkoutUseCase(
 //                Workout(
 //                    0,
-//                    "Пятница",
+//                    "Тестовый 2",
 //                    listOf(
-//                        Exercise(0, "Жим ног", 180, 3, 12, 150_000, order),
-//                        Exercise(0, "Жим лежа", 35, 3, 12, 90_000, order++),
-//                        Exercise(0, "Спина", 61, 3, 12, 90_000, order),
+//                        Exercise(0, "Жим ног", 180, 3, 12, 1500_000, order),
+//                        Exercise(0, "Жим лежа", 35, 3, 12, 900_000, order++),
+//                        Exercise(0, "Спина", 61, 3, 12, 900_000, order),
 //                        Exercise(0, "Сгибание лежа", 50, 3, 12, 120_000, order++),
 //                        Exercise(0, "Плечи", 8, 3, 12, 90_000, order++),
 //                        Exercise(0, "Бицепс", 16, 3, 12, 90_000, order++),

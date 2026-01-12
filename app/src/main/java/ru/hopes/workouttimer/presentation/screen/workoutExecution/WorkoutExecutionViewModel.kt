@@ -1,6 +1,7 @@
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -146,6 +147,18 @@ class WorkoutExecutionViewModel @Inject constructor(
         soundPlayer.playSound(R.raw.timer)
         vibrationManager.vibrate()
         wakeLockHelper.release()
+        _uiState.update { state ->
+            when (state) {
+                is WorkoutExecutionState.Rest -> {
+                    WorkoutExecutionState.Active(
+                        exercise = state.exercise,
+                        currentSet = state.currentSet,
+                        totalSets = state.totalSets
+                    )
+                }
+                else -> state
+            }
+        }
     }
 
     override fun onCleared() {
@@ -191,6 +204,9 @@ class WorkoutExecutionViewModel @Inject constructor(
             _uiState.value = WorkoutExecutionState.Finished
         }
     }
+
+
+
 }
 
 sealed class WorkoutExecutionState {

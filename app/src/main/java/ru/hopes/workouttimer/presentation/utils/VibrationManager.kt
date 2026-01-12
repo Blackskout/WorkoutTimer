@@ -26,7 +26,7 @@ class VibrationManager @Inject constructor(
         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
         .build()
 
-    fun vibrate(durationMillis: Long = 700L) {
+    fun vibrate(durationMillis: Long = 1200L) {
         val vib = vibrator ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             vib.vibrate(
