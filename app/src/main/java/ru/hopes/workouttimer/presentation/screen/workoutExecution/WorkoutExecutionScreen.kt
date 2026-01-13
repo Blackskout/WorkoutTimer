@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import ru.hopes.workouttimer.presentation.components.SystemMediaControllerCompat
 
 // screens/WorkoutExecutionScreen.kt
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,38 +73,48 @@ fun WorkoutExecutionScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
         ) {
-            when (val currentState = uiState) {
-                is WorkoutExecutionState.Loading -> {
-                    LoadingState()
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                Box(modifier = Modifier.weight(1f)) {
+                    when (val currentState = uiState) {
+                        is WorkoutExecutionState.Loading -> {
+                            LoadingState()
+                        }
+                        is WorkoutExecutionState.Error -> {
+                            ErrorState(
+                                message = currentState.message,
+                                onRetry = { viewModel.loadWorkout(workoutId) }
+                            )
+                        }
+                        is WorkoutExecutionState.Rest -> {
+                            RestTimerContent(
+                                restState = currentState,
+                                currentExerciseNumber = viewModel.currentExerciseNumber,
+                                totalExercises = viewModel.totalExercises,
+                                onSkipTimer = { viewModel.skipRest() },
+                            )
+                        }
+                        is WorkoutExecutionState.Active -> {
+                            ActiveExerciseContent(
+                                activeState = currentState,
+                                currentExerciseNumber = viewModel.currentExerciseNumber,
+                                totalExercises = viewModel.totalExercises,
+                                onExerciseFinished = { viewModel.onExerciseFinished() }
+                            )
+                        }
+                        is WorkoutExecutionState.Finished -> {
+                            // Это состояние обрабатывается в LaunchedEffect выше
+                            LoadingState()
+                        }
+                    }
                 }
-                is WorkoutExecutionState.Error -> {
-                    ErrorState(
-                        message = currentState.message,
-                        onRetry = { viewModel.loadWorkout(workoutId) }
-                    )
-                }
-                is WorkoutExecutionState.Rest -> {
-                    RestTimerContent(
-                        restState = currentState,
-                        currentExerciseNumber = viewModel.currentExerciseNumber,
-                        totalExercises = viewModel.totalExercises,
-                        onSkipTimer = { viewModel.skipRest() },
-                    )
-                }
-                is WorkoutExecutionState.Active -> {
-                    ActiveExerciseContent(
-                        activeState = currentState,
-                        currentExerciseNumber = viewModel.currentExerciseNumber,
-                        totalExercises = viewModel.totalExercises,
-                        onExerciseFinished = { viewModel.onExerciseFinished() }
-                    )
-                }
-                is WorkoutExecutionState.Finished -> {
-                    // Это состояние обрабатывается в LaunchedEffect выше
-                    LoadingState()
-                }
+                
+                // MediaController для управления музыкой из других приложений
+                SystemMediaControllerCompat()
             }
         }
     }

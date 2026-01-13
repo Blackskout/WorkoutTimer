@@ -5,6 +5,11 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+<!--экспериментально-->
+    <queries>
+        <package android:name="ru.yandex.music" />
+    </queries>
+
     <application
         android:name=".WorkoutApp"
         android:allowBackup="true"
