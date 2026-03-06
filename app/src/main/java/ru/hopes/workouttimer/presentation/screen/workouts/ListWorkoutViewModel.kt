@@ -13,8 +13,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
-import ru.hopes.workouttimer.domain.model.Exercise
-import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.usecase.AddWorkoutUseCase
 import ru.hopes.workouttimer.domain.usecase.GetAllWorkoutsUseCase
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
@@ -37,16 +35,16 @@ class ListWorkoutViewModel @Inject constructor(
     val state = _state.asStateFlow()
 
     init {
-//        viewModelScope.launch {
+        viewModelScope.launch {
 //            var order = 1
 //            addWorkoutUseCase(
 //                Workout(
 //                    0,
-//                    "Тестовый 2",
+//                    "Тестовый 3",
 //                    listOf(
 //                        Exercise(0, "Жим ног", 180, 3, 12, 1500_000, order),
 //                        Exercise(0, "Жим лежа", 35, 3, 12, 900_000, order++),
-//                        Exercise(0, "Спина", 61, 3, 12, 900_000, order),
+//                        Exercise(0, "Спина", 61, 3, 12, 900_000, order++),
 //                        Exercise(0, "Сгибание лежа", 50, 3, 12, 120_000, order++),
 //                        Exercise(0, "Плечи", 8, 3, 12, 90_000, order++),
 //                        Exercise(0, "Бицепс", 16, 3, 12, 90_000, order++),
@@ -56,7 +54,69 @@ class ListWorkoutViewModel @Inject constructor(
 //                    System.currentTimeMillis()
 //                )
 //            )
-//        }
+
+
+//            addWorkoutUseCase(
+//
+//                    // ПОНЕДЕЛЬНИК
+//                    Workout(
+//                        id = 1,
+//                        name = "Понедельник",
+//                        lastUseAt = System.currentTimeMillis(),
+//                        exercises = listOf(
+//                            Exercise(id = 0, name = "Ягодичный мост", weight = 35.0, sets = 3, reps = 12, timeMillis = 150_000, order = 1),
+//                            Exercise(id = 0, name = "Жим лёжа (скамья на 5)", weight = 25.0, sets = 3, reps = 12, timeMillis = 150_000 , order = 2),
+//                            Exercise(id = 0, name = "Тяга верхнего блока шир. хватом", weight = 61.0, sets = 3, reps = 12, order = 3),
+//                            Exercise(id = 0, name = "Экстензия", weight = 12.5, sets = 3, reps = 12, order = 4),
+//                            Exercise(id = 0, name = "Трицепс с велосипедом", weight = 7.0, sets = 3, reps = 12, order = 5),
+//                            Exercise(id = 0, name = "Плечи", weight = 8.0, sets = 3, reps = 12, order = 6),
+//                            Exercise(id = 0, name = "Бицепс", weight = 13.0, sets = 3, reps = 12, order = 7)
+//                        )
+//                    )
+//            )
+//
+//            addWorkoutUseCase(
+//
+//                // СРЕДА
+//                Workout(
+//                    id = 2,
+//                    name = "Среда",
+//                    lastUseAt = System.currentTimeMillis(),
+//                    exercises = listOf(
+//                        Exercise(id = 0, name = "Тяга верхнего блока шир. хватом", weight = 61.0, sets = 3, reps = 12, order = 1),
+//                        Exercise(id = 0, name = "Жим лёжа (скамья на 5)", weight = 25.0, sets = 3, reps = 12, timeMillis = 150_000, order = 2),
+//                        Exercise(id = 0, name = "Ноги разгибание", weight = 88.0, sets = 3, reps = 12, timeMillis = 150_000, order = 3),
+//                        Exercise(id = 0, name = "Ноги сгибание", weight = 70.0, sets = 3, reps = 12, timeMillis = 150_000, order = 4),
+//                        Exercise(id = 0, name = "Плечи", weight = 8.0, sets = 3, reps = 12, order = 5),
+//                        Exercise(id = 0, name = "Трицепс с велосипедом", weight = 7.0, sets = 3, reps = 12, order = 6),
+//                        Exercise(id = 0, name = "Грудь горизонтальная тяга", weight = 35.0, sets = 3, reps = 12, order = 7),
+//                        Exercise(id = 0, name = "Бицепс", weight = 13.0, sets = 3, reps = 12, order = 8)
+//                    )
+//                )
+//            )
+//
+//            addWorkoutUseCase(
+//
+//                // ПЯТНИЦА
+//                Workout(
+//                    id = 3,
+//                    name = "Пятница",
+//                    lastUseAt = System.currentTimeMillis(),
+//                    exercises = listOf(
+//                        Exercise(id = 0, name = "Жим ног", weight = 180.0, sets = 3, reps = 12, timeMillis = 150_000, order = 1),
+//                        Exercise(id = 0, name = "Жим лёжа (скамья на 5)", weight = 25.0, sets = 3, reps = 12, timeMillis = 150_000, order = 2),
+//                        Exercise(id = 0, name = "Тяга верхнего блока шир. хватом", weight = 61.0, sets = 3, reps = 12, order = 3),
+//                        Exercise(id = 0, name = "Сгибание лежа", weight = 50.0, sets = 3, reps = 12, timeMillis = 150_000, order = 4),
+//                        Exercise(id = 0, name = "Плечи", weight = 8.0, sets = 3, reps = 12, order = 5),
+//                        Exercise(id = 0, name = "Бицепс", weight = 13.0, sets = 3, reps = 12, order = 6),
+//                        Exercise(id = 0, name = "Трицепс с велосипедом", weight = 7.0, sets = 3, reps = 12, order = 7),
+//                        Exercise(id = 0, name = "Хаммер на спину", weight = 47.5, sets = 3, reps = 12, timeMillis = 150_000, order = 8)
+//                    )
+//                )
+//            )
+
+
+        }
 
 
         query

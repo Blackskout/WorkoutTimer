@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
 import androidx.compose.animation.core.LinearEasing
@@ -16,23 +18,33 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.presentation.components.SystemMediaControllerCompat
+import ru.hopes.workouttimer.presentation.utils.toCorrectNum
 
 // screens/WorkoutExecutionScreen.kt
 @OptIn(ExperimentalMaterial3Api::class)
@@ -79,6 +91,25 @@ fun WorkoutExecutionScreen(
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
+
+                val currentState = uiState
+                if (currentState is WorkoutExecutionState.Rest || currentState is WorkoutExecutionState.Active) {
+                    val currentEx = when (currentState) {
+                        is WorkoutExecutionState.Rest -> currentState.exercise
+                        is WorkoutExecutionState.Active -> currentState.exercise
+                        else -> null
+                    }
+
+                    currentEx?.let {
+                        ExercisesDropdown(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                            exercises = viewModel.exercises,
+                            selectedExercise = it,
+                            onExerciseSelected = { viewModel.moveToSelectedExercise(it) }
+                        )
+                    }
+                }
+
                 Box(modifier = Modifier.weight(1f)) {
                     when (val currentState = uiState) {
                         is WorkoutExecutionState.Loading -> {
@@ -97,6 +128,7 @@ fun WorkoutExecutionScreen(
                                 totalExercises = viewModel.totalExercises,
                                 onSkipTimer = { viewModel.skipRest() },
                             )
+
                         }
                         is WorkoutExecutionState.Active -> {
                             ActiveExerciseContent(
@@ -105,6 +137,7 @@ fun WorkoutExecutionScreen(
                                 totalExercises = viewModel.totalExercises,
                                 onExerciseFinished = { viewModel.onExerciseFinished() }
                             )
+
                         }
                         is WorkoutExecutionState.Finished -> {
                             // Это состояние обрабатывается в LaunchedEffect выше
@@ -118,6 +151,50 @@ fun WorkoutExecutionScreen(
             }
         }
     }
+}
+
+@Composable
+private fun ExercisesDropdown(
+    modifier: Modifier = Modifier,
+    exercises: List<Exercise>,
+    selectedExercise: Exercise,
+    onExerciseSelected: (Exercise) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        modifier = modifier.fillMaxWidth(),
+        expanded = expanded,
+        onExpandedChange = { expanded = it }
+    ) {
+        TextField(
+            modifier = Modifier.fillMaxWidth()
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
+            value = selectedExercise.name,
+            onValueChange = {},
+            readOnly = true,
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            }
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            exercises.forEach { exercise ->
+                DropdownMenuItem(
+                    text = {
+                        Text(exercise.name)
+                    },
+                    onClick = {
+                        onExerciseSelected(exercise)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+
 }
 
 
@@ -202,7 +279,7 @@ fun RestTimerContent(
         )
 
         Text(
-            text = "${restState.exercise.weight} кг",
+            text = "${restState.exercise.weight.toCorrectNum()} кг",
             style = MaterialTheme.typography.bodyLarge
         )
 
@@ -295,7 +372,7 @@ fun ActiveExerciseContent(
         )
 
         Text(
-            text = "${activeState.weight} кг",
+            text = "${activeState.weight.toCorrectNum()} кг",
             style = MaterialTheme.typography.bodyLarge
         )
 

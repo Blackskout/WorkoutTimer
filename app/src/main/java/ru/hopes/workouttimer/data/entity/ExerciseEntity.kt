@@ -8,7 +8,7 @@ data class ExerciseEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val workoutId: Long,
     val name: String,
-    val weight: Int,
+    val weight: Double,
     val sets: Int,
     val reps: Int,
     val restTimeMillis: Long,

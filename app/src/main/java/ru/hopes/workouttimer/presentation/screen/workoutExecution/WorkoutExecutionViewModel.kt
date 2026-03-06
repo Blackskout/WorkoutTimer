@@ -1,7 +1,6 @@
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -32,7 +31,7 @@ class WorkoutExecutionViewModel @Inject constructor(
 ) : ViewModel() {
 
     private var workout: Workout? = null
-    private var exercises: List<Exercise> = emptyList()
+    var exercises: List<Exercise> = emptyList()
     private var exerciseIndex = 0
 
     val workoutName: String
@@ -205,6 +204,24 @@ class WorkoutExecutionViewModel @Inject constructor(
         }
     }
 
+    fun moveToSelectedExercise(exercise: Exercise) {
+        // 1. Находим реальный индекс упражнения в текущем списке
+        val index = exercises.indexOfFirst { it.id == exercise.id }
+
+        if (index != -1) {
+            timerJob?.cancel() // Обязательно останавливаем текущий таймер перед сменой
+            exerciseIndex = index
+            val nextExercise = exercises[exerciseIndex]
+
+            _uiState.value = WorkoutExecutionState.Active(
+                exercise = nextExercise,
+                currentSet = 1,
+                totalSets = nextExercise.sets
+            )
+            startRestTimer()
+        }
+    }
+
 
 
 }
@@ -226,7 +243,7 @@ sealed class WorkoutExecutionState {
         val exercise: Exercise,
         val currentSet: Int,
         val totalSets: Int = exercise.sets,
-        val weight: Int = exercise.weight,
+        val weight: Double = exercise.weight,
         val reps: Int = exercise.reps
     ) : WorkoutExecutionState()
     
