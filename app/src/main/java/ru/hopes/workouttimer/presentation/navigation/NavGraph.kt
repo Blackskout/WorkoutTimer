@@ -10,6 +10,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import ru.hopes.workouttimer.presentation.screen.creation.CreateWorkoutScreen
 import ru.hopes.workouttimer.presentation.screen.workoutExecution.WorkoutExecutionScreen
 import ru.hopes.workouttimer.presentation.screen.workouts.ListWorkoutScreen
 
@@ -28,7 +29,7 @@ fun NavGraph() {
                 modifier = Modifier.fillMaxSize(),
                 viewModel = hiltViewModel(),
                 onAddWorkoutClick = {
-                    // TODO
+                    navController.navigate(Screen.CreateWorkout.route)
                 },
                 onLongClick = {
                     // TODO
@@ -37,6 +38,17 @@ fun NavGraph() {
                 // Мы собираем ссылку вручную: "execution_screen/5"
                 onWorkoutClick = { workout ->
                     navController.navigate(Screen.Execution.createRoute(workout.id))
+                }
+            )
+        }
+
+        // Экран создания тренировки
+        composable(Screen.CreateWorkout.route) {
+            CreateWorkoutScreen(
+                modifier = Modifier.fillMaxSize(),
+                viewModel = hiltViewModel(),
+                onFinished = {
+                    navController.popBackStack()
                 }
             )
         }
@@ -62,6 +74,7 @@ fun NavGraph() {
 
 private sealed class Screen(val route: String) {
     data object Workouts : Screen("workouts")
+    data object CreateWorkout : Screen("create_workout")
 
     // ВАЖНО: Маршрут должен содержать placeholder {workout_id}
     data object Execution : Screen("execution/{workout_id}") {

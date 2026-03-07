@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
+import ru.hopes.workouttimer.domain.model.Exercise
+import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.usecase.AddWorkoutUseCase
 import ru.hopes.workouttimer.domain.usecase.GetAllWorkoutsUseCase
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
@@ -36,26 +38,26 @@ class ListWorkoutViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-//            var order = 1
+            var order = 1
 //            addWorkoutUseCase(
 //                Workout(
 //                    0,
 //                    "Тестовый 3",
 //                    listOf(
-//                        Exercise(0, "Жим ног", 180, 3, 12, 1500_000, order),
-//                        Exercise(0, "Жим лежа", 35, 3, 12, 900_000, order++),
-//                        Exercise(0, "Спина", 61, 3, 12, 900_000, order++),
-//                        Exercise(0, "Сгибание лежа", 50, 3, 12, 120_000, order++),
-//                        Exercise(0, "Плечи", 8, 3, 12, 90_000, order++),
-//                        Exercise(0, "Бицепс", 16, 3, 12, 90_000, order++),
-//                        Exercise(0, "Трицепс велосипедои", 7, 3, 12, 90_000, order++),
-//                        Exercise(0, "Спина в хаммере", 48, 3, 12, 120_000, order++),
+//                        Exercise(0, "Жим ног", 180.0, 3, 12, 1500_000, order),
+//                        Exercise(0, "Жим лежа", 35.0, 3, 12, 900_000, order++),
+//                        Exercise(0, "Спина", 61.0, 3, 12, 900_000, order++),
+//                        Exercise(0, "Сгибание лежа", 50.0, 3, 12, 120_000, order++),
+//                        Exercise(0, "Плечи", 8.0, 3, 12, 90_000, order++),
+//                        Exercise(0, "Бицепс", 16.0, 3, 12, 90_000, order++),
+//                        Exercise(0, "Трицепс велосипедои", 7.0, 3, 12, 90_000, order++),
+//                        Exercise(0, "Спина в хаммере", 48.0, 3, 12, 120_000, order++),
 //                    ),
 //                    System.currentTimeMillis()
 //                )
 //            )
-
-
+//
+//
 //            addWorkoutUseCase(
 //
 //                    // ПОНЕДЕЛЬНИК
@@ -94,7 +96,7 @@ class ListWorkoutViewModel @Inject constructor(
 //                    )
 //                )
 //            )
-//
+
 //            addWorkoutUseCase(
 //
 //                // ПЯТНИЦА
