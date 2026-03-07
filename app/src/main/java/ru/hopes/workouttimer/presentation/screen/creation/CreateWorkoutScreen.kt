@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -47,8 +48,15 @@ fun CreateWorkoutScreen(
     modifier: Modifier = Modifier,
     viewModel: CreateWorkoutViewModel = hiltViewModel(),
     onFinished: () -> Unit,
+    workoutId: Int? = null
 ) {
     val state by viewModel.state.collectAsState()
+
+    LaunchedEffect(workoutId) {
+        workoutId?.let { id ->
+            viewModel.loadWorkout(id)
+        }
+    }
 
     if (state.isFinished) {
         onFinished()
@@ -61,7 +69,7 @@ fun CreateWorkoutScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Новая тренировка",
+                        text = if (workoutId == null) "Новая тренировка" else "Редактирование",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground

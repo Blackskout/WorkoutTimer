@@ -1,8 +1,10 @@
 package ru.hopes.workouttimer.data
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import ru.hopes.workouttimer.data.dao.WorkoutDao
 import ru.hopes.workouttimer.data.dao.WorkoutWithExercises
 import ru.hopes.workouttimer.data.entity.ExerciseEntity
@@ -33,11 +35,36 @@ class WorkoutRepositoryImpl @Inject constructor(
     }
 
     override suspend fun updateWorkout(workout: Workout) {
-        TODO("Not yet implemented")
+        withContext(Dispatchers.IO) {
+            // Обновляем тренировку
+            dao.updateWorkout(
+                id = workout.id,
+                name = workout.name,
+                lastUseAt = workout.lastUseAt
+            )
+            
+            // Удаляем старые упражнения и добавляем новые
+            dao.deleteExercisesByWorkoutId(workout.id.toLong())
+            
+            val exerciseEntities = workout.exercises.mapIndexed { idx, ex ->
+                ExerciseEntity(
+                    workoutId = workout.id.toLong(),
+                    name = ex.name,
+                    weight = ex.weight,
+                    sets = ex.sets,
+                    reps = ex.reps,
+                    restTimeMillis = ex.timeMillis,
+                    orderInWorkout = ex.order
+                )
+            }
+            dao.insertExercises(exerciseEntities)
+        }
     }
 
-    override fun deleteWorkout(workout: WorkoutEntity) {
-        dao.deleteWorkout(workout)
+    override suspend fun deleteWorkout(workout: WorkoutEntity) {
+        withContext(Dispatchers.IO) {
+            dao.deleteWorkout(workout)
+        }
     }
 
     override fun searchWorkoutUseCase(query: String): Flow<List<WorkoutEntity>> {

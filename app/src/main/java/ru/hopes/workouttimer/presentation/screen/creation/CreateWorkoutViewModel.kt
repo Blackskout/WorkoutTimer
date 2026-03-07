@@ -10,15 +10,21 @@ import kotlinx.coroutines.launch
 import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.usecase.AddWorkoutUseCase
+import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
+import ru.hopes.workouttimer.domain.usecase.UpdateWorkoutUseCase
 import javax.inject.Inject
 
 @HiltViewModel
 class CreateWorkoutViewModel @Inject constructor(
-    private val addWorkoutUseCase: AddWorkoutUseCase
+    private val addWorkoutUseCase: AddWorkoutUseCase,
+    private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
+    private val updateWorkoutUseCase: UpdateWorkoutUseCase
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(CreateWorkoutState())
     val state = _state.asStateFlow()
+    
+    private var editingWorkoutId: Int? = null
 
     fun processCommand(command: CreateWorkoutCommand) {
         when (command) {
@@ -75,12 +81,17 @@ class CreateWorkoutViewModel @Inject constructor(
 
                     if (_state.value.workoutName.isNotBlank() && validExercises.isNotEmpty()) {
                         val workout = Workout(
-                            id = 0,
+                            id = editingWorkoutId ?: 0,
                             name = _state.value.workoutName,
                             exercises = validExercises,
                             lastUseAt = System.currentTimeMillis()
                         )
-                        addWorkoutUseCase(workout)
+                        
+                        if (editingWorkoutId != null) {
+                            updateWorkoutUseCase(workout)
+                        } else {
+                            addWorkoutUseCase(workout)
+                        }
                         _state.update { it.copy(isFinished = true) }
                     }
                 }
@@ -88,6 +99,31 @@ class CreateWorkoutViewModel @Inject constructor(
 
             CreateWorkoutCommand.Back -> {
                 _state.update { it.copy(isFinished = true) }
+            }
+        }
+    }
+    
+    fun loadWorkout(workoutId: Int) {
+        viewModelScope.launch {
+            val workout = getWorkoutByIdUseCase(workoutId)
+            workout?.let { w ->
+                editingWorkoutId = w.id
+                _state.update {
+                    CreateWorkoutState(
+                        workoutName = w.name,
+                        exercises = w.exercises.map { ex ->
+                            ExerciseItem(
+                                id = ex.id,
+                                name = ex.name,
+                                weight = ex.weight,
+                                sets = ex.sets,
+                                reps = ex.reps,
+                                restTimeSeconds = (ex.timeMillis / 1000).toInt()
+                            )
+                        },
+                        isFinished = false
+                    )
+                }
             }
         }
     }

@@ -13,9 +13,8 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
-import ru.hopes.workouttimer.domain.model.Exercise
-import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.usecase.AddWorkoutUseCase
+import ru.hopes.workouttimer.domain.usecase.DeleteWorkoutUseCase
 import ru.hopes.workouttimer.domain.usecase.GetAllWorkoutsUseCase
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
 import ru.hopes.workouttimer.domain.usecase.SearchWorkoutsUseCase
@@ -28,6 +27,7 @@ class ListWorkoutViewModel @Inject constructor(
     private val searchWorkoutsUseCase: SearchWorkoutsUseCase,
     private val addWorkoutUseCase: AddWorkoutUseCase,
     private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
+    private val deleteWorkoutUseCase: DeleteWorkoutUseCase,
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -140,6 +140,12 @@ class ListWorkoutViewModel @Inject constructor(
 
     fun updateSearchQuery(newQuery: String) {
         query.update { newQuery.trim() }
+    }
+
+    fun deleteWorkout(workout: WorkoutEntity) {
+        viewModelScope.launch {
+            deleteWorkoutUseCase(workout)
+        }
     }
 
 }
