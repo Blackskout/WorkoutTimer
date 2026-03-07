@@ -41,7 +41,8 @@ class CreateWorkoutViewModel @Inject constructor(
                             weight = 0.0,
                             sets = 4,
                             reps = 12,
-                            restTimeSeconds = 120
+                            restTimeSeconds = 120,
+                            note = ""
                         )
                     )
                 }
@@ -63,6 +64,16 @@ class CreateWorkoutViewModel @Inject constructor(
                 }
             }
 
+            is CreateWorkoutCommand.UpdateExerciseNote -> {
+                _state.update {
+                    it.copy(
+                        exercises = it.exercises.map { ex ->
+                            if (ex.id == command.id) ex.copy(note = command.note) else ex
+                        }
+                    )
+                }
+            }
+
             CreateWorkoutCommand.Save -> {
                 viewModelScope.launch {
                     val validExercises = _state.value.exercises
@@ -75,7 +86,8 @@ class CreateWorkoutViewModel @Inject constructor(
                                 sets = ex.sets,
                                 reps = ex.reps,
                                 timeMillis = ex.restTimeSeconds * 1000L,
-                                order = index + 1
+                                order = index + 1,
+                                note = ex.note
                             )
                         }
 
@@ -86,7 +98,7 @@ class CreateWorkoutViewModel @Inject constructor(
                             exercises = validExercises,
                             lastUseAt = System.currentTimeMillis()
                         )
-                        
+
                         if (editingWorkoutId != null) {
                             updateWorkoutUseCase(workout)
                         } else {
@@ -118,7 +130,8 @@ class CreateWorkoutViewModel @Inject constructor(
                                 weight = ex.weight,
                                 sets = ex.sets,
                                 reps = ex.reps,
-                                restTimeSeconds = (ex.timeMillis / 1000).toInt()
+                                restTimeSeconds = (ex.timeMillis / 1000).toInt(),
+                                note = ex.note
                             )
                         },
                         isFinished = false
@@ -134,6 +147,7 @@ sealed interface CreateWorkoutCommand {
     data class UpdateExercise(val id: Int, val exercise: ExerciseItem) : CreateWorkoutCommand
     data class AddExercise(val dummy: Unit = Unit) : CreateWorkoutCommand
     data class RemoveExercise(val id: Int) : CreateWorkoutCommand
+    data class UpdateExerciseNote(val id: Int, val note: String) : CreateWorkoutCommand
     data object Save : CreateWorkoutCommand
     data object Back : CreateWorkoutCommand
 }
@@ -144,7 +158,8 @@ data class ExerciseItem(
     val weight: Double,
     val sets: Int,
     val reps: Int,
-    val restTimeSeconds: Int
+    val restTimeSeconds: Int,
+    val note: String = ""
 )
 
 data class CreateWorkoutState(

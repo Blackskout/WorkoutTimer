@@ -2,8 +2,6 @@ package ru.hopes.workouttimer.presentation.components
 
 import android.content.Context
 import android.content.Intent
-import android.media.AudioManager
-import android.os.Build
 import android.view.KeyEvent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -17,6 +15,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,16 +30,18 @@ fun SystemMediaControllerCompat(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    
+    // Менеджер для отправки медиа-команд
+    val mediaButtonManager = remember { MediaButtonManager(context) }
 
-
-    // Кнопки управления через AudioManager
+    // Кнопки управления медиа
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
 
+        // Кнопка открытия Яндекс.Музыки
         IconButton(
             onClick = {
                 val packageName = "ru.yandex.music"
@@ -78,11 +79,11 @@ fun SystemMediaControllerCompat(
             )
         }
 
+        // Кнопка предыдущего трека
         IconButton(
             onClick = {
-                sendMediaKeyEvent(context, audioManager, KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+                mediaButtonManager.sendMediaCommand(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
             },
-            enabled = audioManager != null,
             modifier = Modifier.size(90.dp)
         ) {
             Icon(
@@ -92,11 +93,11 @@ fun SystemMediaControllerCompat(
             )
         }
 
+        // Кнопка play/pause
         IconButton(
             onClick = {
-                sendMediaKeyEvent(context, audioManager, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                mediaButtonManager.sendMediaCommand(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
             },
-            enabled = audioManager != null,
             modifier = Modifier.size(90.dp)
         ) {
             Icon(
@@ -107,11 +108,11 @@ fun SystemMediaControllerCompat(
             )
         }
 
+        // Кнопка следующего трека
         IconButton(
             onClick = {
-                sendMediaKeyEvent(context, audioManager, KeyEvent.KEYCODE_MEDIA_NEXT)
+                mediaButtonManager.sendMediaCommand(KeyEvent.KEYCODE_MEDIA_NEXT)
             },
-            enabled = audioManager != null,
             modifier = Modifier.size(90.dp)
         ) {
             Icon(
@@ -120,26 +121,5 @@ fun SystemMediaControllerCompat(
                 modifier = Modifier.size(40.dp)
             )
         }
-    }
-}
-
-private fun sendMediaKeyEvent(context: Context, audioManager: AudioManager?, keyCode: Int) {
-    if (audioManager == null) return
-
-    try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            val downEvent = KeyEvent(KeyEvent.ACTION_DOWN, keyCode)
-            val upEvent = KeyEvent(KeyEvent.ACTION_UP, keyCode)
-
-            audioManager.dispatchMediaKeyEvent(downEvent)
-            audioManager.dispatchMediaKeyEvent(upEvent)
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
-            @Suppress("DEPRECATION")
-            audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
-        }
-    } catch (e: Exception) {
-        e.printStackTrace()
     }
 }

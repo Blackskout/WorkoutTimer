@@ -102,7 +102,7 @@ fun ListWorkoutScreen(
             ) {
                 Icon(
                     modifier = Modifier.size(50.dp),
-                    painter = painterResource(R.drawable.add_circle_svgrepo_com),
+                    painter = painterResource(R.drawable.outline_add_circle_24),
                     contentDescription = null
                 )
             }

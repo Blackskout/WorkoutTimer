@@ -42,10 +42,10 @@ class WorkoutRepositoryImpl @Inject constructor(
                 name = workout.name,
                 lastUseAt = workout.lastUseAt
             )
-            
+
             // Удаляем старые упражнения и добавляем новые
             dao.deleteExercisesByWorkoutId(workout.id.toLong())
-            
+
             val exerciseEntities = workout.exercises.mapIndexed { idx, ex ->
                 ExerciseEntity(
                     workoutId = workout.id.toLong(),
@@ -54,7 +54,8 @@ class WorkoutRepositoryImpl @Inject constructor(
                     sets = ex.sets,
                     reps = ex.reps,
                     restTimeMillis = ex.timeMillis,
-                    orderInWorkout = ex.order
+                    orderInWorkout = ex.order,
+                    note = ex.note
                 )
             }
             dao.insertExercises(exerciseEntities)
@@ -82,7 +83,8 @@ class WorkoutRepositoryImpl @Inject constructor(
                 sets = ex.sets,
                 reps = ex.reps,
                 restTimeMillis = ex.timeMillis,
-                orderInWorkout = ex.order
+                orderInWorkout = ex.order,
+                note = ex.note
             )
         }
         dao.insertExercises(exerciseEntities)

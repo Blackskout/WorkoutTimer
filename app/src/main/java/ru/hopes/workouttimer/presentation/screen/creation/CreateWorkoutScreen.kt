@@ -186,6 +186,14 @@ fun CreateWorkoutScreen(
                                 )
                             )
                         },
+                        onNoteChange = {
+                            viewModel.processCommand(
+                                CreateWorkoutCommand.UpdateExerciseNote(
+                                    exercise.id,
+                                    it
+                                )
+                            )
+                        },
                         onRemoveClick = {
                             viewModel.processCommand(CreateWorkoutCommand.RemoveExercise(exercise.id))
                         }
@@ -232,6 +240,7 @@ private fun ExerciseItem(
     onSetsChange: (Int) -> Unit,
     onRepsChange: (Int) -> Unit,
     onRestTimeChange: (Int) -> Unit,
+    onNoteChange: (String) -> Unit,
     onRemoveClick: () -> Unit,
 ) {
     Column(
@@ -319,6 +328,18 @@ private fun ExerciseItem(
                 shape = RoundedCornerShape(8.dp)
             )
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = exercise.note,
+            onValueChange = onNoteChange,
+            label = { Text("Заметка") },
+            placeholder = { Text("Добавить заметку к упражнению") },
+            minLines = 2,
+            shape = RoundedCornerShape(8.dp)
+        )
     }
 }
 

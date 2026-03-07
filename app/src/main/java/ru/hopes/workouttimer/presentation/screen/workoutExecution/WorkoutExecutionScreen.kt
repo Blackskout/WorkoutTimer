@@ -288,6 +288,21 @@ fun RestTimerContent(
             style = MaterialTheme.typography.bodyLarge
         )
 
+        if (restState.exercise.note.isNotBlank()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Text(
+                text = "Заметка:",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = restState.exercise.note,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
@@ -380,6 +395,21 @@ fun ActiveExerciseContent(
             text = "${activeState.reps} повторений",
             style = MaterialTheme.typography.bodyLarge
         )
+
+        if (activeState.exercise.note.isNotBlank()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Text(
+                text = "Заметка:",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = activeState.exercise.note,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
 
         Spacer(modifier = Modifier.height(64.dp))
 

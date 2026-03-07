@@ -12,5 +12,6 @@ data class ExerciseEntity(
     val sets: Int,
     val reps: Int,
     val restTimeMillis: Long,
-    val orderInWorkout: Int
+    val orderInWorkout: Int,
+    val note: String = ""
 )
