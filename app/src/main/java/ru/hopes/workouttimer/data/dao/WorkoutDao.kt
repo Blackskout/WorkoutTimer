@@ -47,4 +47,7 @@ interface WorkoutDao {
         """
     )
     fun searchWorkouts(query: String): Flow<List<WorkoutEntity>>
+
+    @Query("UPDATE exercises SET note = :note WHERE id = :exerciseId")
+    suspend fun updateExerciseNote(exerciseId: Int, note: String)
 }

@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.domain.model.Workout
+import ru.hopes.workouttimer.domain.repository.WorkoutRepository
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
 import ru.hopes.workouttimer.presentation.utils.SoundPlayer
 import ru.hopes.workouttimer.presentation.utils.VibrationManager
@@ -27,7 +28,8 @@ class WorkoutExecutionViewModel @Inject constructor(
     private val soundPlayer: SoundPlayer,
     private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
     private val vibrationManager: VibrationManager,
-    private val wakeLockHelper: WakeLockHelper
+    private val wakeLockHelper: WakeLockHelper,
+    private val workoutRepository: WorkoutRepository
 ) : ViewModel() {
 
     private var workout: Workout? = null
@@ -219,6 +221,41 @@ class WorkoutExecutionViewModel @Inject constructor(
                 totalSets = nextExercise.sets
             )
             startRestTimer()
+        }
+    }
+
+    fun updateExerciseNote(exerciseId: Int, note: String) {
+        viewModelScope.launch {
+            workoutRepository.updateExerciseNote(exerciseId, note)
+            
+            // Обновляем локальный список упражнений
+            val exerciseIndex = exercises.indexOfFirst { it.id == exerciseId }
+            if (exerciseIndex != -1) {
+                val updatedExercise = exercises[exerciseIndex].copy(note = note)
+                exercises = exercises.toMutableList().apply {
+                    set(exerciseIndex, updatedExercise)
+                }
+                
+                // Обновляем текущее состояние, если это текущее упражнение
+                val currentState = _uiState.value
+                when (currentState) {
+                    is WorkoutExecutionState.Active -> {
+                        if (currentState.exercise.id == exerciseId) {
+                            _uiState.value = currentState.copy(
+                                exercise = updatedExercise
+                            )
+                        }
+                    }
+                    is WorkoutExecutionState.Rest -> {
+                        if (currentState.exercise.id == exerciseId) {
+                            _uiState.value = currentState.copy(
+                                exercise = updatedExercise
+                            )
+                        }
+                    }
+                    else -> {}
+                }
+            }
         }
     }
 

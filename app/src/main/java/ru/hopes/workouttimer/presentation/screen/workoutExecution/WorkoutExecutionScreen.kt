@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -26,8 +28,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -39,7 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.hopes.workouttimer.domain.model.Exercise
@@ -56,6 +60,10 @@ fun WorkoutExecutionScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val workoutName = viewModel.workoutName
+
+    // Состояние для диалога редактирования заметки
+    var showNoteDialog by remember { mutableStateOf(false) }
+    var currentEditingExercise by remember { mutableStateOf<Exercise?>(null) }
 
     // Загружаем тренировку при первом запуске
     LaunchedEffect(workoutId) {
@@ -89,7 +97,7 @@ fun WorkoutExecutionScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
             ) {
 
                 val currentState = uiState
@@ -102,7 +110,9 @@ fun WorkoutExecutionScreen(
 
                     currentEx?.let {
                         ExercisesDropdown(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp),
                             exercises = viewModel.exercises,
                             selectedExercise = it,
                             onExerciseSelected = { viewModel.moveToSelectedExercise(it) }
@@ -115,40 +125,66 @@ fun WorkoutExecutionScreen(
                         is WorkoutExecutionState.Loading -> {
                             LoadingState()
                         }
+
                         is WorkoutExecutionState.Error -> {
                             ErrorState(
                                 message = currentState.message,
                                 onRetry = { viewModel.loadWorkout(workoutId) }
                             )
                         }
+
                         is WorkoutExecutionState.Rest -> {
                             RestTimerContent(
                                 restState = currentState,
                                 currentExerciseNumber = viewModel.currentExerciseNumber,
                                 totalExercises = viewModel.totalExercises,
                                 onSkipTimer = { viewModel.skipRest() },
+                                onEditNote = { exercise ->
+                                    currentEditingExercise = exercise
+                                    showNoteDialog = true
+                                }
                             )
 
                         }
+
                         is WorkoutExecutionState.Active -> {
                             ActiveExerciseContent(
                                 activeState = currentState,
                                 currentExerciseNumber = viewModel.currentExerciseNumber,
                                 totalExercises = viewModel.totalExercises,
-                                onExerciseFinished = { viewModel.onExerciseFinished() }
+                                onExerciseFinished = { viewModel.onExerciseFinished() },
+                                onEditNote = { exercise ->
+                                    currentEditingExercise = exercise
+                                    showNoteDialog = true
+                                }
                             )
 
                         }
+
                         is WorkoutExecutionState.Finished -> {
                             // Это состояние обрабатывается в LaunchedEffect выше
                             LoadingState()
                         }
                     }
                 }
-                
+
                 // MediaController для управления музыкой из других приложений
                 SystemMediaControllerCompat()
             }
+        }
+    }
+
+    // Диалог редактирования заметки
+    currentEditingExercise?.let { exercise ->
+        if (showNoteDialog) {
+            NoteEditDialog(
+                exercise = exercise,
+                onDismiss = { showNoteDialog = false },
+                onSave = { note ->
+                    viewModel.updateExerciseNote(exercise.id, note)
+                    showNoteDialog = false
+                }
+            )
         }
     }
 }
@@ -168,7 +204,8 @@ private fun ExercisesDropdown(
         onExpandedChange = { expanded = it }
     ) {
         TextField(
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
                 .menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
             value = selectedExercise.name,
             onValueChange = {},
@@ -249,6 +286,7 @@ fun RestTimerContent(
     currentExerciseNumber: Int,
     totalExercises: Int,
     onSkipTimer: () -> Unit,
+    onEditNote: (Exercise) -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -288,19 +326,47 @@ fun RestTimerContent(
             style = MaterialTheme.typography.bodyLarge
         )
 
-        if (restState.exercise.note.isNotBlank()) {
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Text(
-                text = "Заметка:",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = restState.exercise.note,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        // Кнопка и текст заметки
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Заметка:",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                IconButton(
+                    onClick = { onEditNote(restState.exercise) },
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .size(16.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "Редактировать заметку",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            if (restState.exercise.note.isNotBlank()) {
+                Text(
+                    text = restState.exercise.note,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                Text(
+                    text = "Нет заметок",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -361,7 +427,8 @@ fun ActiveExerciseContent(
     activeState: WorkoutExecutionState.Active,
     currentExerciseNumber: Int,
     totalExercises: Int,
-    onExerciseFinished: () -> Unit
+    onExerciseFinished: () -> Unit,
+    onEditNote: (Exercise) -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -396,19 +463,47 @@ fun ActiveExerciseContent(
             style = MaterialTheme.typography.bodyLarge
         )
 
-        if (activeState.exercise.note.isNotBlank()) {
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Text(
-                text = "Заметка:",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = activeState.exercise.note,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        // Кнопка и текст заметки
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Заметка:",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                IconButton(
+                    onClick = { onEditNote(activeState.exercise) },
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .size(16.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "Редактировать заметку",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            if (activeState.exercise.note.isNotBlank()) {
+                Text(
+                    text = activeState.exercise.note,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                Text(
+                    text = "Нет заметок",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(64.dp))
@@ -423,12 +518,45 @@ fun ActiveExerciseContent(
 }
 
 
-@Preview
 @Composable
-fun PreviewWorkoutExecutionScreen() {
-    WorkoutExecutionScreen(
-        viewModel = TODO(),
-        onExerciseCompleted = TODO(),
-        workoutId = TODO()
+private fun NoteEditDialog(
+    exercise: Exercise,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var noteText by remember { mutableStateOf(exercise.note) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Заметка для упражнения",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            OutlinedTextField(
+                value = noteText,
+                onValueChange = { noteText = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Введите заметку...") },
+                minLines = 3,
+                maxLines = 6
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(noteText) }
+            ) {
+                Text("Сохранить")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text("Отмена")
+            }
+        }
     )
 }
