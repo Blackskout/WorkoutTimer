@@ -333,7 +333,8 @@ private fun ExerciseItem(
                 },
                 label = { Text("Отдых (мин)") },
                 singleLine = true,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(8.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
         }
 

@@ -55,6 +55,7 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.kotlin.stdlib)
+    implementation(libs.kotlin.metadata.jvm)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.compose.runtime)
     ksp(libs.androidx.room.compiler)
