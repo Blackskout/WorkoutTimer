@@ -184,9 +184,9 @@ fun CreateWorkoutScreen(
                             },
                             onWeightChange = {
                                 viewModel.processCommand(
-                                    CreateWorkoutCommand.UpdateExercise(
+                                    CreateWorkoutCommand.UpdateExerciseWeight(
                                         exercise.id,
-                                        exercise.copy(weight = it)
+                                        it
                                     )
                                 )
                             },
@@ -241,7 +241,7 @@ fun CreateWorkoutScreen(
 private fun ExerciseItem(
     exercise: ExerciseItem,
     onNameChange: (String) -> Unit,
-    onWeightChange: (Double) -> Unit,
+    onWeightChange: (String) -> Unit,
     onSetsChange: (Int) -> Unit,
     onRepsChange: (Int) -> Unit,
     onRestTimeChange: (Int) -> Unit,
@@ -284,14 +284,12 @@ private fun ExerciseItem(
         ) {
             OutlinedTextField(
                 modifier = Modifier.width(68.dp),
-                value = if (exercise.weight == 0.0) "" else exercise.weight.toString(),
-                onValueChange = {
-                    onWeightChange(it.toDoubleOrNull() ?: 0.0)
-                },
+                value = exercise.weightStr,
+                onValueChange = onWeightChange,
                 label = { Text("Вес") },
                 singleLine = true,
                 shape = RoundedCornerShape(8.dp),
-                keyboardOptions = KeyboardOptions(keyboardType =  KeyboardType.Decimal)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
             )
 
             Spacer(modifier = Modifier.width(8.dp))

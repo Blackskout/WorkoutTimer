@@ -8,12 +8,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
@@ -24,6 +26,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,8 +46,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.presentation.components.SystemMediaControllerCompat
@@ -313,18 +318,31 @@ fun RestTimerContent(
 
         Text(
             text = restState.exercise.name,
-            style = MaterialTheme.typography.headlineMedium
+            style = MaterialTheme.typography.headlineMedium,
+            fontSize = 20.sp,
+            color = MaterialTheme.colorScheme.primary
         )
 
-        Text(
-            text = "${restState.exercise.weight.toCorrectNum()} кг",
-            style = MaterialTheme.typography.bodyLarge
+        Row {
+            Text(
+                text = "${restState.exercise.weight.toCorrectNum()} кг",
+                style = MaterialTheme.typography.bodyLarge
+            )
+
+            Spacer(Modifier.width(16.dp))
+
+            Text(
+                text = "${restState.exercise.reps} повторений",
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 4.dp),
+            thickness = 1.dp,      // Толщина
+            color = Color.Gray     // Цвет
         )
 
-        Text(
-            text = "${restState.exercise.reps} повторений",
-            style = MaterialTheme.typography.bodyLarge
-        )
 
         // Кнопка и текст заметки
         Column(
@@ -450,17 +468,29 @@ fun ActiveExerciseContent(
 
         Text(
             text = activeState.exercise.name,
-            style = MaterialTheme.typography.headlineMedium
+            fontSize = 20.sp,
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.primary
         )
 
-        Text(
-            text = "${activeState.weight.toCorrectNum()} кг",
-            style = MaterialTheme.typography.bodyLarge
-        )
+        Row {
+            Text(
+                text = "${activeState.weight.toCorrectNum()} кг",
+                style = MaterialTheme.typography.bodyLarge
+            )
 
-        Text(
-            text = "${activeState.reps} повторений",
-            style = MaterialTheme.typography.bodyLarge
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Text(
+                text = "${activeState.reps} повторений",
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 4.dp),
+            thickness = 1.dp,      // Толщина
+            color = Color.Gray     // Цвет
         )
 
         // Кнопка и текст заметки

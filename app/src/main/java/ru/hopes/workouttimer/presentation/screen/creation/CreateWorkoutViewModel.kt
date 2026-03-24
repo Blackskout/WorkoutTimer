@@ -39,6 +39,7 @@ class CreateWorkoutViewModel @Inject constructor(
                             id = System.currentTimeMillis().toInt(),
                             name = "",
                             weight = 0.0,
+                            weightStr = "",
                             sets = 4,
                             reps = 12,
                             restTimeSeconds = 120,
@@ -59,6 +60,19 @@ class CreateWorkoutViewModel @Inject constructor(
                     it.copy(
                         exercises = it.exercises.map { ex ->
                             if (ex.id == command.id) command.exercise else ex
+                        }
+                    )
+                }
+            }
+
+            is CreateWorkoutCommand.UpdateExerciseWeight -> {
+                _state.update {
+                    it.copy(
+                        exercises = it.exercises.map { ex ->
+                            if (ex.id == command.id) {
+                                val weight = command.weightStr.toDoubleOrNull() ?: 0.0
+                                ex.copy(weight = weight, weightStr = command.weightStr)
+                            } else ex
                         }
                     )
                 }
@@ -128,6 +142,7 @@ class CreateWorkoutViewModel @Inject constructor(
                                 id = ex.id,
                                 name = ex.name,
                                 weight = ex.weight,
+                                weightStr = if (ex.weight == 0.0) "" else ex.weight.toString(),
                                 sets = ex.sets,
                                 reps = ex.reps,
                                 restTimeSeconds = (ex.timeMillis / 1000).toInt(),
@@ -147,6 +162,7 @@ sealed interface CreateWorkoutCommand {
     data class UpdateExercise(val id: Int, val exercise: ExerciseItem) : CreateWorkoutCommand
     data class AddExercise(val dummy: Unit = Unit) : CreateWorkoutCommand
     data class RemoveExercise(val id: Int) : CreateWorkoutCommand
+    data class UpdateExerciseWeight(val id: Int, val weightStr: String) : CreateWorkoutCommand
     data class UpdateExerciseNote(val id: Int, val note: String) : CreateWorkoutCommand
     data object Save : CreateWorkoutCommand
     data object Back : CreateWorkoutCommand
@@ -156,6 +172,7 @@ data class ExerciseItem(
     val id: Int,
     val name: String,
     val weight: Double,
+    val weightStr: String = weight.toString(),
     val sets: Int,
     val reps: Int,
     val restTimeSeconds: Int,
