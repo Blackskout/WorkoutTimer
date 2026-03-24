@@ -291,7 +291,7 @@ private fun ExerciseItem(
             Spacer(modifier = Modifier.width(8.dp))
 
             OutlinedTextField(
-                modifier = Modifier.width(80.dp),
+                modifier = Modifier.width(92.dp),
                 value = exercise.sets.toString(),
                 onValueChange = {
                     onSetsChange(it.toIntOrNull() ?: 1)
@@ -304,7 +304,7 @@ private fun ExerciseItem(
             Spacer(modifier = Modifier.width(8.dp))
 
             OutlinedTextField(
-                modifier = Modifier.width(80.dp),
+                modifier = Modifier.width(86.dp),
                 value = exercise.reps.toString(),
                 onValueChange = {
                     onRepsChange(it.toIntOrNull() ?: 1)
