@@ -13,16 +13,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -36,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -89,6 +93,24 @@ fun CreateWorkoutScreen(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Назад"
                     )
+                },
+                actions = {
+                    IconButton(
+                        onClick = {
+                            viewModel.processCommand(CreateWorkoutCommand.Save)
+                        },
+                        enabled = state.isSaveEnabled
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "Сохранить",
+                            tint = if (state.isSaveEnabled) {
+                                MaterialTheme.colorScheme.onBackground
+                            } else {
+                                MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
+                            }
+                        )
+                    }
                 }
             )
         },
@@ -141,92 +163,75 @@ fun CreateWorkoutScreen(
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(state.exercises, key = { it.id }) { exercise ->
-                    ExerciseItem(
-                        exercise = exercise,
-                        onNameChange = {
-                            viewModel.processCommand(
-                                CreateWorkoutCommand.UpdateExercise(
-                                    exercise.id,
-                                    exercise.copy(name = it)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        shape = RoundedCornerShape(12.dp),
+
+                    ) {
+                        ExerciseItem(
+                            exercise = exercise,
+                            onNameChange = {
+                                viewModel.processCommand(
+                                    CreateWorkoutCommand.UpdateExercise(
+                                        exercise.id,
+                                        exercise.copy(name = it)
+                                    )
                                 )
-                            )
-                        },
-                        onWeightChange = {
-                            viewModel.processCommand(
-                                CreateWorkoutCommand.UpdateExercise(
-                                    exercise.id,
-                                    exercise.copy(weight = it)
+                            },
+                            onWeightChange = {
+                                viewModel.processCommand(
+                                    CreateWorkoutCommand.UpdateExercise(
+                                        exercise.id,
+                                        exercise.copy(weight = it)
+                                    )
                                 )
-                            )
-                        },
-                        onSetsChange = {
-                            viewModel.processCommand(
-                                CreateWorkoutCommand.UpdateExercise(
-                                    exercise.id,
-                                    exercise.copy(sets = it)
+                            },
+                            onSetsChange = {
+                                viewModel.processCommand(
+                                    CreateWorkoutCommand.UpdateExercise(
+                                        exercise.id,
+                                        exercise.copy(sets = it)
+                                    )
                                 )
-                            )
-                        },
-                        onRepsChange = {
-                            viewModel.processCommand(
-                                CreateWorkoutCommand.UpdateExercise(
-                                    exercise.id,
-                                    exercise.copy(reps = it)
+                            },
+                            onRepsChange = {
+                                viewModel.processCommand(
+                                    CreateWorkoutCommand.UpdateExercise(
+                                        exercise.id,
+                                        exercise.copy(reps = it)
+                                    )
                                 )
-                            )
-                        },
-                        onRestTimeChange = {
-                            viewModel.processCommand(
-                                CreateWorkoutCommand.UpdateExercise(
-                                    exercise.id,
-                                    exercise.copy(restTimeSeconds = it)
+                            },
+                            onRestTimeChange = {
+                                viewModel.processCommand(
+                                    CreateWorkoutCommand.UpdateExercise(
+                                        exercise.id,
+                                        exercise.copy(restTimeSeconds = it)
+                                    )
                                 )
-                            )
-                        },
-                        onNoteChange = {
-                            viewModel.processCommand(
-                                CreateWorkoutCommand.UpdateExerciseNote(
-                                    exercise.id,
-                                    it
+                            },
+                            onNoteChange = {
+                                viewModel.processCommand(
+                                    CreateWorkoutCommand.UpdateExerciseNote(
+                                        exercise.id,
+                                        it
+                                    )
                                 )
-                            )
-                        },
-                        onRemoveClick = {
-                            viewModel.processCommand(CreateWorkoutCommand.RemoveExercise(exercise.id))
-                        }
-                    )
+                            },
+                            onRemoveClick = {
+                                viewModel.processCommand(CreateWorkoutCommand.RemoveExercise(exercise.id))
+                            }
+                        )
+                    }
                 }
 
                 item {
-                    Spacer(modifier = Modifier.height(80.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
-            }
-
-            Button(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-                    .height(56.dp),
-                onClick = {
-                    viewModel.processCommand(CreateWorkoutCommand.Save)
-                },
-                shape = RoundedCornerShape(12.dp),
-                enabled = state.isSaveEnabled,
-                colors = ButtonDefaults.buttonColors(
-                    disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
-                )
-            ) {
-                Text(
-                    text = "Сохранить тренировку",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
-                )
             }
         }
     }
@@ -246,7 +251,7 @@ private fun ExerciseItem(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(16.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically
@@ -278,14 +283,15 @@ private fun ExerciseItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
-                modifier = Modifier.width(100.dp),
+                modifier = Modifier.width(68.dp),
                 value = if (exercise.weight == 0.0) "" else exercise.weight.toString(),
                 onValueChange = {
                     onWeightChange(it.toDoubleOrNull() ?: 0.0)
                 },
-                label = { Text("Вес (кг)") },
+                label = { Text("Вес") },
                 singleLine = true,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(8.dp),
+                keyboardOptions = KeyboardOptions(keyboardType =  KeyboardType.Decimal)
             )
 
             Spacer(modifier = Modifier.width(8.dp))
@@ -298,7 +304,8 @@ private fun ExerciseItem(
                 },
                 label = { Text("Подходы") },
                 singleLine = true,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(8.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
 
             Spacer(modifier = Modifier.width(8.dp))
@@ -311,7 +318,8 @@ private fun ExerciseItem(
                 },
                 label = { Text("Повторы") },
                 singleLine = true,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(8.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
 
             Spacer(modifier = Modifier.width(8.dp))
