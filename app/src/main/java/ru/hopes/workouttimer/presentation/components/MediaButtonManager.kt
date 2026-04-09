@@ -4,10 +4,6 @@ import android.content.Context
 import android.media.AudioManager
 import android.os.Build
 import android.view.KeyEvent
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 
 /**
  * Простой менеджер для отправки медиа-команд через AudioManager.
@@ -15,7 +11,8 @@ import androidx.compose.runtime.setValue
  */
 class MediaButtonManager(private val context: Context) {
 
-    private val audioManager: AudioManager? = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    private val audioManager: AudioManager? =
+        context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
 
     /**
      * Отправляет медиа-событие (play/pause, next, previous).
