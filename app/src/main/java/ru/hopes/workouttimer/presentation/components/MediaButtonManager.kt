@@ -21,18 +21,11 @@ class MediaButtonManager(private val context: Context) {
         if (audioManager == null) return
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                val downEvent = KeyEvent(KeyEvent.ACTION_DOWN, keyCode)
-                val upEvent = KeyEvent(KeyEvent.ACTION_UP, keyCode)
+            val downEvent = KeyEvent(KeyEvent.ACTION_DOWN, keyCode)
+            val upEvent = KeyEvent(KeyEvent.ACTION_UP, keyCode)
 
-                audioManager.dispatchMediaKeyEvent(downEvent)
-                audioManager.dispatchMediaKeyEvent(upEvent)
-            } else {
-                @Suppress("DEPRECATION")
-                audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
-                @Suppress("DEPRECATION")
-                audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
-            }
+            audioManager.dispatchMediaKeyEvent(downEvent)
+            audioManager.dispatchMediaKeyEvent(upEvent)
         } catch (e: Exception) {
             e.printStackTrace()
         }
