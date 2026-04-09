@@ -1,6 +1,8 @@
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.content.Intent
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -18,6 +20,7 @@ import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.repository.WorkoutRepository
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
+import ru.hopes.workouttimer.presentation.service.TimerNotificationService
 import ru.hopes.workouttimer.presentation.utils.SoundPlayer
 import ru.hopes.workouttimer.presentation.utils.VibrationManager
 import ru.hopes.workouttimer.presentation.utils.WakeLockHelper
@@ -29,8 +32,9 @@ class WorkoutExecutionViewModel @Inject constructor(
     private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
     private val vibrationManager: VibrationManager,
     private val wakeLockHelper: WakeLockHelper,
-    private val workoutRepository: WorkoutRepository
-) : ViewModel() {
+    private val workoutRepository: WorkoutRepository,
+    application: Application
+) : AndroidViewModel(application) {
 
     private var workout: Workout? = null
     var exercises: List<Exercise> = emptyList()
@@ -51,6 +55,42 @@ class WorkoutExecutionViewModel @Inject constructor(
     val uiState: StateFlow<WorkoutExecutionState> = _uiState.asStateFlow()
 
     private var timerJob: Job? = null
+
+    private fun startNotification(exerciseName: String, currentSet: Int, totalSets: Int, timeLeftMillis: Long) {
+        val intent = Intent(getApplication(), TimerNotificationService::class.java).apply {
+            action = TimerNotificationService.ACTION_START
+            putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
+            putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
+            putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
+            putExtra(TimerNotificationService.EXTRA_TIME_LEFT, timeLeftMillis)
+        }
+        getApplication<android.app.Application>().startService(intent)
+    }
+
+    private fun updateNotification(exerciseName: String, currentSet: Int, totalSets: Int, timeLeftMillis: Long) {
+        val intent = Intent(getApplication(), TimerNotificationService::class.java).apply {
+            action = TimerNotificationService.ACTION_UPDATE
+            putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
+            putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
+            putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
+            putExtra(TimerNotificationService.EXTRA_TIME_LEFT, timeLeftMillis)
+        }
+        getApplication<android.app.Application>().startService(intent)
+    }
+
+    private fun stopNotification() {
+        val intent = Intent(getApplication(), TimerNotificationService::class.java).apply {
+            action = TimerNotificationService.ACTION_STOP
+        }
+        getApplication<android.app.Application>().startService(intent)
+    }
+
+    private fun formatTime(millis: Long): String {
+        val totalSeconds = millis / 1000
+        val minutes = totalSeconds / 60
+        val seconds = totalSeconds % 60
+        return String.format("%02d:%02d", minutes, seconds)
+    }
 
     fun loadWorkout(workoutId: Int) {
         viewModelScope.launch {
@@ -80,6 +120,7 @@ class WorkoutExecutionViewModel @Inject constructor(
     fun skipRest() {
         timerJob?.cancel()
         wakeLockHelper.release()
+        stopNotification()
         _uiState.update { state ->
             when (state) {
                 is WorkoutExecutionState.Rest -> {
@@ -105,7 +146,13 @@ class WorkoutExecutionViewModel @Inject constructor(
 
         val finishTime = System.currentTimeMillis() + currentState.restTimeMillis
 
-
+        // Запускаем уведомление с таймером
+        startNotification(
+            exerciseName = currentState.exercise.name,
+            currentSet = currentState.currentSet,
+            totalSets = currentState.totalSets,
+            timeLeftMillis = currentState.restTimeMillis
+        )
 
         timerJob = viewModelScope.launch {
             countdownFlow(finishTime)
@@ -123,6 +170,14 @@ class WorkoutExecutionViewModel @Inject constructor(
                             else -> state
                         }
                     }
+                    
+                    // Обновляем уведомление каждые 200мс (но ограничим частоту)
+                    updateNotification(
+                        exerciseName = currentState.exercise.name,
+                        currentSet = currentState.currentSet,
+                        totalSets = currentState.totalSets,
+                        timeLeftMillis = timeLeft
+                    )
                 }
         }
     }
@@ -145,6 +200,7 @@ class WorkoutExecutionViewModel @Inject constructor(
 
     private fun onRestFinished() {
         timerJob?.cancel()
+        stopNotification()
         soundPlayer.playSound(R.raw.timer)
         vibrationManager.vibrate()
         wakeLockHelper.release()
@@ -164,8 +220,9 @@ class WorkoutExecutionViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        soundPlayer.release() // <-- Освобождаем ресурсы здесь, в нужном месте
+        soundPlayer.release()
         wakeLockHelper.release()
+        stopNotification()
     }
 
     fun onExerciseFinished() {
