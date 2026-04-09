@@ -11,6 +11,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import ru.hopes.workouttimer.presentation.screen.creation.CreateWorkoutScreen
+import ru.hopes.workouttimer.presentation.screen.exportImport.ExportImportScreen
 import ru.hopes.workouttimer.presentation.screen.workoutExecution.WorkoutExecutionScreen
 import ru.hopes.workouttimer.presentation.screen.workouts.ListWorkoutScreen
 
@@ -41,6 +42,9 @@ fun NavGraph() {
                 },
                 onEditClick = { workout ->
                     navController.navigate(Screen.EditWorkout.createRoute(workout.id))
+                },
+                onExportImportClick = {
+                    navController.navigate(Screen.ExportImport.route)
                 }
             )
         }
@@ -90,12 +94,22 @@ fun NavGraph() {
                 workoutId = workoutId
             )
         }
+
+        // Экран экспорта/импорта
+        composable(Screen.ExportImport.route) {
+            ExportImportScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
     }
 }
 
 private sealed class Screen(val route: String) {
     data object Workouts : Screen("workouts")
     data object CreateWorkout : Screen("create_workout")
+    data object ExportImport : Screen("export_import")
     data object EditWorkout : Screen("edit_workout/{workout_id}") {
         fun createRoute(workoutId: Int): String {
             return "edit_workout/$workoutId"
