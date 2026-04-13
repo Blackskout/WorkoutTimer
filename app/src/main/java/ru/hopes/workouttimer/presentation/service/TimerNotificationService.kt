@@ -40,7 +40,6 @@ class TimerNotificationService : Service() {
             }
             ACTION_STOP -> {
                 stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
             }
         }
         return START_NOT_STICKY
@@ -55,6 +54,7 @@ class TimerNotificationService : Service() {
             ).apply {
                 description = "Отображение обратного отсчета таймера во время отдыха между подходами"
                 setShowBadge(false)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
             }
             notificationManager.createNotificationChannel(channel)
         }
@@ -88,6 +88,7 @@ class TimerNotificationService : Service() {
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setShowWhen(false)
+            .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

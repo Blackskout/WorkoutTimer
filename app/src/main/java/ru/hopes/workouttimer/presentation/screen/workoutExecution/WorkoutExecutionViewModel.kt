@@ -155,6 +155,8 @@ class WorkoutExecutionViewModel @Inject constructor(
         )
 
         timerJob = viewModelScope.launch {
+            var lastNotificationSecond = -1L
+
             countdownFlow(finishTime)
                 .onCompletion { cause ->
                     if (cause == null) {
@@ -170,14 +172,18 @@ class WorkoutExecutionViewModel @Inject constructor(
                             else -> state
                         }
                     }
-                    
-                    // Обновляем уведомление каждые 200мс (но ограничим частоту)
-                    updateNotification(
-                        exerciseName = currentState.exercise.name,
-                        currentSet = currentState.currentSet,
-                        totalSets = currentState.totalSets,
-                        timeLeftMillis = timeLeft
-                    )
+
+                    // Обновляем уведомление только раз в секунду (не чаще)
+                    val currentSecond = timeLeft / 500
+                    if (currentSecond != lastNotificationSecond) {
+                        lastNotificationSecond = currentSecond
+                        updateNotification(
+                            exerciseName = currentState.exercise.name,
+                            currentSet = currentState.currentSet,
+                            totalSets = currentState.totalSets,
+                            timeLeftMillis = timeLeft
+                        )
+                    }
                 }
         }
     }
