@@ -17,9 +17,13 @@ class TimerNotificationService : Service() {
     private val channelId = "timer_notification_channel"
     private val notificationId = 1
 
+    private val finishedChannelId = "rest_finished_notification_channel"
+    private val finishedNotificationId = 2
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        createFinishedNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -41,6 +45,12 @@ class TimerNotificationService : Service() {
             ACTION_STOP -> {
                 stopForeground(STOP_FOREGROUND_REMOVE)
             }
+            ACTION_SHOW_FINISHED -> {
+                val exerciseName = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: "Упражнение"
+                val currentSet = intent.getIntExtra(EXTRA_CURRENT_SET, 1)
+                val totalSets = intent.getIntExtra(EXTRA_TOTAL_SETS, 1)
+                notificationManager.notify(finishedNotificationId, createFinishedNotification(exerciseName, currentSet, totalSets))
+            }
         }
         return START_NOT_STICKY
     }
@@ -60,6 +70,28 @@ class TimerNotificationService : Service() {
         }
     }
 
+    private fun createFinishedNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                finishedChannelId,
+                "Завершение отдыха",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Уведомление о завершении отдыха между подходами"
+                setShowBadge(false)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                enableVibration(true)
+                setSound(
+                    android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION),
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                        .build()
+                )
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
     private fun createNotification(
         exerciseName: String,
         currentSet: Int,
@@ -69,7 +101,7 @@ class TimerNotificationService : Service() {
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
-        
+
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,
@@ -95,6 +127,39 @@ class TimerNotificationService : Service() {
             .build()
     }
 
+    private fun createFinishedNotification(
+        exerciseName: String,
+        currentSet: Int,
+        totalSets: Int
+    ): android.app.Notification {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val title = "Отдых завершён!"
+        val content = "$exerciseName — Подход $currentSet из $totalSets"
+
+        return NotificationCompat.Builder(this, finishedChannelId)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentIntent(pendingIntent)
+            .setOngoing(false)
+            .setShowWhen(false)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+    }
+
     private fun formatTime(millis: Long): String {
         val totalSeconds = millis / 1000
         val minutes = totalSeconds / 60
@@ -103,7 +168,7 @@ class TimerNotificationService : Service() {
     }
 
     private val notificationManager: NotificationManager
-        get() = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        get() = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -111,6 +176,7 @@ class TimerNotificationService : Service() {
         const val ACTION_START = "START"
         const val ACTION_UPDATE = "UPDATE"
         const val ACTION_STOP = "STOP"
+        const val ACTION_SHOW_FINISHED = "SHOW_FINISHED"
 
         const val EXTRA_EXERCISE_NAME = "exercise_name"
         const val EXTRA_CURRENT_SET = "current_set"

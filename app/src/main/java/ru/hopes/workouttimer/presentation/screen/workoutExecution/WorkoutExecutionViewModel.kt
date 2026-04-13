@@ -85,6 +85,16 @@ class WorkoutExecutionViewModel @Inject constructor(
         getApplication<android.app.Application>().startService(intent)
     }
 
+    private fun showRestFinishedNotification(exerciseName: String, currentSet: Int, totalSets: Int) {
+        val intent = Intent(getApplication(), TimerNotificationService::class.java).apply {
+            action = TimerNotificationService.ACTION_SHOW_FINISHED
+            putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
+            putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
+            putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
+        }
+        getApplication<android.app.Application>().startService(intent)
+    }
+
     private fun formatTime(millis: Long): String {
         val totalSeconds = millis / 1000
         val minutes = totalSeconds / 60
@@ -205,11 +215,22 @@ class WorkoutExecutionViewModel @Inject constructor(
     }
 
     private fun onRestFinished() {
+        val previousState = _uiState.value as? WorkoutExecutionState.Rest
         timerJob?.cancel()
         stopNotification()
         soundPlayer.playSound(R.raw.timer)
         vibrationManager.vibrate()
         wakeLockHelper.release()
+
+        // Показываем уведомление о завершении отдыха
+        if (previousState != null) {
+            showRestFinishedNotification(
+                exerciseName = previousState.exercise.name,
+                currentSet = previousState.currentSet,
+                totalSets = previousState.totalSets
+            )
+        }
+
         _uiState.update { state ->
             when (state) {
                 is WorkoutExecutionState.Rest -> {
