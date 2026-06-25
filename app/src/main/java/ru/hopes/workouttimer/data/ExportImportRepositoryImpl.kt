@@ -35,27 +35,21 @@ class ExportImportRepositoryImpl @Inject constructor(
         encodeDefaults = true
     }
 
-    override suspend fun exportToJson(workoutsJson: String): Uri? {
+    override suspend fun exportToJson(workoutsJson: String): Uri {
         return withContext(Dispatchers.IO) {
-            try {
-                val fileName = "workout_export_${getDateStamp()}.json"
-                val file = File(context.cacheDir, fileName)
-                file.writeText(workoutsJson)
-
-                val uri = FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    file
-                )
-                uri
-            } catch (e: Exception) {
-                null
-            }
+            val fileName = "workout_export_${getDateStamp()}.json"
+            val file = File(context.cacheDir, fileName)
+            file.writeText(workoutsJson)
+            FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
         }
     }
 
     override suspend fun shareJson(workoutsJson: String) {
-        val uri = exportToJson(workoutsJson) ?: return
+        val uri = exportToJson(workoutsJson) ?: throw Exception("Не удалось создать файл для экспорта")
 
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "application/json"
@@ -94,23 +88,18 @@ class ExportImportRepositoryImpl @Inject constructor(
                 val existingNames = dao.getAllWorkouts()
                     .map { list -> list.map { it.name }.toSet() }
                     .first()
+                    .toMutableSet()
 
                 var importedCount = 0
                 var skippedCount = 0
 
                 exportData.workouts.forEach { exportWorkout ->
                     val uniqueName = getUniqueName(exportWorkout.name, existingNames)
-                    
-                    val workoutId = dao.insertWorkout(
-                        ru.hopes.workouttimer.data.entity.WorkoutEntity(
-                            name = uniqueName,
-                            lastUseAt = exportWorkout.lastUseAt
-                        )
-                    )
+                    existingNames.add(uniqueName)
 
                     val exerciseEntities = exportWorkout.exercises.map { ex ->
                         ExerciseEntity(
-                            workoutId = workoutId,
+                            workoutId = 0,
                             name = ex.name,
                             weight = ex.weight,
                             sets = ex.sets,
@@ -121,7 +110,13 @@ class ExportImportRepositoryImpl @Inject constructor(
                         )
                     }
 
-                    dao.insertExercises(exerciseEntities)
+                    dao.insertWorkoutWithExercises(
+                        ru.hopes.workouttimer.data.entity.WorkoutEntity(
+                            name = uniqueName,
+                            lastUseAt = exportWorkout.lastUseAt
+                        ),
+                        exerciseEntities
+                    )
                     importedCount++
                 }
 

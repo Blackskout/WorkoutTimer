@@ -13,6 +13,7 @@ import ru.hopes.workouttimer.domain.repository.WorkoutRepository
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import javax.inject.Inject
 
 class ExportAllWorkoutsUseCase @Inject constructor(
@@ -41,7 +42,8 @@ class ExportAllWorkoutsUseCase @Inject constructor(
     }
 
     private fun getCurrentDateTime(): String {
-        val formatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+        val formatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+        formatter.timeZone = TimeZone.getTimeZone("UTC")
         return formatter.format(Date())
     }
 }

@@ -152,7 +152,7 @@ class WorkoutExecutionViewModel @Inject constructor(
         val currentState = _uiState.value as? WorkoutExecutionState.Rest ?: return
         timerJob?.cancel()
 
-        wakeLockHelper.acquire()
+        wakeLockHelper.acquire(currentState.restTimeMillis)
 
         val finishTime = System.currentTimeMillis() + currentState.restTimeMillis
 
@@ -184,7 +184,7 @@ class WorkoutExecutionViewModel @Inject constructor(
                     }
 
                     // Обновляем уведомление только раз в секунду (не чаще)
-                    val currentSecond = timeLeft / 500
+                    val currentSecond = timeLeft / 1000
                     if (currentSecond != lastNotificationSecond) {
                         lastNotificationSecond = currentSecond
                         updateNotification(
@@ -291,11 +291,12 @@ class WorkoutExecutionViewModel @Inject constructor(
     }
 
     fun moveToSelectedExercise(exercise: Exercise) {
-        // 1. Находим реальный индекс упражнения в текущем списке
         val index = exercises.indexOfFirst { it.id == exercise.id }
 
         if (index != -1) {
-            timerJob?.cancel() // Обязательно останавливаем текущий таймер перед сменой
+            timerJob?.cancel()
+            wakeLockHelper.release()
+            stopNotification()
             exerciseIndex = index
             val nextExercise = exercises[exerciseIndex]
 
@@ -304,7 +305,6 @@ class WorkoutExecutionViewModel @Inject constructor(
                 currentSet = 1,
                 totalSets = nextExercise.sets
             )
-            startRestTimer()
         }
     }
 

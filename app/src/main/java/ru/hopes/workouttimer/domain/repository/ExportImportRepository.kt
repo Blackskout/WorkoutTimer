@@ -4,7 +4,7 @@ import android.net.Uri
 import kotlinx.coroutines.flow.Flow
 
 interface ExportImportRepository {
-    suspend fun exportToJson(workoutsJson: String): Uri?
+    suspend fun exportToJson(workoutsJson: String): Uri
     suspend fun shareJson(workoutsJson: String)
     suspend fun importFromJson(uri: Uri): ImportResult
     suspend fun getAllExistingWorkoutNames(): Flow<Set<String>>

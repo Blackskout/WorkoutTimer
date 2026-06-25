@@ -44,6 +44,7 @@ class TimerNotificationService : Service() {
             }
             ACTION_STOP -> {
                 stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
             }
             ACTION_SHOW_FINISHED -> {
                 val exerciseName = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: "Упражнение"
