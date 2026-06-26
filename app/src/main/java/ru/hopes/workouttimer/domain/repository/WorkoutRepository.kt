@@ -13,4 +13,5 @@ interface WorkoutRepository {
         suspend fun updateWorkout(workout: Workout)
         fun deleteWorkout(workout: WorkoutEntity)
         fun searchWorkoutUseCase(query: String): Flow<List<WorkoutEntity>>
+        suspend fun updateLastUseAt(workoutId: Int)
 }

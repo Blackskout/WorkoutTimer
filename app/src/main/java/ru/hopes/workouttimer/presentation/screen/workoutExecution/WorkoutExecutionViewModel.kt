@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.domain.model.Workout
+import ru.hopes.workouttimer.domain.repository.WorkoutRepository
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
 import ru.hopes.workouttimer.presentation.utils.SoundPlayer
 import ru.hopes.workouttimer.presentation.utils.VibrationManager
@@ -28,7 +29,8 @@ class WorkoutExecutionViewModel @Inject constructor(
     private val soundPlayer: SoundPlayer,
     private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
     private val vibrationManager: VibrationManager,
-    private val wakeLockHelper: WakeLockHelper
+    private val wakeLockHelper: WakeLockHelper,
+    private val workoutRepository: WorkoutRepository
 ) : ViewModel() {
 
     private var workout: Workout? = null
@@ -200,7 +202,9 @@ class WorkoutExecutionViewModel @Inject constructor(
             )
             startRestTimer()
         } else {
-            // Все упражнения завершены
+            workout?.id?.let { id ->
+                viewModelScope.launch { workoutRepository.updateLastUseAt(id) }
+            }
             _uiState.value = WorkoutExecutionState.Finished
         }
     }
