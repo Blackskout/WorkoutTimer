@@ -1,10 +1,11 @@
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
-import android.app.Application
+import android.content.Context
 import android.content.Intent
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -28,6 +29,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class WorkoutExecutionViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val soundPlayer: SoundPlayer,
     private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
     private val vibrationManager: VibrationManager,
@@ -56,42 +58,42 @@ class WorkoutExecutionViewModel @Inject constructor(
     private var timerJob: Job? = null
 
     private fun startNotification(exerciseName: String, currentSet: Int, totalSets: Int, timeLeftMillis: Long) {
-        val intent = Intent(getApplication(), TimerNotificationService::class.java).apply {
+        val intent = Intent(context, TimerNotificationService::class.java).apply {
             action = TimerNotificationService.ACTION_START
             putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
             putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
             putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
             putExtra(TimerNotificationService.EXTRA_TIME_LEFT, timeLeftMillis)
         }
-        getApplication<android.app.Application>().startService(intent)
+        context.startService(intent)
     }
 
     private fun updateNotification(exerciseName: String, currentSet: Int, totalSets: Int, timeLeftMillis: Long) {
-        val intent = Intent(getApplication(), TimerNotificationService::class.java).apply {
+        val intent = Intent(context, TimerNotificationService::class.java).apply {
             action = TimerNotificationService.ACTION_UPDATE
             putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
             putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
             putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
             putExtra(TimerNotificationService.EXTRA_TIME_LEFT, timeLeftMillis)
         }
-        getApplication<android.app.Application>().startService(intent)
+        context.startService(intent)
     }
 
     private fun stopNotification() {
-        val intent = Intent(getApplication(), TimerNotificationService::class.java).apply {
+        val intent = Intent(context, TimerNotificationService::class.java).apply {
             action = TimerNotificationService.ACTION_STOP
         }
-        getApplication<android.app.Application>().startService(intent)
+        context.startService(intent)
     }
 
     private fun showRestFinishedNotification(exerciseName: String, currentSet: Int, totalSets: Int) {
-        val intent = Intent(getApplication(), TimerNotificationService::class.java).apply {
+        val intent = Intent(context, TimerNotificationService::class.java).apply {
             action = TimerNotificationService.ACTION_SHOW_FINISHED
             putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
             putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
             putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
         }
-        getApplication<android.app.Application>().startService(intent)
+        context.startService(intent)
     }
 
     private fun formatTime(millis: Long): String {
