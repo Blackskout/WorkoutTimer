@@ -12,6 +12,11 @@
         <package android:name="ru.yandex.music" />
     </queries>
 
+<!--экспериментально-->
+    <queries>
+        <package android:name="ru.yandex.music" />
+    </queries>
+
     <application
         android:name=".WorkoutApp"
         android:allowBackup="true"
