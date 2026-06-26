@@ -3,6 +3,7 @@ package ru.hopes.workouttimer.presentation.screen.workouts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,17 +16,30 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -42,19 +56,67 @@ import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
 import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ListWorkoutScreen(
     modifier: Modifier = Modifier,
     viewModel: ListWorkoutViewModel = hiltViewModel(),
     onAddWorkoutClick: () -> Unit,
     onWorkoutClick: (WorkoutEntity) -> Unit,
-    onLongClick: (WorkoutEntity) -> Unit
+    onLongClick: (WorkoutEntity) -> Unit,
+    onEditClick: (WorkoutEntity) -> Unit = {},
+    onExportImportClick: () -> Unit = {}
 ) {
 
     val state by viewModel.state.collectAsState()
+    var workoutToDelete by rememberSaveable { mutableStateOf<WorkoutEntity?>(null) }
+    var showContextMenu by rememberSaveable { mutableStateOf<WorkoutEntity?>(null) }
+
+    if (workoutToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { workoutToDelete = null },
+            title = { Text("Удалить тренировку?") },
+            text = { Text("Вы уверены, что хотите удалить \"${workoutToDelete?.name}\"? Это действие нельзя отменить.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        workoutToDelete?.let { viewModel.deleteWorkout(it) }
+                        workoutToDelete = null
+                    }
+                ) {
+                    Text("Удалить")
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { workoutToDelete = null }
+                ) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
 
     Scaffold(
         modifier = modifier,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = stringResource(R.string.all_workouts),
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                actions = {
+                    IconButton(onClick = onExportImportClick) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Экспорт/Импорт"
+                        )
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddWorkoutClick,
@@ -64,7 +126,7 @@ fun ListWorkoutScreen(
             ) {
                 Icon(
                     modifier = Modifier.size(50.dp),
-                    painter = painterResource(R.drawable.add_circle_svgrepo_com),
+                    painter = painterResource(R.drawable.outline_add_circle_24),
                     contentDescription = null
                 )
             }
@@ -77,13 +139,6 @@ fun ListWorkoutScreen(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-
-            item {
-                Title(
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                    text = stringResource(R.string.all_workouts)
-                )
-            }
 
             item {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -112,8 +167,10 @@ fun ListWorkoutScreen(
                         .padding(8.dp),
                     workout = workout,
                     onWorkoutClick = onWorkoutClick,
-                    onLongClick = {
-                        onLongClick(workout)
+                    onLongClick = onLongClick,
+                    onEditClick = onEditClick,
+                    onDeleteClick = {
+                        workoutToDelete = it
                     },
                     backgroundColor = MaterialTheme.colorScheme.surface
                 )
@@ -182,38 +239,77 @@ fun WorkoutCard(
     workout: WorkoutEntity,
     backgroundColor: Color,
     onWorkoutClick: (WorkoutEntity) -> Unit,
-    onLongClick: (WorkoutEntity) -> Unit
+    onLongClick: (WorkoutEntity) -> Unit,
+    onEditClick: (WorkoutEntity) -> Unit = {},
+    onDeleteClick: (WorkoutEntity) -> Unit = {}
 ) {
+    var showMenu by rememberSaveable { mutableStateOf(false) }
 
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
-            .background(backgroundColor)
-            .combinedClickable(
+    Box(modifier = modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+                .background(backgroundColor)
+                .combinedClickable(
+                    onClick = {
+                        onWorkoutClick(workout)
+                    },
+                    onLongClick = {
+                        showMenu = true
+                    }
+                )
+                .padding(16.dp)
+        ) {
+            Text(
+                modifier = Modifier.weight(3.5f),
+                text = workout.name,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                modifier = Modifier.weight(1f),
+                text = DateFormatter.formatDateToString(workout.lastUseAt),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("Редактировать") },
                 onClick = {
-                    onWorkoutClick(workout)
+                    showMenu = false
+                    onEditClick(workout)
                 },
-                onLongClick = {
-                    onLongClick(workout)
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = null
+                    )
                 }
             )
-            .padding(16.dp)) {
-        Text(
-            modifier = Modifier.weight(3.5f),
-            text = workout.name,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-//        Spacer(modifier = Modifier.weight(1f))
-        Text(
-            modifier = Modifier.weight(1f),
-            text = DateFormatter.formatDateToString(workout.lastUseAt),
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+            DropdownMenuItem(
+                text = { Text("Удалить") },
+                onClick = {
+                    showMenu = false
+                    onDeleteClick(workout)
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            )
+        }
     }
 }
 

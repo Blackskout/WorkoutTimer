@@ -15,7 +15,8 @@ fun WorkoutWithExercises.toDomain(): Workout {
                 reps = e.reps,
                 timeMillis = e.restTimeMillis,
                 order = e.orderInWorkout,
-                weight = e.weight
+                weight = e.weight,
+                note = e.note
             )
         }
     return Workout(

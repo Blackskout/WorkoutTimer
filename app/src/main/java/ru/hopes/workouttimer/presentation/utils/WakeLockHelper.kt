@@ -10,16 +10,14 @@ class WakeLockHelper @Inject constructor(
 ) {
     private var wakeLock: PowerManager.WakeLock? = null
 
-    fun acquire() {
+    fun acquire(timeoutMillis: Long = 3 * 60 * 1000L) {
         if (wakeLock == null) {
             val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-            // PARTIAL_WAKE_LOCK: Экран может погаснуть, но процессор (CPU) будет работать
             wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WorkoutTimer:RestTimer")
             wakeLock?.setReferenceCounted(false)
         }
-
-        // Держим процессор включенным (максимум на 3 минуты для безопасности) (было 10)
-        wakeLock?.acquire(3 * 60 * 1000L)
+        // +5s buffer so the lock outlives the countdown by a small margin
+        wakeLock?.acquire(timeoutMillis + 5_000L)
     }
 
     fun release() {

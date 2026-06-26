@@ -16,3 +16,4 @@ local.properties
 *.aab
 *.apk
 output-metadata.json
+/note/noteTODO.txt
