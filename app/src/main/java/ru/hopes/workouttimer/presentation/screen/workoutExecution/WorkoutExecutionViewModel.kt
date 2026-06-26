@@ -32,9 +32,8 @@ class WorkoutExecutionViewModel @Inject constructor(
     private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
     private val vibrationManager: VibrationManager,
     private val wakeLockHelper: WakeLockHelper,
-    private val workoutRepository: WorkoutRepository,
-    application: Application
-) : AndroidViewModel(application) {
+    private val workoutRepository: WorkoutRepository
+) : ViewModel() {
 
     private var workout: Workout? = null
     var exercises: List<Exercise> = emptyList()
@@ -285,7 +284,9 @@ class WorkoutExecutionViewModel @Inject constructor(
             )
             startRestTimer()
         } else {
-            // Все упражнения завершены
+            workout?.id?.let { id ->
+                viewModelScope.launch { workoutRepository.updateLastUseAt(id) }
+            }
             _uiState.value = WorkoutExecutionState.Finished
         }
     }

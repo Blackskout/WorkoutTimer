@@ -48,12 +48,6 @@ interface WorkoutDao {
     )
     fun searchWorkouts(query: String): Flow<List<WorkoutEntity>>
 
-    @Query("UPDATE exercises SET note = :note WHERE id = :exerciseId")
-    suspend fun updateExerciseNote(exerciseId: Int, note: String)
-
-    @Transaction
-    suspend fun insertWorkoutWithExercises(workout: WorkoutEntity, exercises: List<ExerciseEntity>) {
-        val id = insertWorkout(workout)
-        insertExercises(exercises.map { it.copy(workoutId = id) })
-    }
+    @Query("UPDATE workouts SET lastUseAt = :lastUseAt WHERE id = :id")
+    suspend fun updateLastUseAt(id: Int, lastUseAt: Long)
 }

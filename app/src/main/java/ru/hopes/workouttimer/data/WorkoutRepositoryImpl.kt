@@ -90,9 +90,7 @@ class WorkoutRepositoryImpl @Inject constructor(
         dao.insertExercises(exerciseEntities)
     }
 
-    override suspend fun updateExerciseNote(exerciseId: Int, note: String) {
-        withContext(Dispatchers.IO) {
-            dao.updateExerciseNote(exerciseId, note)
-        }
+    override suspend fun updateLastUseAt(workoutId: Int) {
+        dao.updateLastUseAt(workoutId, System.currentTimeMillis())
     }
 }
