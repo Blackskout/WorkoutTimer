@@ -1,7 +1,8 @@
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
+import android.app.Application
+import android.content.Intent
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -19,6 +20,7 @@ import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.repository.WorkoutRepository
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
+import ru.hopes.workouttimer.presentation.service.TimerNotificationService
 import ru.hopes.workouttimer.presentation.utils.SoundPlayer
 import ru.hopes.workouttimer.presentation.utils.VibrationManager
 import ru.hopes.workouttimer.presentation.utils.WakeLockHelper
@@ -34,7 +36,7 @@ class WorkoutExecutionViewModel @Inject constructor(
 ) : ViewModel() {
 
     private var workout: Workout? = null
-    private var exercises: List<Exercise> = emptyList()
+    var exercises: List<Exercise> = emptyList()
     private var exerciseIndex = 0
 
     val workoutName: String
@@ -52,6 +54,52 @@ class WorkoutExecutionViewModel @Inject constructor(
     val uiState: StateFlow<WorkoutExecutionState> = _uiState.asStateFlow()
 
     private var timerJob: Job? = null
+
+    private fun startNotification(exerciseName: String, currentSet: Int, totalSets: Int, timeLeftMillis: Long) {
+        val intent = Intent(getApplication(), TimerNotificationService::class.java).apply {
+            action = TimerNotificationService.ACTION_START
+            putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
+            putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
+            putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
+            putExtra(TimerNotificationService.EXTRA_TIME_LEFT, timeLeftMillis)
+        }
+        getApplication<android.app.Application>().startService(intent)
+    }
+
+    private fun updateNotification(exerciseName: String, currentSet: Int, totalSets: Int, timeLeftMillis: Long) {
+        val intent = Intent(getApplication(), TimerNotificationService::class.java).apply {
+            action = TimerNotificationService.ACTION_UPDATE
+            putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
+            putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
+            putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
+            putExtra(TimerNotificationService.EXTRA_TIME_LEFT, timeLeftMillis)
+        }
+        getApplication<android.app.Application>().startService(intent)
+    }
+
+    private fun stopNotification() {
+        val intent = Intent(getApplication(), TimerNotificationService::class.java).apply {
+            action = TimerNotificationService.ACTION_STOP
+        }
+        getApplication<android.app.Application>().startService(intent)
+    }
+
+    private fun showRestFinishedNotification(exerciseName: String, currentSet: Int, totalSets: Int) {
+        val intent = Intent(getApplication(), TimerNotificationService::class.java).apply {
+            action = TimerNotificationService.ACTION_SHOW_FINISHED
+            putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
+            putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
+            putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
+        }
+        getApplication<android.app.Application>().startService(intent)
+    }
+
+    private fun formatTime(millis: Long): String {
+        val totalSeconds = millis / 1000
+        val minutes = totalSeconds / 60
+        val seconds = totalSeconds % 60
+        return String.format("%02d:%02d", minutes, seconds)
+    }
 
     fun loadWorkout(workoutId: Int) {
         viewModelScope.launch {
@@ -81,6 +129,7 @@ class WorkoutExecutionViewModel @Inject constructor(
     fun skipRest() {
         timerJob?.cancel()
         wakeLockHelper.release()
+        stopNotification()
         _uiState.update { state ->
             when (state) {
                 is WorkoutExecutionState.Rest -> {
@@ -102,13 +151,21 @@ class WorkoutExecutionViewModel @Inject constructor(
         val currentState = _uiState.value as? WorkoutExecutionState.Rest ?: return
         timerJob?.cancel()
 
-        wakeLockHelper.acquire()
+        wakeLockHelper.acquire(currentState.restTimeMillis)
 
         val finishTime = System.currentTimeMillis() + currentState.restTimeMillis
 
-
+        // Запускаем уведомление с таймером
+        startNotification(
+            exerciseName = currentState.exercise.name,
+            currentSet = currentState.currentSet,
+            totalSets = currentState.totalSets,
+            timeLeftMillis = currentState.restTimeMillis
+        )
 
         timerJob = viewModelScope.launch {
+            var lastNotificationSecond = -1L
+
             countdownFlow(finishTime)
                 .onCompletion { cause ->
                     if (cause == null) {
@@ -123,6 +180,18 @@ class WorkoutExecutionViewModel @Inject constructor(
                             is WorkoutExecutionState.Rest -> state.copy(restTimeMillis = timeLeft)
                             else -> state
                         }
+                    }
+
+                    // Обновляем уведомление только раз в секунду (не чаще)
+                    val currentSecond = timeLeft / 1000
+                    if (currentSecond != lastNotificationSecond) {
+                        lastNotificationSecond = currentSecond
+                        updateNotification(
+                            exerciseName = currentState.exercise.name,
+                            currentSet = currentState.currentSet,
+                            totalSets = currentState.totalSets,
+                            timeLeftMillis = timeLeft
+                        )
                     }
                 }
         }
@@ -145,10 +214,22 @@ class WorkoutExecutionViewModel @Inject constructor(
     }
 
     private fun onRestFinished() {
+        val previousState = _uiState.value as? WorkoutExecutionState.Rest
         timerJob?.cancel()
+        stopNotification()
         soundPlayer.playSound(R.raw.timer)
         vibrationManager.vibrate()
         wakeLockHelper.release()
+
+        // Показываем уведомление о завершении отдыха
+        if (previousState != null) {
+            showRestFinishedNotification(
+                exerciseName = previousState.exercise.name,
+                currentSet = previousState.currentSet,
+                totalSets = previousState.totalSets
+            )
+        }
+
         _uiState.update { state ->
             when (state) {
                 is WorkoutExecutionState.Rest -> {
@@ -165,8 +246,9 @@ class WorkoutExecutionViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        soundPlayer.release() // <-- Освобождаем ресурсы здесь, в нужном месте
+        soundPlayer.release()
         wakeLockHelper.release()
+        stopNotification()
     }
 
     fun onExerciseFinished() {
@@ -209,6 +291,59 @@ class WorkoutExecutionViewModel @Inject constructor(
         }
     }
 
+    fun moveToSelectedExercise(exercise: Exercise) {
+        val index = exercises.indexOfFirst { it.id == exercise.id }
+
+        if (index != -1) {
+            timerJob?.cancel()
+            wakeLockHelper.release()
+            stopNotification()
+            exerciseIndex = index
+            val nextExercise = exercises[exerciseIndex]
+
+            _uiState.value = WorkoutExecutionState.Active(
+                exercise = nextExercise,
+                currentSet = 1,
+                totalSets = nextExercise.sets
+            )
+        }
+    }
+
+    fun updateExerciseNote(exerciseId: Int, note: String) {
+        viewModelScope.launch {
+            workoutRepository.updateExerciseNote(exerciseId, note)
+            
+            // Обновляем локальный список упражнений
+            val exerciseIndex = exercises.indexOfFirst { it.id == exerciseId }
+            if (exerciseIndex != -1) {
+                val updatedExercise = exercises[exerciseIndex].copy(note = note)
+                exercises = exercises.toMutableList().apply {
+                    set(exerciseIndex, updatedExercise)
+                }
+                
+                // Обновляем текущее состояние, если это текущее упражнение
+                val currentState = _uiState.value
+                when (currentState) {
+                    is WorkoutExecutionState.Active -> {
+                        if (currentState.exercise.id == exerciseId) {
+                            _uiState.value = currentState.copy(
+                                exercise = updatedExercise
+                            )
+                        }
+                    }
+                    is WorkoutExecutionState.Rest -> {
+                        if (currentState.exercise.id == exerciseId) {
+                            _uiState.value = currentState.copy(
+                                exercise = updatedExercise
+                            )
+                        }
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
+
 
 
 }
@@ -230,7 +365,7 @@ sealed class WorkoutExecutionState {
         val exercise: Exercise,
         val currentSet: Int,
         val totalSets: Int = exercise.sets,
-        val weight: Int = exercise.weight,
+        val weight: Double = exercise.weight,
         val reps: Int = exercise.reps
     ) : WorkoutExecutionState()
     

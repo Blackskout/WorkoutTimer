@@ -1,205 +1,359 @@
-//package ru.hopes.workouttimer.presentation.screen.creation
-//
-//import androidx.activity.compose.rememberLauncherForActivityResult
-//import androidx.activity.result.contract.ActivityResultContracts
-//import androidx.compose.foundation.clickable
-//import androidx.compose.foundation.layout.Column
-//import androidx.compose.foundation.layout.fillMaxWidth
-//import androidx.compose.foundation.layout.padding
-//import androidx.compose.foundation.shape.RoundedCornerShape
-//import androidx.compose.material.icons.Icons
-//import androidx.compose.material.icons.automirrored.filled.ArrowBack
-//import androidx.compose.material.icons.filled.AddPhotoAlternate
-//import androidx.compose.material3.Button
-//import androidx.compose.material3.ButtonDefaults
-//import androidx.compose.material3.ExperimentalMaterial3Api
-//import androidx.compose.material3.Icon
-//import androidx.compose.material3.MaterialTheme
-//import androidx.compose.material3.Scaffold
-//import androidx.compose.material3.Text
-//import androidx.compose.material3.TextField
-//import androidx.compose.material3.TextFieldDefaults
-//import androidx.compose.material3.TopAppBar
-//import androidx.compose.material3.TopAppBarDefaults
-//import androidx.compose.runtime.Composable
-//import androidx.compose.runtime.LaunchedEffect
-//import androidx.compose.runtime.collectAsState
-//import androidx.compose.ui.Modifier
-//import androidx.compose.ui.graphics.Color
-//import androidx.compose.ui.text.TextStyle
-//import androidx.compose.ui.text.font.FontWeight
-//import androidx.compose.ui.tooling.preview.Preview
-//import androidx.compose.ui.unit.dp
-//import androidx.compose.ui.unit.sp
-//import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-//import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
-//import ru.hopes.workouttimer.presentation.utils.DateFormatter
-//
-//
-//@OptIn(ExperimentalMaterial3Api::class)
-//@Composable // side effect// Composable functions can run frequently when recomposition happens — so they must be free of side effects unless you use the right APIs.
-//fun CreateWorkoutScreen(
-//    modifier: Modifier = Modifier,
-//    viewModel: CreateWorkoutViewModel = hiltViewModel(),
-//    onFinished: () -> Unit,
-//) {
-////TODO by or .value ...// upd: here we use ".value" because "by" is dynamic and constantly changing and we need current state
-//    val state = viewModel.state.collectAsState()
-//    val currentState = state.value
-//
-//    val imagePicker = rememberLauncherForActivityResult(
-//        contract = ActivityResultContracts.GetContent(),
-//        onResult = { uri ->
-//            uri?.let {
-//                viewModel.processCommand(CreateWorkoutCommand.AddImage(it))
-//            }
-//        }
-//    )
-//
-//    when (currentState) {
-//        is CreateWorkoutState.Creation -> {
-//            Scaffold(
-//                modifier = modifier,
-//                topBar = {
-//                    TopAppBar(
-//                        title = {
-//                            Text(
-//                                text = "Create workout",
-//                                fontSize = 20.sp,
-//                                fontWeight = FontWeight.Bold,
-//                                color = MaterialTheme.colorScheme.onBackground
-//                            )
-//                        },
-//                        colors = TopAppBarDefaults.topAppBarColors(
-//                            containerColor = Color.Transparent,
-//                            navigationIconContentColor = MaterialTheme.colorScheme.onBackground
-//                        ),
-//                        navigationIcon = {
-//                            Icon(
-//                                modifier = Modifier
-//                                    .padding(start = 16.dp, end = 8.dp)
-//                                    .clickable {
-//                                        viewModel.processCommand(CreateWorkoutCommand.Back)
-//                                    },
-//                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-//                                contentDescription = "Back"
-//                            )
-//                        },
-//                        actions = {
-//                            Icon(
-//                                modifier = Modifier
-//                                    .clickable {
-//                                        imagePicker.launch("image/*")
-//                                    }
-//                                    .padding(end = 24.dp),
-//                                imageVector = Icons.Default.AddPhotoAlternate,
-//                                contentDescription = "add photo from gallery",
-//                                tint = MaterialTheme.colorScheme.onSurface,
-//                            )
-//                        }
-//                    )
-//                }
-//            ) { innerPadding ->
-//                Column(
-//                    modifier = Modifier.padding(innerPadding)
-//                ) {
-//
-//                    TextField(
-//                        modifier = Modifier
-//                            .fillMaxWidth()
-//                            .padding(horizontal = 8.dp),
-//                        value = currentState.title,
-//                        onValueChange = { changedTitle ->
-//                            viewModel
-//                                .processCommand(CreateWorkoutCommand.InputTitle(changedTitle))
-//                        },
-//                        colors = TextFieldDefaults.colors(
-//                            focusedContainerColor = Color.Transparent,
-//                            unfocusedContainerColor = Color.Transparent,
-//                            unfocusedIndicatorColor = Color.Transparent,
-//                            focusedIndicatorColor = Color.Transparent
-//                        ),
-//                        textStyle = TextStyle(
-//                            fontSize = 24.sp,
-//                            fontWeight = FontWeight.Bold,
-//                            color = MaterialTheme.colorScheme.onBackground
-//                        ),
-//                        placeholder = {
-//                            Text(
-//                                text = "Title",
-//                                fontSize = 24.sp,
-//                                fontWeight = FontWeight.Bold,
-//                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f)
-//                            )
-//                        }
-//                    )
-//                    Text(
-//                        modifier = Modifier.padding(horizontal = 24.dp),
-//                        text = DateFormatter.formatCurrentDate(),
-//                        fontSize = 12.sp,
-//                        color = MaterialTheme.colorScheme.onSurfaceVariant
-//                    )
-//
-//                    Content(
-//                        modifier = Modifier
-//                            .weight(1f),
-//                        content = currentState.content,
-//                        onDeleteImageClick = {
-//                            viewModel.processCommand(
-//                                CreateWorkoutCommand.DeleteImage(it)
-//                            )
-//                        },
-//                        onTextChanged = { index, text ->
-//                            viewModel.processCommand(
-//                                CreateWorkoutCommand.InputContent(
-//                                    content = text,
-//                                    index = index
-//                                )
-//                            )
-//                        }
-//                    )
-//
-//                    Button(
-//                        modifier = Modifier
-//                            .padding(horizontal = 8.dp)
-//                            .fillMaxWidth(),
-//                        onClick = {
-//                            viewModel.processCommand(CreateWorkoutCommand.Save)
-//                        },
-//                        shape = RoundedCornerShape(10.dp),
-//                        enabled = currentState.isSaveEnabled,
-//                        colors = ButtonDefaults.buttonColors(
-//                            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(
-//                                alpha = 0.1f
-//                            ),
-//                            containerColor = MaterialTheme.colorScheme.primary,
-//                            contentColor = MaterialTheme.colorScheme.onPrimary,
-//                            disabledContentColor = MaterialTheme.colorScheme.onPrimary
-//                        )
-//                    ) {
-//                        Text(
-//                            text = "Save workout",
-//                        )
-//                    }
-//                }
-//            }
-//        }
-//
-//        CreateWorkoutState.Finished -> {
-//            LaunchedEffect(key1 = Unit) {
-//                onFinished()
-//            }
-//        }
-//    }
-//
-//}
-//
-//
-//@Preview
-//@Composable
-//fun CreateWorkoutScreenPreview() {
-//    WorkoutTimerTheme {
-//        CreateWorkoutScreen(onFinished = {})
-//    }
-//}
-//
+package ru.hopes.workouttimer.presentation.screen.creation
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CreateWorkoutScreen(
+    modifier: Modifier = Modifier,
+    viewModel: CreateWorkoutViewModel = hiltViewModel(),
+    onFinished: () -> Unit,
+    workoutId: Int? = null
+) {
+    val state by viewModel.state.collectAsState()
+
+    LaunchedEffect(workoutId) {
+        workoutId?.let { id ->
+            viewModel.loadWorkout(id)
+        }
+    }
+
+    if (state.isFinished) {
+        onFinished()
+        return
+    }
+
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = if (workoutId == null) "Новая тренировка" else "Редактирование",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground
+                ),
+                navigationIcon = {
+                    Icon(
+                        modifier = Modifier
+                            .padding(start = 16.dp, end = 8.dp)
+                            .clickable {
+                                viewModel.processCommand(CreateWorkoutCommand.Back)
+                            },
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Назад"
+                    )
+                },
+                actions = {
+                    IconButton(
+                        onClick = {
+                            viewModel.processCommand(CreateWorkoutCommand.Save)
+                        },
+                        enabled = state.isSaveEnabled
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "Сохранить",
+                            tint = if (state.isSaveEnabled) {
+                                MaterialTheme.colorScheme.onBackground
+                            } else {
+                                MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
+                            }
+                        )
+                    }
+                }
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = {
+                    viewModel.processCommand(CreateWorkoutCommand.AddExercise())
+                },
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                containerColor = MaterialTheme.colorScheme.primary,
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Добавить упражнение"
+                )
+            }
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+        ) {
+            OutlinedTextField(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                value = state.workoutName,
+                onValueChange = {
+                    viewModel.processCommand(CreateWorkoutCommand.ChangeWorkoutName(it))
+                },
+                label = { Text("Название тренировки") },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                text = "Упражнения",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(state.exercises, key = { it.id }) { exercise ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        shape = RoundedCornerShape(12.dp),
+
+                    ) {
+                        ExerciseItem(
+                            exercise = exercise,
+                            onNameChange = {
+                                viewModel.processCommand(
+                                    CreateWorkoutCommand.UpdateExercise(
+                                        exercise.id,
+                                        exercise.copy(name = it)
+                                    )
+                                )
+                            },
+                            onWeightChange = {
+                                viewModel.processCommand(
+                                    CreateWorkoutCommand.UpdateExerciseWeight(
+                                        exercise.id,
+                                        it
+                                    )
+                                )
+                            },
+                            onSetsChange = {
+                                viewModel.processCommand(
+                                    CreateWorkoutCommand.UpdateExercise(
+                                        exercise.id,
+                                        exercise.copy(sets = it)
+                                    )
+                                )
+                            },
+                            onRepsChange = {
+                                viewModel.processCommand(
+                                    CreateWorkoutCommand.UpdateExercise(
+                                        exercise.id,
+                                        exercise.copy(reps = it)
+                                    )
+                                )
+                            },
+                            onRestTimeChange = {
+                                viewModel.processCommand(
+                                    CreateWorkoutCommand.UpdateExercise(
+                                        exercise.id,
+                                        exercise.copy(restTimeSeconds = it)
+                                    )
+                                )
+                            },
+                            onNoteChange = {
+                                viewModel.processCommand(
+                                    CreateWorkoutCommand.UpdateExerciseNote(
+                                        exercise.id,
+                                        it
+                                    )
+                                )
+                            },
+                            onRemoveClick = {
+                                viewModel.processCommand(CreateWorkoutCommand.RemoveExercise(exercise.id))
+                            }
+                        )
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExerciseItem(
+    exercise: ExerciseItem,
+    onNameChange: (String) -> Unit,
+    onWeightChange: (String) -> Unit,
+    onSetsChange: (Int) -> Unit,
+    onRepsChange: (Int) -> Unit,
+    onRestTimeChange: (Int) -> Unit,
+    onNoteChange: (String) -> Unit,
+    onRemoveClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                modifier = Modifier.weight(1f),
+                value = exercise.name,
+                onValueChange = onNameChange,
+                label = { Text("Название") },
+                singleLine = true,
+                shape = RoundedCornerShape(8.dp)
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Icon(
+                modifier = Modifier
+                    .clickable { onRemoveClick() }
+                    .padding(8.dp),
+                imageVector = Icons.Default.Close,
+                contentDescription = "Удалить",
+                tint = MaterialTheme.colorScheme.error
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                modifier = Modifier.width(68.dp),
+                value = exercise.weightStr,
+                onValueChange = onWeightChange,
+                label = { Text("Вес") },
+                singleLine = true,
+                shape = RoundedCornerShape(8.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            OutlinedTextField(
+                modifier = Modifier.width(92.dp),
+                value = exercise.sets.toString(),
+                onValueChange = {
+                    onSetsChange(it.toIntOrNull() ?: 1)
+                },
+                label = { Text("Подходы") },
+                singleLine = true,
+                shape = RoundedCornerShape(8.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            OutlinedTextField(
+                modifier = Modifier.width(86.dp),
+                value = exercise.reps.toString(),
+                onValueChange = {
+                    onRepsChange(it.toIntOrNull() ?: 1)
+                },
+                label = { Text("Повторы") },
+                singleLine = true,
+                shape = RoundedCornerShape(8.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            OutlinedTextField(
+                modifier = Modifier.width(100.dp),
+                value = (exercise.restTimeSeconds / 60).toString(),
+                onValueChange = {
+                    val minutes = it.toIntOrNull() ?: 1
+                    onRestTimeChange(minutes.coerceAtLeast(1) * 60)
+                },
+                label = { Text("Отдых (мин)") },
+                singleLine = true,
+                shape = RoundedCornerShape(8.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = exercise.note,
+            onValueChange = onNoteChange,
+            label = { Text("Заметка") },
+            placeholder = { Text("Добавить заметку к упражнению") },
+            minLines = 2,
+            shape = RoundedCornerShape(8.dp)
+        )
+    }
+}
+
+@Preview
+@Composable
+fun CreateWorkoutScreenPreview() {
+    WorkoutTimerTheme {
+        CreateWorkoutScreen(onFinished = {})
+    }
+}
