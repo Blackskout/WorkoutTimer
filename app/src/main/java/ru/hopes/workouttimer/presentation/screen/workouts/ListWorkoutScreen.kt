@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
@@ -67,7 +68,8 @@ fun ListWorkoutScreen(
     onWorkoutClick: (WorkoutEntity) -> Unit,
     onLongClick: (WorkoutEntity) -> Unit,
     onEditClick: (WorkoutEntity) -> Unit = {},
-    onExportImportClick: () -> Unit = {}
+    onExportImportClick: () -> Unit = {},
+    onHistoryClick: (WorkoutEntity) -> Unit = {}
 ) {
 
     val state by viewModel.state.collectAsState()
@@ -175,6 +177,7 @@ fun ListWorkoutScreen(
                     onDeleteClick = {
                         workoutToDelete = it
                     },
+                    onHistoryClick = onHistoryClick,
                     backgroundColor = MaterialTheme.colorScheme.surface
                 )
 
@@ -245,7 +248,8 @@ fun WorkoutCard(
     onWorkoutClick: (WorkoutEntity) -> Unit,
     onLongClick: (WorkoutEntity) -> Unit,
     onEditClick: (WorkoutEntity) -> Unit = {},
-    onDeleteClick: (WorkoutEntity) -> Unit = {}
+    onDeleteClick: (WorkoutEntity) -> Unit = {},
+    onHistoryClick: (WorkoutEntity) -> Unit = {}
 ) {
     var showMenu by rememberSaveable { mutableStateOf(false) }
 
@@ -306,6 +310,19 @@ fun WorkoutCard(
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Edit,
+                        contentDescription = null
+                    )
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("История") },
+                onClick = {
+                    showMenu = false
+                    onHistoryClick(workout)
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.History,
                         contentDescription = null
                     )
                 }

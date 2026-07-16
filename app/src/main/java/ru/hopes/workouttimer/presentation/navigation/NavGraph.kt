@@ -13,6 +13,7 @@ import androidx.navigation.navArgument
 import ru.hopes.workouttimer.presentation.screen.creation.CreateWorkoutScreen
 import ru.hopes.workouttimer.presentation.screen.exportImport.ExportImportScreen
 import ru.hopes.workouttimer.presentation.screen.workoutExecution.WorkoutExecutionScreen
+import ru.hopes.workouttimer.presentation.screen.workoutHistory.WorkoutHistoryScreen
 import ru.hopes.workouttimer.presentation.screen.workouts.ListWorkoutScreen
 
 @Composable
@@ -45,6 +46,9 @@ fun NavGraph() {
                 },
                 onExportImportClick = {
                     navController.navigate(Screen.ExportImport.route)
+                },
+                onHistoryClick = { workout ->
+                    navController.navigate(Screen.History.createRoute(workout.id))
                 }
             )
         }
@@ -103,6 +107,23 @@ fun NavGraph() {
                 }
             )
         }
+
+        // Экран истории сессий тренировки
+        composable(
+            route = Screen.History.route,
+            arguments = listOf(
+                navArgument("workout_id") { type = NavType.IntType }
+            )
+        ) { entry ->
+            val workoutId = Screen.History.getWorkoutId(entry.arguments)
+            WorkoutHistoryScreen(
+                viewModel = hiltViewModel(),
+                workoutId = workoutId,
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
     }
 }
 
@@ -126,6 +147,16 @@ private sealed class Screen(val route: String) {
         // ВАЖНО: Формируем ссылку, которая совпадает с названием экрана (было "edit_note", стало "execution")
         fun createRoute(workoutId: Int): String {
             return "execution/$workoutId"
+        }
+
+        fun getWorkoutId(arguments: Bundle?): Int {
+            return arguments?.getInt("workout_id") ?: 0
+        }
+    }
+
+    data object History : Screen("history/{workout_id}") {
+        fun createRoute(workoutId: Int): String {
+            return "history/$workoutId"
         }
 
         fun getWorkoutId(arguments: Bundle?): Int {
