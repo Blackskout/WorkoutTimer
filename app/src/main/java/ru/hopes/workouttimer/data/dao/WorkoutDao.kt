@@ -8,6 +8,7 @@ import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 import ru.hopes.workouttimer.data.entity.ExerciseEntity
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
+import ru.hopes.workouttimer.data.entity.WorkoutSessionEntity
 
 @Dao
 interface WorkoutDao {
@@ -63,4 +64,23 @@ interface WorkoutDao {
         val exercisesWithId = exercises.map { it.copy(workoutId = workoutId) }
         insertExercises(exercisesWithId)
     }
+
+    @Insert
+    suspend fun insertSession(session: WorkoutSessionEntity)
+
+    @Query("SELECT * FROM workout_sessions WHERE workoutId = :workoutId ORDER BY finishedAt DESC")
+    fun getSessionsForWorkout(workoutId: Long): Flow<List<WorkoutSessionEntity>>
+
+    @Query(
+        """
+        SELECT ws.workoutId AS workoutId, ws.durationMillis AS durationMillis
+        FROM workout_sessions ws
+        INNER JOIN (
+            SELECT workoutId, MAX(finishedAt) AS maxFinishedAt
+            FROM workout_sessions
+            GROUP BY workoutId
+        ) latest ON ws.workoutId = latest.workoutId AND ws.finishedAt = latest.maxFinishedAt
+        """
+    )
+    fun getLastSessionDurations(): Flow<List<LastSessionDuration>>
 }
