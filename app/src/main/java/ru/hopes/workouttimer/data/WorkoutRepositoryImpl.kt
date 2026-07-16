@@ -9,8 +9,10 @@ import ru.hopes.workouttimer.data.dao.WorkoutDao
 import ru.hopes.workouttimer.data.dao.WorkoutWithExercises
 import ru.hopes.workouttimer.data.entity.ExerciseEntity
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
+import ru.hopes.workouttimer.data.entity.WorkoutSessionEntity
 import ru.hopes.workouttimer.data.mapper.toDomain
 import ru.hopes.workouttimer.domain.model.Workout
+import ru.hopes.workouttimer.domain.model.WorkoutSession
 import ru.hopes.workouttimer.domain.repository.WorkoutRepository
 import javax.inject.Inject
 
@@ -97,6 +99,29 @@ class WorkoutRepositoryImpl @Inject constructor(
     override suspend fun updateExerciseNote(exerciseId: Int, note: String) {
         withContext(Dispatchers.IO) {
             dao.updateExerciseNote(exerciseId, note)
+        }
+    }
+
+    override suspend fun addWorkoutSession(workoutId: Int, startedAt: Long, finishedAt: Long): Long {
+        val durationMillis = finishedAt - startedAt
+        dao.insertSession(
+            WorkoutSessionEntity(
+                workoutId = workoutId.toLong(),
+                startedAt = startedAt,
+                finishedAt = finishedAt,
+                durationMillis = durationMillis
+            )
+        )
+        return durationMillis
+    }
+
+    override fun getSessionsForWorkout(workoutId: Int): Flow<List<WorkoutSession>> {
+        return dao.getSessionsForWorkout(workoutId.toLong()).map { sessions -> sessions.map { it.toDomain() } }
+    }
+
+    override fun getLastSessionDurations(): Flow<Map<Int, Long>> {
+        return dao.getLastSessionDurations().map { list ->
+            list.associate { it.workoutId.toInt() to it.durationMillis }
         }
     }
 }
