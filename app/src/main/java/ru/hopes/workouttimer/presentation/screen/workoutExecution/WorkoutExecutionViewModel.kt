@@ -20,6 +20,7 @@ import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.repository.WorkoutRepository
+import ru.hopes.workouttimer.domain.usecase.AddWorkoutSessionUseCase
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
 import ru.hopes.workouttimer.presentation.service.TimerNotificationService
 import ru.hopes.workouttimer.presentation.utils.SoundPlayer
@@ -34,12 +35,14 @@ class WorkoutExecutionViewModel @Inject constructor(
     private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
     private val vibrationManager: VibrationManager,
     private val wakeLockHelper: WakeLockHelper,
-    private val workoutRepository: WorkoutRepository
+    private val workoutRepository: WorkoutRepository,
+    private val addWorkoutSessionUseCase: AddWorkoutSessionUseCase
 ) : ViewModel() {
 
     private var workout: Workout? = null
     var exercises: List<Exercise> = emptyList()
     private var exerciseIndex = 0
+    private var sessionStartedAt: Long = 0L
 
     val workoutName: String
         get() = workout?.name ?: ""
@@ -112,7 +115,8 @@ class WorkoutExecutionViewModel @Inject constructor(
                 workout = loadedWorkout
                 exercises = loadedWorkout.exercises.sortedBy { it.order }
                 exerciseIndex = 0
-                
+                sessionStartedAt = System.currentTimeMillis()
+
                 // Начинаем с первого упражнения в состоянии Rest
                 val firstExercise = exercises[0]
                 _uiState.value = WorkoutExecutionState.Active(
@@ -286,10 +290,17 @@ class WorkoutExecutionViewModel @Inject constructor(
             )
             startRestTimer()
         } else {
-            workout?.id?.let { id ->
-                viewModelScope.launch { workoutRepository.updateLastUseAt(id) }
+            val workoutId = workout?.id ?: return
+            viewModelScope.launch {
+                workoutRepository.updateLastUseAt(workoutId)
+                val finishedAt = System.currentTimeMillis()
+                val durationMillis = addWorkoutSessionUseCase(
+                    workoutId = workoutId,
+                    startedAt = sessionStartedAt,
+                    finishedAt = finishedAt
+                )
+                _uiState.value = WorkoutExecutionState.Finished(durationMillis = durationMillis)
             }
-            _uiState.value = WorkoutExecutionState.Finished
         }
     }
 
@@ -371,5 +382,5 @@ sealed class WorkoutExecutionState {
         val reps: Int = exercise.reps
     ) : WorkoutExecutionState()
     
-    data object Finished : WorkoutExecutionState()
+    data class Finished(val durationMillis: Long) : WorkoutExecutionState()
 }
