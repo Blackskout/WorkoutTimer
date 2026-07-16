@@ -7,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -16,6 +17,7 @@ import ru.hopes.workouttimer.data.entity.WorkoutEntity
 import ru.hopes.workouttimer.domain.usecase.AddWorkoutUseCase
 import ru.hopes.workouttimer.domain.usecase.DeleteWorkoutUseCase
 import ru.hopes.workouttimer.domain.usecase.GetAllWorkoutsUseCase
+import ru.hopes.workouttimer.domain.usecase.GetLastSessionDurationsUseCase
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
 import ru.hopes.workouttimer.domain.usecase.SearchWorkoutsUseCase
 import javax.inject.Inject
@@ -28,6 +30,7 @@ class ListWorkoutViewModel @Inject constructor(
     private val addWorkoutUseCase: AddWorkoutUseCase,
     private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
     private val deleteWorkoutUseCase: DeleteWorkoutUseCase,
+    private val getLastSessionDurationsUseCase: GetLastSessionDurationsUseCase,
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -126,13 +129,16 @@ class ListWorkoutViewModel @Inject constructor(
                 _state.update { it.copy(query = input) }
             }
             .flatMapLatest { input ->
-                if (input.isBlank()) {
+                val workoutsFlow = if (input.isBlank()) {
                     getAllWorkoutsUseCase()
                 } else {
                     searchWorkoutsUseCase(input)
                 }
-            }.onEach { workouts ->
-                _state.update { it.copy(workouts = workouts) }
+                workoutsFlow.combine(getLastSessionDurationsUseCase()) { workouts, durations ->
+                    workouts to durations
+                }
+            }.onEach { (workouts, durations) ->
+                _state.update { it.copy(workouts = workouts, lastSessionDurations = durations) }
             }
             .launchIn(viewModelScope)
     }
@@ -152,6 +158,7 @@ class ListWorkoutViewModel @Inject constructor(
 
 data class ListWorkoutState(
     val query: String = "",
-    val workouts: List<WorkoutEntity> = listOf()
+    val workouts: List<WorkoutEntity> = listOf(),
+    val lastSessionDurations: Map<Int, Long> = emptyMap()
 )
 
