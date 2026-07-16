@@ -12,6 +12,7 @@ import ru.hopes.workouttimer.data.ExportImportRepositoryImpl
 import ru.hopes.workouttimer.data.WorkoutRepositoryImpl
 import ru.hopes.workouttimer.data.dao.AppDatabase
 import ru.hopes.workouttimer.data.dao.MIGRATION_5_6
+import ru.hopes.workouttimer.data.dao.MIGRATION_6_7
 import ru.hopes.workouttimer.data.dao.WorkoutDao
 import ru.hopes.workouttimer.domain.repository.ExportImportRepository
 import ru.hopes.workouttimer.domain.repository.WorkoutRepository
@@ -28,7 +29,7 @@ object AppModule {
             AppDatabase::class.java,
             "workout_db"
         )
-            .addMigrations(MIGRATION_5_6)
+            .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
     }

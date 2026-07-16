@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.presentation.components.SystemMediaControllerCompat
+import ru.hopes.workouttimer.presentation.utils.DateFormatter
 import ru.hopes.workouttimer.presentation.utils.toCorrectNum
 
 // screens/WorkoutExecutionScreen.kt
@@ -73,13 +74,6 @@ fun WorkoutExecutionScreen(
     // Загружаем тренировку при первом запуске
     LaunchedEffect(workoutId) {
         viewModel.loadWorkout(workoutId)
-    }
-
-    // Обрабатываем завершение тренировки
-    LaunchedEffect(uiState) {
-        if (uiState is WorkoutExecutionState.Finished) {
-            onExerciseCompleted()
-        }
     }
 
     Scaffold(
@@ -167,8 +161,7 @@ fun WorkoutExecutionScreen(
                         }
 
                         is WorkoutExecutionState.Finished -> {
-                            // Это состояние обрабатывается в LaunchedEffect выше
-                            LoadingState()
+                            // Отображается диалогом завершения ниже
                         }
                     }
                 }
@@ -191,6 +184,21 @@ fun WorkoutExecutionScreen(
                 }
             )
         }
+    }
+
+    // Диалог завершения тренировки
+    val finishedState = uiState as? WorkoutExecutionState.Finished
+    if (finishedState != null) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Тренировка завершена") },
+            text = { Text("Время: ${DateFormatter.formatDurationToString(finishedState.durationMillis)}") },
+            confirmButton = {
+                TextButton(onClick = onExerciseCompleted) {
+                    Text("ОК")
+                }
+            }
+        )
     }
 }
 

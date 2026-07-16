@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
@@ -40,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -65,7 +68,8 @@ fun ListWorkoutScreen(
     onWorkoutClick: (WorkoutEntity) -> Unit,
     onLongClick: (WorkoutEntity) -> Unit,
     onEditClick: (WorkoutEntity) -> Unit = {},
-    onExportImportClick: () -> Unit = {}
+    onExportImportClick: () -> Unit = {},
+    onHistoryClick: (WorkoutEntity) -> Unit = {}
 ) {
 
     val state by viewModel.state.collectAsState()
@@ -166,12 +170,14 @@ fun ListWorkoutScreen(
                         .fillMaxWidth()
                         .padding(8.dp),
                     workout = workout,
+                    lastSessionDurationMillis = state.lastSessionDurations[workout.id],
                     onWorkoutClick = onWorkoutClick,
                     onLongClick = onLongClick,
                     onEditClick = onEditClick,
                     onDeleteClick = {
                         workoutToDelete = it
                     },
+                    onHistoryClick = onHistoryClick,
                     backgroundColor = MaterialTheme.colorScheme.surface
                 )
 
@@ -238,10 +244,12 @@ fun WorkoutCard(
     modifier: Modifier = Modifier,
     workout: WorkoutEntity,
     backgroundColor: Color,
+    lastSessionDurationMillis: Long? = null,
     onWorkoutClick: (WorkoutEntity) -> Unit,
     onLongClick: (WorkoutEntity) -> Unit,
     onEditClick: (WorkoutEntity) -> Unit = {},
-    onDeleteClick: (WorkoutEntity) -> Unit = {}
+    onDeleteClick: (WorkoutEntity) -> Unit = {},
+    onHistoryClick: (WorkoutEntity) -> Unit = {}
 ) {
     var showMenu by rememberSaveable { mutableStateOf(false) }
 
@@ -270,12 +278,23 @@ fun WorkoutCard(
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Text(
+            Column(
                 modifier = Modifier.weight(1f),
-                text = DateFormatter.formatDateToString(workout.lastUseAt),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+                horizontalAlignment = Alignment.End
+            ) {
+                Text(
+                    text = DateFormatter.formatDateToString(workout.lastUseAt),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (lastSessionDurationMillis != null) {
+                    Text(
+                        text = DateFormatter.formatDurationToString(lastSessionDurationMillis),
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
 
         DropdownMenu(
@@ -291,6 +310,19 @@ fun WorkoutCard(
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Edit,
+                        contentDescription = null
+                    )
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("История") },
+                onClick = {
+                    showMenu = false
+                    onHistoryClick(workout)
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.History,
                         contentDescription = null
                     )
                 }
