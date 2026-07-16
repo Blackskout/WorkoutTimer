@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -166,6 +168,7 @@ fun ListWorkoutScreen(
                         .fillMaxWidth()
                         .padding(8.dp),
                     workout = workout,
+                    lastSessionDurationMillis = state.lastSessionDurations[workout.id],
                     onWorkoutClick = onWorkoutClick,
                     onLongClick = onLongClick,
                     onEditClick = onEditClick,
@@ -238,6 +241,7 @@ fun WorkoutCard(
     modifier: Modifier = Modifier,
     workout: WorkoutEntity,
     backgroundColor: Color,
+    lastSessionDurationMillis: Long? = null,
     onWorkoutClick: (WorkoutEntity) -> Unit,
     onLongClick: (WorkoutEntity) -> Unit,
     onEditClick: (WorkoutEntity) -> Unit = {},
@@ -270,12 +274,23 @@ fun WorkoutCard(
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Text(
+            Column(
                 modifier = Modifier.weight(1f),
-                text = DateFormatter.formatDateToString(workout.lastUseAt),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+                horizontalAlignment = Alignment.End
+            ) {
+                Text(
+                    text = DateFormatter.formatDateToString(workout.lastUseAt),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (lastSessionDurationMillis != null) {
+                    Text(
+                        text = DateFormatter.formatDurationToString(lastSessionDurationMillis),
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
 
         DropdownMenu(
