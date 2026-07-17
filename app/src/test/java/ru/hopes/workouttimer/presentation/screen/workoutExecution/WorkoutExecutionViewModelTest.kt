@@ -4,6 +4,9 @@ import android.content.Context
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.Runs
+import io.mockk.just
+import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -64,9 +67,15 @@ class WorkoutExecutionViewModelTest {
         val workoutRepository = mockk<WorkoutRepository>()
         coEvery { workoutRepository.updateLastUseAt(1) } returns Unit
         val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val durationSlot = slot<Long>()
         coEvery {
-            addWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any())
-        } returns 1_234L
+            addWorkoutSessionUseCase(
+                workoutId = 1,
+                startedAt = any(),
+                finishedAt = any(),
+                durationMillis = capture(durationSlot)
+            )
+        } just Runs
 
         val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
@@ -74,9 +83,9 @@ class WorkoutExecutionViewModelTest {
 
         val state = viewModel.uiState.value
         assertTrue(state is WorkoutExecutionState.Finished)
-        assertEquals(1_234L, (state as WorkoutExecutionState.Finished).durationMillis)
+        assertEquals(durationSlot.captured, (state as WorkoutExecutionState.Finished).durationMillis)
         coVerify(exactly = 1) {
-            addWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any())
+            addWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any())
         }
     }
 
@@ -93,7 +102,7 @@ class WorkoutExecutionViewModelTest {
         viewModel.loadWorkout(1)
 
         coVerify(exactly = 0) {
-            addWorkoutSessionUseCase(workoutId = any(), startedAt = any(), finishedAt = any())
+            addWorkoutSessionUseCase(workoutId = any(), startedAt = any(), finishedAt = any(), durationMillis = any())
         }
     }
 

@@ -303,10 +303,13 @@ class WorkoutExecutionViewModel @Inject constructor(
             viewModelScope.launch {
                 workoutRepository.updateLastUseAt(workoutId)
                 val finishedAt = System.currentTimeMillis()
-                val durationMillis = addWorkoutSessionUseCase(
+                val rawDurationMillis = finishedAt - sessionStartedAt
+                val durationMillis = (rawDurationMillis - excludedIdleMillis).coerceAtLeast(0L)
+                addWorkoutSessionUseCase(
                     workoutId = workoutId,
                     startedAt = sessionStartedAt,
-                    finishedAt = finishedAt
+                    finishedAt = finishedAt,
+                    durationMillis = durationMillis
                 )
                 _uiState.value = WorkoutExecutionState.Finished(durationMillis = durationMillis)
             }

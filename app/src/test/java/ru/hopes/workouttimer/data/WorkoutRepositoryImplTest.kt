@@ -17,19 +17,18 @@ import ru.hopes.workouttimer.data.entity.WorkoutSessionEntity
 class WorkoutRepositoryImplTest {
 
     @Test
-    fun `addWorkoutSession computes duration and inserts entity with converted workoutId`() = runTest {
+    fun `addWorkoutSession stores the provided duration and inserts entity with converted workoutId`() = runTest {
         val dao = mockk<WorkoutDao>()
         val entitySlot = slot<WorkoutSessionEntity>()
         coEvery { dao.insertSession(capture(entitySlot)) } just io.mockk.Runs
         val repo = WorkoutRepositoryImpl(dao)
 
-        val duration = repo.addWorkoutSession(workoutId = 7, startedAt = 1_000L, finishedAt = 6_500L)
+        repo.addWorkoutSession(workoutId = 7, startedAt = 1_000L, finishedAt = 6_500L, durationMillis = 4_000L)
 
-        assertEquals(5_500L, duration)
         assertEquals(7L, entitySlot.captured.workoutId)
         assertEquals(1_000L, entitySlot.captured.startedAt)
         assertEquals(6_500L, entitySlot.captured.finishedAt)
-        assertEquals(5_500L, entitySlot.captured.durationMillis)
+        assertEquals(4_000L, entitySlot.captured.durationMillis)
     }
 
     @Test

@@ -102,8 +102,7 @@ class WorkoutRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun addWorkoutSession(workoutId: Int, startedAt: Long, finishedAt: Long): Long {
-        val durationMillis = finishedAt - startedAt
+    override suspend fun addWorkoutSession(workoutId: Int, startedAt: Long, finishedAt: Long, durationMillis: Long) {
         dao.insertSession(
             WorkoutSessionEntity(
                 workoutId = workoutId.toLong(),
@@ -112,7 +111,6 @@ class WorkoutRepositoryImpl @Inject constructor(
                 durationMillis = durationMillis
             )
         )
-        return durationMillis
     }
 
     override fun getSessionsForWorkout(workoutId: Int): Flow<List<WorkoutSession>> {
