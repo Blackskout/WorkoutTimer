@@ -112,13 +112,17 @@ class WorkoutExecutionViewModelTest {
         val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
 
-        // Bank a 35-minute excluded gap using timestamps far in the "future" relative to real
-        // wall-clock, so the automatic registerInteraction() inside onExerciseFinished() (which
-        // uses the real current time) computes a negative gap afterward and adds no further
-        // exclusion -- isolating the assertion to exactly this banked 35-minute amount.
+        // Bank a large excluded gap using timestamps far in the "future" relative to real
+        // wall-clock: the jump from loadWorkout's real lastInteractionAt to farFutureBase is
+        // itself well over the threshold and banks its own excess, and the subsequent 45-minute
+        // gap banks a further 35 minutes on top -- the exact total isn't asserted, only that it's
+        // large enough to exceed the (near-zero, in a fast unit test) raw duration below. The
+        // automatic registerInteraction() inside onExerciseFinished() (which uses the real
+        // current time, far in the past relative to farFutureBase) then computes a negative gap
+        // and adds no further exclusion.
         val farFutureBase = System.currentTimeMillis() + 10_000_000L
         viewModel.registerInteraction(now = farFutureBase)
-        viewModel.registerInteraction(now = farFutureBase + 45 * 60 * 1000L) // 45 min gap -> 35 min excluded
+        viewModel.registerInteraction(now = farFutureBase + 45 * 60 * 1000L) // additional 45 min gap
 
         viewModel.onExerciseFinished()
 
