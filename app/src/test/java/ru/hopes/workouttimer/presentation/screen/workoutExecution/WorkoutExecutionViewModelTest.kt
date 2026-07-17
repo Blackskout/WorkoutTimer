@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -275,5 +276,73 @@ class WorkoutExecutionViewModelTest {
         viewModel.onRestFinished()
 
         assertEquals(afterRealInteraction, viewModel.lastInteractionAt)
+    }
+
+    @Test
+    fun `loading a workout schedules the idle reminder for the first exercise`() = runTest {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
+        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        viewModel.loadWorkout(1)
+
+        assertTrue(viewModel.isIdleReminderJobActive)
+    }
+
+    @Test
+    fun `moving to rest cancels the idle reminder`() = runTest {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
+        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        viewModel.loadWorkout(1)
+        viewModel.onExerciseFinished() // sets=2, currentSet 1<2 -> переход в Rest
+
+        assertFalse(viewModel.isIdleReminderJobActive)
+    }
+
+    @Test
+    fun `skipping rest re-schedules the idle reminder`() = runTest {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
+        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        viewModel.loadWorkout(1)
+        viewModel.onExerciseFinished() // -> Rest
+        viewModel.skipRest() // -> Active
+
+        assertTrue(viewModel.isIdleReminderJobActive)
+    }
+
+    @Test
+    fun `finishing the workout cancels the idle reminder`() = runTest {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val workoutRepository = mockk<WorkoutRepository>()
+        coEvery { workoutRepository.updateLastUseAt(1) } returns Unit
+        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        coEvery {
+            addWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any())
+        } just Runs
+
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        viewModel.loadWorkout(1)
+        viewModel.onExerciseFinished() // единственное упражнение, единственный подход -> Finished
+
+        assertFalse(viewModel.isIdleReminderJobActive)
     }
 }

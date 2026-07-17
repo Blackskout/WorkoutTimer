@@ -64,6 +64,10 @@ class WorkoutExecutionViewModel @Inject constructor(
     val uiState: StateFlow<WorkoutExecutionState> = _uiState.asStateFlow()
 
     private var timerJob: Job? = null
+    private var idleReminderJob: Job? = null
+
+    internal val isIdleReminderJobActive: Boolean
+        get() = idleReminderJob?.isActive == true
 
     private fun startNotification(exerciseName: String, currentSet: Int, totalSets: Int, timeLeftMillis: Long) {
         val intent = Intent(context, TimerNotificationService::class.java).apply {
@@ -131,6 +135,7 @@ class WorkoutExecutionViewModel @Inject constructor(
                     currentSet = 1,
                     totalSets = firstExercise.sets,
                 )
+                scheduleIdleReminderIfActive()
             } else {
                 _uiState.value = WorkoutExecutionState.Error(
                     message = "Тренировка не найдена или не содержит упражнений"
@@ -159,6 +164,7 @@ class WorkoutExecutionViewModel @Inject constructor(
                 else -> state
             }
         }
+        scheduleIdleReminderIfActive()
     }
 
     fun startRestTimer() {
@@ -256,6 +262,7 @@ class WorkoutExecutionViewModel @Inject constructor(
                 else -> state
             }
         }
+        scheduleIdleReminderIfActive()
     }
 
     override fun onCleared() {
@@ -263,6 +270,7 @@ class WorkoutExecutionViewModel @Inject constructor(
         soundPlayer.release()
         wakeLockHelper.release()
         stopNotification()
+        idleReminderJob?.cancel()
     }
 
     fun onExerciseFinished() {
@@ -279,6 +287,7 @@ class WorkoutExecutionViewModel @Inject constructor(
                     totalRestTimeMillis = currentState.exercise.timeMillis
                 )
                 startRestTimer()
+                scheduleIdleReminderIfActive()
             } else {
                 // Упражнение завершено, переходим к следующему
                 moveToNextExercise()
@@ -298,6 +307,7 @@ class WorkoutExecutionViewModel @Inject constructor(
                 totalRestTimeMillis = nextExercise.timeMillis
             )
             startRestTimer()
+            scheduleIdleReminderIfActive()
         } else {
             val workoutId = workout?.id ?: return
             viewModelScope.launch {
@@ -312,6 +322,7 @@ class WorkoutExecutionViewModel @Inject constructor(
                     durationMillis = durationMillis
                 )
                 _uiState.value = WorkoutExecutionState.Finished(durationMillis = durationMillis)
+                scheduleIdleReminderIfActive()
             }
         }
     }
@@ -332,6 +343,7 @@ class WorkoutExecutionViewModel @Inject constructor(
                 currentSet = 1,
                 totalSets = nextExercise.sets
             )
+            scheduleIdleReminderIfActive()
         }
     }
 
@@ -379,6 +391,27 @@ class WorkoutExecutionViewModel @Inject constructor(
             }
         }
         lastInteractionAt = now
+    }
+
+    private fun scheduleIdleReminderIfActive() {
+        idleReminderJob?.cancel()
+        if (_uiState.value is WorkoutExecutionState.Active) {
+            idleReminderJob = viewModelScope.launch {
+                delay(IDLE_REMINDER_DELAY_MILLIS)
+                showIdleReminderNotification()
+            }
+        }
+    }
+
+    private fun showIdleReminderNotification() {
+        val state = _uiState.value as? WorkoutExecutionState.Active ?: return
+        val intent = Intent(context, TimerNotificationService::class.java).apply {
+            action = TimerNotificationService.ACTION_SHOW_IDLE_REMINDER
+            putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, state.exercise.name)
+            putExtra(TimerNotificationService.EXTRA_CURRENT_SET, state.currentSet)
+            putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, state.totalSets)
+        }
+        context.startService(intent)
     }
 
     companion object {
