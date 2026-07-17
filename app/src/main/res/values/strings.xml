@@ -1,6 +1,8 @@
 <resources>
     <string name="app_name">Workout Timer</string>
     <string name="all_workouts">Все тренировки</string>
+    <string name="add_workout">Добавить тренировку</string>
     <string name="h_ago">%1$d ч. назад</string>
+    <string name="d_ago">%1$d дн. назад</string>
     <string name="just_now">Только что</string>
 </resources>

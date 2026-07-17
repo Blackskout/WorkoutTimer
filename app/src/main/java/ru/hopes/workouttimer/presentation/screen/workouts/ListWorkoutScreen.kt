@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
@@ -46,7 +47,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.hopes.workouttimer.presentation.utils.DateFormatter
+import ru.hopes.workouttimer.presentation.utils.isStaleWorkout
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
 import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
@@ -129,9 +130,8 @@ fun ListWorkoutScreen(
                 shape = CircleShape
             ) {
                 Icon(
-                    modifier = Modifier.size(50.dp),
-                    painter = painterResource(R.drawable.outline_add_circle_24),
-                    contentDescription = null
+                    imageVector = Icons.Default.Add,
+                    contentDescription = stringResource(R.string.add_workout)
                 )
             }
         }
@@ -252,6 +252,11 @@ fun WorkoutCard(
     onHistoryClick: (WorkoutEntity) -> Unit = {}
 ) {
     var showMenu by rememberSaveable { mutableStateOf(false) }
+    val cardBackgroundColor = if (isStaleWorkout(workout.lastUseAt)) {
+        MaterialTheme.colorScheme.surfaceVariant
+    } else {
+        backgroundColor
+    }
 
     Box(modifier = modifier) {
         Row(
@@ -259,7 +264,7 @@ fun WorkoutCard(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
-                .background(backgroundColor)
+                .background(cardBackgroundColor)
                 .combinedClickable(
                     onClick = {
                         onWorkoutClick(workout)
