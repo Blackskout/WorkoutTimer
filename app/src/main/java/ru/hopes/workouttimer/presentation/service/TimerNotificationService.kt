@@ -20,10 +20,14 @@ class TimerNotificationService : Service() {
     private val finishedChannelId = "rest_finished_notification_channel"
     private val finishedNotificationId = 2
 
+    private val idleReminderChannelId = "idle_reminder_notification_channel"
+    private val idleReminderNotificationId = 3
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
         createFinishedNotificationChannel()
+        createIdleReminderNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -51,6 +55,12 @@ class TimerNotificationService : Service() {
                 val currentSet = intent.getIntExtra(EXTRA_CURRENT_SET, 1)
                 val totalSets = intent.getIntExtra(EXTRA_TOTAL_SETS, 1)
                 notificationManager.notify(finishedNotificationId, createFinishedNotification(exerciseName, currentSet, totalSets))
+            }
+            ACTION_SHOW_IDLE_REMINDER -> {
+                val exerciseName = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: "Упражнение"
+                val currentSet = intent.getIntExtra(EXTRA_CURRENT_SET, 1)
+                val totalSets = intent.getIntExtra(EXTRA_TOTAL_SETS, 1)
+                notificationManager.notify(idleReminderNotificationId, createIdleReminderNotification(exerciseName, currentSet, totalSets))
             }
         }
         return START_NOT_STICKY
@@ -161,6 +171,54 @@ class TimerNotificationService : Service() {
             .build()
     }
 
+    private fun createIdleReminderNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                idleReminderChannelId,
+                "Напоминание о тренировке",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Напоминание вернуться в приложение, если подход давно не завершён"
+                setShowBadge(false)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun createIdleReminderNotification(
+        exerciseName: String,
+        currentSet: Int,
+        totalSets: Int
+    ): android.app.Notification {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val title = "Вы всё ещё тренируетесь?"
+        val content = "$exerciseName — Подход $currentSet из $totalSets. Не забудьте закончить подход."
+
+        return NotificationCompat.Builder(this, idleReminderChannelId)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentIntent(pendingIntent)
+            .setOngoing(false)
+            .setShowWhen(false)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+    }
+
     private fun formatTime(millis: Long): String {
         val totalSeconds = millis / 1000
         val minutes = totalSeconds / 60
@@ -178,6 +236,7 @@ class TimerNotificationService : Service() {
         const val ACTION_UPDATE = "UPDATE"
         const val ACTION_STOP = "STOP"
         const val ACTION_SHOW_FINISHED = "SHOW_FINISHED"
+        const val ACTION_SHOW_IDLE_REMINDER = "SHOW_IDLE_REMINDER"
 
         const val EXTRA_EXERCISE_NAME = "exercise_name"
         const val EXTRA_CURRENT_SET = "current_set"
