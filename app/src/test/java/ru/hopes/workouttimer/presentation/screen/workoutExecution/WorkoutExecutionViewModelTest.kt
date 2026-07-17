@@ -91,6 +91,46 @@ class WorkoutExecutionViewModelTest {
     }
 
     @Test
+    fun `excluded idle time is subtracted from the saved duration and clamped at zero`() = runTest {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val workoutRepository = mockk<WorkoutRepository>()
+        coEvery { workoutRepository.updateLastUseAt(1) } returns Unit
+        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val durationSlot = slot<Long>()
+        coEvery {
+            addWorkoutSessionUseCase(
+                workoutId = 1,
+                startedAt = any(),
+                finishedAt = any(),
+                durationMillis = capture(durationSlot)
+            )
+        } just Runs
+
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        viewModel.loadWorkout(1)
+
+        // Bank a 35-minute excluded gap using timestamps far in the "future" relative to real
+        // wall-clock, so the automatic registerInteraction() inside onExerciseFinished() (which
+        // uses the real current time) computes a negative gap afterward and adds no further
+        // exclusion -- isolating the assertion to exactly this banked 35-minute amount.
+        val farFutureBase = System.currentTimeMillis() + 10_000_000L
+        viewModel.registerInteraction(now = farFutureBase)
+        viewModel.registerInteraction(now = farFutureBase + 45 * 60 * 1000L) // 45 min gap -> 35 min excluded
+
+        viewModel.onExerciseFinished()
+
+        // Raw elapsed (real loadWorkout time -> real finishedAt time) is near-zero in a fast unit
+        // test, while the banked exclusion is 35 minutes, so the coerceAtLeast(0L) clamp must apply.
+        assertEquals(0L, durationSlot.captured)
+        val state = viewModel.uiState.value
+        assertTrue(state is WorkoutExecutionState.Finished)
+        assertEquals(0L, (state as WorkoutExecutionState.Finished).durationMillis)
+    }
+
+    @Test
     fun `loading a workout does not save a session by itself`() = runTest {
         val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
         val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)

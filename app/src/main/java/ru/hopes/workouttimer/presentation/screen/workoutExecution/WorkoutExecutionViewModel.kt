@@ -411,7 +411,14 @@ class WorkoutExecutionViewModel @Inject constructor(
             putExtra(TimerNotificationService.EXTRA_CURRENT_SET, state.currentSet)
             putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, state.totalSets)
         }
-        context.startService(intent)
+        try {
+            context.startService(intent)
+        } catch (e: IllegalStateException) {
+            // Best-effort, not correctness-critical: the app may be fully backgrounded with no
+            // foreground service running (the exact scenario this reminder exists for), in which
+            // case Android disallows starting a service (API 26+) and throws IllegalStateException
+            // (or its API 31+ subclass ForegroundServiceStartNotAllowedException). Swallow it.
+        }
     }
 
     companion object {
