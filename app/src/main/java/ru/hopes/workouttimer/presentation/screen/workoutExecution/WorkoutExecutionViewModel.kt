@@ -44,6 +44,11 @@ class WorkoutExecutionViewModel @Inject constructor(
     private var exerciseIndex = 0
     private var sessionStartedAt: Long = 0L
 
+    internal var lastInteractionAt: Long = 0L
+        private set
+    internal var excludedIdleMillis: Long = 0L
+        private set
+
     val workoutName: String
         get() = workout?.name ?: ""
 
@@ -116,6 +121,8 @@ class WorkoutExecutionViewModel @Inject constructor(
                 exercises = loadedWorkout.exercises.sortedBy { it.order }
                 exerciseIndex = 0
                 sessionStartedAt = System.currentTimeMillis()
+                lastInteractionAt = sessionStartedAt
+                excludedIdleMillis = 0L
 
                 // Начинаем с первого упражнения в состоянии Rest
                 val firstExercise = exercises[0]
@@ -357,8 +364,20 @@ class WorkoutExecutionViewModel @Inject constructor(
         }
     }
 
+    internal fun registerInteraction(now: Long = System.currentTimeMillis()) {
+        if (lastInteractionAt != 0L) {
+            val gap = now - lastInteractionAt
+            if (gap > IDLE_EXCLUSION_THRESHOLD_MILLIS) {
+                excludedIdleMillis += gap - IDLE_EXCLUSION_THRESHOLD_MILLIS
+            }
+        }
+        lastInteractionAt = now
+    }
 
-
+    companion object {
+        internal const val IDLE_EXCLUSION_THRESHOLD_MILLIS = 10 * 60 * 1000L
+        internal const val IDLE_REMINDER_DELAY_MILLIS = 5 * 60 * 1000L
+    }
 }
 
 sealed class WorkoutExecutionState {
