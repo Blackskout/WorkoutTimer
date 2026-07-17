@@ -109,8 +109,8 @@ class WorkoutExecutionViewModelTest {
         val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
 
-        viewModel.registerInteraction(now = 0L)
-        viewModel.registerInteraction(now = 5 * 60 * 1000L) // 5 минут, меньше порога в 10
+        viewModel.registerInteraction(now = 1L) // ненулевая база: 0L совпал бы с "ещё не было взаимодействий"
+        viewModel.registerInteraction(now = 1L + 5 * 60 * 1000L) // 5 минут, меньше порога в 10
 
         assertEquals(0L, viewModel.excludedIdleMillis)
     }
@@ -127,8 +127,8 @@ class WorkoutExecutionViewModelTest {
         val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
 
-        viewModel.registerInteraction(now = 0L)
-        viewModel.registerInteraction(now = 45 * 60 * 1000L) // 45 минут простоя
+        viewModel.registerInteraction(now = 1L)
+        viewModel.registerInteraction(now = 1L + 45 * 60 * 1000L) // 45 минут простоя
 
         assertEquals(35 * 60 * 1000L, viewModel.excludedIdleMillis) // исключены только 45 - 10 = 35 минут
     }
@@ -145,9 +145,9 @@ class WorkoutExecutionViewModelTest {
         val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
 
-        viewModel.registerInteraction(now = 0L)
-        viewModel.registerInteraction(now = 20 * 60 * 1000L) // гэп 20 мин -> исключено 10 мин
-        viewModel.registerInteraction(now = 20 * 60 * 1000L + 30 * 60 * 1000L) // ещё гэп 30 мин -> исключено ещё 20 мин
+        viewModel.registerInteraction(now = 1L)
+        viewModel.registerInteraction(now = 1L + 20 * 60 * 1000L) // гэп 20 мин -> исключено 10 мин
+        viewModel.registerInteraction(now = 1L + 20 * 60 * 1000L + 30 * 60 * 1000L) // ещё гэп 30 мин -> исключено ещё 20 мин
 
         assertEquals(30 * 60 * 1000L, viewModel.excludedIdleMillis) // 10 + 20 = 30 минут суммарно
     }
@@ -163,8 +163,8 @@ class WorkoutExecutionViewModelTest {
 
         val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
-        viewModel.registerInteraction(now = 0L)
-        viewModel.registerInteraction(now = 45 * 60 * 1000L)
+        viewModel.registerInteraction(now = 1L)
+        viewModel.registerInteraction(now = 1L + 45 * 60 * 1000L)
         assertEquals(35 * 60 * 1000L, viewModel.excludedIdleMillis)
 
         viewModel.loadWorkout(1) // повторная загрузка = новая сессия
