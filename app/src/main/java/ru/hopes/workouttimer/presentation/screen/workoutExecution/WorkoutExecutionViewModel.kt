@@ -140,6 +140,7 @@ class WorkoutExecutionViewModel @Inject constructor(
     }
 
     fun skipRest() {
+        registerInteraction()
         timerJob?.cancel()
         wakeLockHelper.release()
         stopNotification()
@@ -226,7 +227,7 @@ class WorkoutExecutionViewModel @Inject constructor(
         }
     }
 
-    private fun onRestFinished() {
+    internal fun onRestFinished() {
         val previousState = _uiState.value as? WorkoutExecutionState.Rest
         timerJob?.cancel()
         stopNotification()
@@ -265,6 +266,7 @@ class WorkoutExecutionViewModel @Inject constructor(
     }
 
     fun onExerciseFinished() {
+        registerInteraction()
         val currentState = _uiState.value
         if (currentState is WorkoutExecutionState.Active) {
             if (currentState.currentSet < currentState.totalSets) {
@@ -315,6 +317,7 @@ class WorkoutExecutionViewModel @Inject constructor(
         val index = exercises.indexOfFirst { it.id == exercise.id }
 
         if (index != -1) {
+            registerInteraction()
             timerJob?.cancel()
             wakeLockHelper.release()
             stopNotification()
@@ -330,6 +333,7 @@ class WorkoutExecutionViewModel @Inject constructor(
     }
 
     fun updateExerciseNote(exerciseId: Int, note: String) {
+        registerInteraction()
         viewModelScope.launch {
             workoutRepository.updateExerciseNote(exerciseId, note)
             

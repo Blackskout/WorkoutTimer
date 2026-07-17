@@ -171,4 +171,100 @@ class WorkoutExecutionViewModelTest {
 
         assertEquals(0L, viewModel.excludedIdleMillis)
     }
+
+    @Test
+    fun `onExerciseFinished registers an interaction`() = runTest {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
+        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        viewModel.loadWorkout(1)
+        val farFuture = System.currentTimeMillis() + 1_000_000L
+        viewModel.registerInteraction(now = farFuture)
+
+        viewModel.onExerciseFinished()
+
+        assertTrue(viewModel.lastInteractionAt < farFuture)
+    }
+
+    @Test
+    fun `skipRest registers an interaction`() = runTest {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
+        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        viewModel.loadWorkout(1)
+        val farFuture = System.currentTimeMillis() + 1_000_000L
+        viewModel.registerInteraction(now = farFuture)
+
+        viewModel.skipRest()
+
+        assertTrue(viewModel.lastInteractionAt < farFuture)
+    }
+
+    @Test
+    fun `moveToSelectedExercise registers an interaction`() = runTest {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
+        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        viewModel.loadWorkout(1)
+        val farFuture = System.currentTimeMillis() + 1_000_000L
+        viewModel.registerInteraction(now = farFuture)
+
+        viewModel.moveToSelectedExercise(exercise)
+
+        assertTrue(viewModel.lastInteractionAt < farFuture)
+    }
+
+    @Test
+    fun `updateExerciseNote registers an interaction`() = runTest {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
+        coEvery { workoutRepository.updateExerciseNote(1, "note") } returns Unit
+        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        viewModel.loadWorkout(1)
+        val farFuture = System.currentTimeMillis() + 1_000_000L
+        viewModel.registerInteraction(now = farFuture)
+
+        viewModel.updateExerciseNote(1, "note")
+
+        assertTrue(viewModel.lastInteractionAt < farFuture)
+    }
+
+    @Test
+    fun `automatic rest completion does not register an interaction`() = runTest {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
+        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        viewModel.loadWorkout(1)
+        viewModel.onExerciseFinished() // sets=2, currentSet 1<2 -> переход в Rest, регистрирует взаимодействие
+        val afterRealInteraction = viewModel.lastInteractionAt
+
+        viewModel.onRestFinished()
+
+        assertEquals(afterRealInteraction, viewModel.lastInteractionAt)
+    }
 }
