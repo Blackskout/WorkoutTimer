@@ -6,7 +6,7 @@ import javax.inject.Inject
 class AddWorkoutSessionUseCase @Inject constructor(
     private val repo: WorkoutRepository
 ) {
-    suspend operator fun invoke(workoutId: Int, startedAt: Long, finishedAt: Long): Long {
-        return repo.addWorkoutSession(workoutId, startedAt, finishedAt)
+    suspend operator fun invoke(workoutId: Int, startedAt: Long, finishedAt: Long, durationMillis: Long) {
+        repo.addWorkoutSession(workoutId, startedAt, finishedAt, durationMillis)
     }
 }
