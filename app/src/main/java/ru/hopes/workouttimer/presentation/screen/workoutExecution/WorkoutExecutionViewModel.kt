@@ -58,6 +58,12 @@ class WorkoutExecutionViewModel @Inject constructor(
     val currentExerciseNumber: Int
         get() = exerciseIndex + 1
 
+    // Текущий подход закрывает всю тренировку: экран спрашивает подтверждение перед
+    // onExerciseFinished(), потому что дальше сессия уже уйдёт в БД.
+    val isLastSetOfWorkout: Boolean
+        get() = (_uiState.value as? WorkoutExecutionState.Active)
+            ?.let { it.currentSet == it.totalSets && exerciseIndex == exercises.lastIndex } == true
+
     private val _uiState = MutableStateFlow<WorkoutExecutionState>(
         WorkoutExecutionState.Loading
     )

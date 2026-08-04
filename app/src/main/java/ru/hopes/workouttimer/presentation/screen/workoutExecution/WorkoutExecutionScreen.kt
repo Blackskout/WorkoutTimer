@@ -2,6 +2,7 @@
 
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -71,9 +72,23 @@ fun WorkoutExecutionScreen(
     var showNoteDialog by remember { mutableStateOf(false) }
     var currentEditingExercise by remember { mutableStateOf<Exercise?>(null) }
 
+    // Состояние диалогов подтверждения
+    var showExitDialog by remember { mutableStateOf(false) }
+    var showFinishDialog by remember { mutableStateOf(false) }
+
+    // Уходить без подтверждения нечего терять только в Loading/Error/Finished:
+    // в Finished сессия уже сохранена, в остальных двух её ещё нет.
+    val hasUnsavedProgress =
+        uiState is WorkoutExecutionState.Active || uiState is WorkoutExecutionState.Rest
+
     // Загружаем тренировку при первом запуске
     LaunchedEffect(workoutId) {
         viewModel.loadWorkout(workoutId)
+    }
+
+    // Системная кнопка/жест «Назад» — тот же диалог, что и стрелка в TopAppBar
+    BackHandler(enabled = hasUnsavedProgress) {
+        showExitDialog = true
     }
 
     Scaffold(
@@ -81,7 +96,11 @@ fun WorkoutExecutionScreen(
             TopAppBar(
                 title = { Text(text = workoutName.ifEmpty { "Тренировка" }) },
                 navigationIcon = {
-                    IconButton(onClick = { onExerciseCompleted() }) {
+                    IconButton(
+                        onClick = {
+                            if (hasUnsavedProgress) showExitDialog = true else onExerciseCompleted()
+                        }
+                    ) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
                     }
                 }
@@ -151,7 +170,13 @@ fun WorkoutExecutionScreen(
                                 activeState = currentState,
                                 currentExerciseNumber = viewModel.currentExerciseNumber,
                                 totalExercises = viewModel.totalExercises,
-                                onExerciseFinished = { viewModel.onExerciseFinished() },
+                                onExerciseFinished = {
+                                    if (viewModel.isLastSetOfWorkout) {
+                                        showFinishDialog = true
+                                    } else {
+                                        viewModel.onExerciseFinished()
+                                    }
+                                },
                                 onEditNote = { exercise ->
                                     currentEditingExercise = exercise
                                     showNoteDialog = true
@@ -184,6 +209,54 @@ fun WorkoutExecutionScreen(
                 }
             )
         }
+    }
+
+    // Подтверждение выхода: прогресс нигде не сохраняется, пока тренировка не дойдёт до конца
+    if (showExitDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitDialog = false },
+            title = { Text("Выйти из тренировки?") },
+            text = { Text("Прогресс не будет сохранён.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showExitDialog = false
+                        onExerciseCompleted()
+                    }
+                ) {
+                    Text("Выйти")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitDialog = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+
+    // Подтверждение завершения: следующий шаг уже запишет сессию в историю
+    if (showFinishDialog) {
+        AlertDialog(
+            onDismissRequest = { showFinishDialog = false },
+            title = { Text("Завершить тренировку?") },
+            text = { Text("Это последний подход. Тренировка будет завершена и сохранена в историю.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showFinishDialog = false
+                        viewModel.onExerciseFinished()
+                    }
+                ) {
+                    Text("Завершить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFinishDialog = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
     }
 
     // Диалог завершения тренировки

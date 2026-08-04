@@ -389,4 +389,77 @@ class WorkoutExecutionViewModelTest {
 
         assertFalse(viewModel.isIdleReminderJobActive)
     }
+
+    @Test
+    fun `isLastSetOfWorkout is false on an intermediate set`() = runTest {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val viewModel = buildViewModel(
+            getWorkoutByIdUseCase,
+            mockk<WorkoutRepository>(relaxed = true),
+            mockk<AddWorkoutSessionUseCase>()
+        )
+
+        viewModel.loadWorkout(1) // подход 1 из 2
+
+        assertFalse(viewModel.isLastSetOfWorkout)
+    }
+
+    @Test
+    fun `isLastSetOfWorkout is false on the last set of a non-final exercise`() = runTest {
+        val first = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
+        val second = Exercise(id = 2, name = "Pull", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 2)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(first, second), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val viewModel = buildViewModel(
+            getWorkoutByIdUseCase,
+            mockk<WorkoutRepository>(relaxed = true),
+            mockk<AddWorkoutSessionUseCase>()
+        )
+
+        viewModel.loadWorkout(1) // единственный подход первого из двух упражнений
+
+        assertFalse(viewModel.isLastSetOfWorkout)
+    }
+
+    @Test
+    fun `isLastSetOfWorkout is true on the last set of the last exercise`() = runTest {
+        val first = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
+        val second = Exercise(id = 2, name = "Pull", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 2)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(first, second), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val viewModel = buildViewModel(
+            getWorkoutByIdUseCase,
+            mockk<WorkoutRepository>(relaxed = true),
+            mockk<AddWorkoutSessionUseCase>()
+        )
+
+        viewModel.loadWorkout(1)
+        viewModel.moveToSelectedExercise(second) // единственный подход последнего упражнения
+
+        assertTrue(viewModel.isLastSetOfWorkout)
+    }
+
+    @Test
+    fun `isLastSetOfWorkout is false while resting`() = runTest {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val viewModel = buildViewModel(
+            getWorkoutByIdUseCase,
+            mockk<WorkoutRepository>(relaxed = true),
+            mockk<AddWorkoutSessionUseCase>()
+        )
+
+        viewModel.loadWorkout(1)
+        viewModel.onExerciseFinished() // sets=2, currentSet 1<2 -> Rest
+
+        assertTrue(viewModel.uiState.value is WorkoutExecutionState.Rest)
+        assertFalse(viewModel.isLastSetOfWorkout)
+    }
 }
