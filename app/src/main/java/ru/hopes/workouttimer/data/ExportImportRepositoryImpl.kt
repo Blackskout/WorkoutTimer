@@ -9,12 +9,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import ru.hopes.workouttimer.data.dao.WorkoutDao
 import ru.hopes.workouttimer.data.entity.ExerciseEntity
-import ru.hopes.workouttimer.data.mapper.toDomain
-import ru.hopes.workouttimer.data.mapper.toExport
 import ru.hopes.workouttimer.domain.model.export.ExportData
 import ru.hopes.workouttimer.domain.repository.ExportImportRepository
 import ru.hopes.workouttimer.domain.repository.ImportResult
