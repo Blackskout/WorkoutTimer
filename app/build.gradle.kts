@@ -63,6 +63,7 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.kotlin.stdlib)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.compose.runtime)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
