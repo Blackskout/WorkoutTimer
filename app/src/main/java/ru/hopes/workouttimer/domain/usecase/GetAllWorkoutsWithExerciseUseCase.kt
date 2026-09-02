@@ -8,7 +8,7 @@ import javax.inject.Inject
 class GetAllWorkoutsWithExerciseUseCase @Inject constructor(
     private val repo: WorkoutRepository
 ) {
-    suspend operator fun invoke(): Flow<List<WorkoutWithExercises>> {
+    operator fun invoke(): Flow<List<WorkoutWithExercises>> {
         return repo.getAllWorkoutsWithExercise()
     }
 }
