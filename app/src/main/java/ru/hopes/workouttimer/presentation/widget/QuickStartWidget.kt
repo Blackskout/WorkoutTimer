@@ -12,6 +12,7 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.LocalContext
+import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
@@ -78,7 +79,7 @@ private fun WidgetContent(workouts: List<WidgetWorkout>) {
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .padding(bottom = 8.dp)
-                .clickable(actionStartActivity(openWorkoutsIntent(context)))
+                .clickable(actionStartActivity<MainActivity>())
         )
 
         if (workouts.isEmpty()) {
@@ -90,7 +91,7 @@ private fun WidgetContent(workouts: List<WidgetWorkout>) {
                 ),
                 modifier = GlanceModifier
                     .fillMaxWidth()
-                    .clickable(actionStartActivity(openWorkoutsIntent(context)))
+                    .clickable(actionStartActivity<MainActivity>())
             )
         } else {
             LazyColumn {
@@ -130,16 +131,6 @@ private fun WorkoutRow(workout: WidgetWorkout) {
         )
     }
 }
-
-/**
- * Открывает приложение без deep link'а (шапка виджета, пустое состояние).
- * FLAG_ACTIVITY_NEW_TASK обязателен: клик по виджету запускает Activity не из
- * контекста другой Activity, без флага система выбросит исключение.
- */
-private fun openWorkoutsIntent(context: Context): Intent =
-    Intent(context, MainActivity::class.java).apply {
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-    }
 
 /**
  * Флаги обязательны: без NEW_TASK|CLEAR_TASK NavController обрезает стек до
