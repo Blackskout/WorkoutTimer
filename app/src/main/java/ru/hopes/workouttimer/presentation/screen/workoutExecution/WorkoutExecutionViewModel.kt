@@ -317,7 +317,6 @@ class WorkoutExecutionViewModel @Inject constructor(
         } else {
             val workoutId = workout?.id ?: return
             viewModelScope.launch {
-                workoutRepository.updateLastUseAt(workoutId)
                 val finishedAt = System.currentTimeMillis()
                 val rawDurationMillis = finishedAt - sessionStartedAt
                 val durationMillis = (rawDurationMillis - excludedIdleMillis).coerceAtLeast(0L)
@@ -327,6 +326,11 @@ class WorkoutExecutionViewModel @Inject constructor(
                     finishedAt = finishedAt,
                     durationMillis = durationMillis
                 )
+                // Порядок важен: пуш обновления виджета подвешен на updateLastUseAt(),
+                // а виджет берёт длительность из последней сессии. Если вызвать
+                // updateLastUseAt() раньше записи сессии, виджет может перерисоваться
+                // со старой длительностью или без неё — сессию нужно писать первой.
+                workoutRepository.updateLastUseAt(workoutId)
                 _uiState.value = WorkoutExecutionState.Finished(durationMillis = durationMillis)
                 scheduleIdleReminderIfActive()
             }
