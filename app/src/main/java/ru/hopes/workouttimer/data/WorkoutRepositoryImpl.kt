@@ -41,8 +41,7 @@ class WorkoutRepositoryImpl @Inject constructor(
             // Обновляем тренировку
             dao.updateWorkout(
                 id = workout.id,
-                name = workout.name,
-                lastUseAt = workout.lastUseAt
+                name = workout.name
             )
 
             // Удаляем старые упражнения и добавляем новые

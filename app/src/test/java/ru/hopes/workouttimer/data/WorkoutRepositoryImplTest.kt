@@ -1,6 +1,7 @@
 package ru.hopes.workouttimer.data
 
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -13,6 +14,7 @@ import org.junit.Test
 import ru.hopes.workouttimer.data.dao.LastSessionDuration
 import ru.hopes.workouttimer.data.dao.WorkoutDao
 import ru.hopes.workouttimer.data.entity.WorkoutSessionEntity
+import ru.hopes.workouttimer.domain.model.Workout
 
 class WorkoutRepositoryImplTest {
 
@@ -62,5 +64,17 @@ class WorkoutRepositoryImplTest {
         val durations = repo.getLastSessionDurations().first()
 
         assertEquals(mapOf(7 to 5_500L, 9 to 2_000L), durations)
+    }
+
+    @Test
+    fun `updateWorkout does not touch lastUseAt`() = runTest {
+        val dao = mockk<WorkoutDao>(relaxed = true)
+        val repo = WorkoutRepositoryImpl(dao)
+
+        repo.updateWorkout(
+            Workout(id = 3, name = "Ноги", exercises = emptyList(), lastUseAt = 999L)
+        )
+
+        coVerify { dao.updateWorkout(id = 3, name = "Ноги") }
     }
 }
