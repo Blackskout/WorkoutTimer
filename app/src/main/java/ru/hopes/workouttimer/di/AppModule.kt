@@ -15,7 +15,9 @@ import ru.hopes.workouttimer.data.dao.MIGRATION_5_6
 import ru.hopes.workouttimer.data.dao.MIGRATION_6_7
 import ru.hopes.workouttimer.data.dao.WorkoutDao
 import ru.hopes.workouttimer.domain.repository.ExportImportRepository
+import ru.hopes.workouttimer.domain.repository.WidgetUpdater
 import ru.hopes.workouttimer.domain.repository.WorkoutRepository
+import ru.hopes.workouttimer.presentation.widget.GlanceWidgetUpdater
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -40,16 +42,26 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideWorkoutRepository(dao: WorkoutDao): WorkoutRepository {
-        return WorkoutRepositoryImpl(dao)
+    fun provideWidgetUpdater(@ApplicationContext ctx: Context): WidgetUpdater {
+        return GlanceWidgetUpdater(ctx)
+    }
+
+    @Provides
+    @Singleton
+    fun provideWorkoutRepository(
+        dao: WorkoutDao,
+        widgetUpdater: WidgetUpdater
+    ): WorkoutRepository {
+        return WorkoutRepositoryImpl(dao, widgetUpdater)
     }
 
     @Provides
     @Singleton
     fun provideExportImportRepository(
         @ApplicationContext ctx: Context,
-        dao: WorkoutDao
+        dao: WorkoutDao,
+        widgetUpdater: WidgetUpdater
     ): ExportImportRepository {
-        return ExportImportRepositoryImpl(ctx, dao)
+        return ExportImportRepositoryImpl(ctx, dao, widgetUpdater)
     }
 }

@@ -18,6 +18,7 @@ import ru.hopes.workouttimer.data.mapper.toExport
 import ru.hopes.workouttimer.domain.model.export.ExportData
 import ru.hopes.workouttimer.domain.repository.ExportImportRepository
 import ru.hopes.workouttimer.domain.repository.ImportResult
+import ru.hopes.workouttimer.domain.repository.WidgetUpdater
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -26,7 +27,8 @@ import javax.inject.Inject
 
 class ExportImportRepositoryImpl @Inject constructor(
     private val context: Context,
-    private val dao: WorkoutDao
+    private val dao: WorkoutDao,
+    private val widgetUpdater: WidgetUpdater
 ) : ExportImportRepository {
 
     private val json = Json {
@@ -118,6 +120,10 @@ class ExportImportRepositoryImpl @Inject constructor(
                         exerciseEntities
                     )
                     importedCount++
+                }
+
+                if (importedCount > 0) {
+                    widgetUpdater.requestUpdate()
                 }
 
                 ImportResult(
