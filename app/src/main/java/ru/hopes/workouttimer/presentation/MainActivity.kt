@@ -1,12 +1,14 @@
 package ru.hopes.workouttimer.presentation
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -23,6 +25,8 @@ class MainActivity : ComponentActivity() {
         // Пользователь принял или отклонил разрешение на уведомления
     }
 
+    private val newIntent = mutableStateOf<Intent?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -32,9 +36,18 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             WorkoutTimerTheme {
-                NavGraph()
+                NavGraph(
+                    newIntent = newIntent.value,
+                    onIntentHandled = { newIntent.value = null }
+                )
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        newIntent.value = intent
     }
 
     private fun requestNotificationPermission() {
