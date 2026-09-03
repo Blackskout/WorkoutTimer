@@ -326,12 +326,15 @@ class WorkoutExecutionViewModel @Inject constructor(
                     finishedAt = finishedAt,
                     durationMillis = durationMillis
                 )
-                // Порядок важен: пуш обновления виджета подвешен на updateLastUseAt(),
-                // а виджет берёт длительность из последней сессии. Если вызвать
-                // updateLastUseAt() раньше записи сессии, виджет может перерисоваться
-                // со старой длительностью или без неё — сессию нужно писать первой.
-                workoutRepository.updateLastUseAt(workoutId)
+                // Экран должен показать Finished сразу после записи сессии, не дожидаясь
+                // перерисовки виджета: updateLastUseAt() внутри дёргает updateAll() (биндер,
+                // чтение DataStore, композиция Glance), и если поставить его раньше присваивания
+                // состояния, пользователь увидит финальный экран только после этой перерисовки.
+                // Порядок «сессия раньше updateLastUseAt()» при этом сохраняется: пуш обновления
+                // виджета подвешен на updateLastUseAt(), а виджет берёт длительность из последней
+                // сессии, так что сессия по-прежнему должна быть записана первой.
                 _uiState.value = WorkoutExecutionState.Finished(durationMillis = durationMillis)
+                workoutRepository.updateLastUseAt(workoutId)
                 scheduleIdleReminderIfActive()
             }
         }

@@ -3,6 +3,7 @@ package ru.hopes.workouttimer.presentation.screen.workoutExecution
 import android.content.Context
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.mockk
 import io.mockk.Runs
 import io.mockk.just
@@ -87,6 +88,33 @@ class WorkoutExecutionViewModelTest {
         assertEquals(durationSlot.captured, (state as WorkoutExecutionState.Finished).durationMillis)
         coVerify(exactly = 1) {
             addWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any())
+        }
+    }
+
+    // f5956c4 поменял порядок вызовов местами: пуш обновления виджета подвешен на
+    // updateLastUseAt(), поэтому он обязан срабатывать уже после записи сессии в БД, иначе
+    // виджет может перерисоваться со старой длительностью или без неё. До этого теста порядок
+    // не был закреплён ничем, кроме комментария в коде.
+    @Test
+    fun `finishing the workout records the session before pushing lastUseAt`() = runTest {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val workoutRepository = mockk<WorkoutRepository>()
+        coEvery { workoutRepository.updateLastUseAt(1) } returns Unit
+        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        coEvery {
+            addWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any())
+        } just Runs
+
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        viewModel.loadWorkout(1)
+        viewModel.onExerciseFinished()
+
+        coVerifyOrder {
+            addWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any())
+            workoutRepository.updateLastUseAt(1)
         }
     }
 
