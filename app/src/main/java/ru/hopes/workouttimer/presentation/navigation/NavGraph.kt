@@ -26,8 +26,15 @@ fun NavGraph(
 ) {
     val navController = rememberNavController()
 
-    // Стартовый интент разбирает сам NavController при создании графа,
-    // сюда приходят только интенты из onNewIntent — иначе он обработался бы дважды
+    // Виджет шлёт интент с FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TASK, а это всегда
+    // поднимает НОВЫЙ экземпляр MainActivity: CLEAR_TASK сносит задачу целиком, и после этого
+    // singleTop нечего переиспользовать. Поэтому тап по виджету на практике всегда обрабатывает
+    // разбор стартового интента в setGraph() (см. NavHost ниже), а не этот LaunchedEffect.
+    // Путь через onNewIntent()/newIntent остаётся защитой на случай, если флаги когда-нибудь
+    // поменяют и активити начнёт переиспользоваться — не убирайте его в расчёте, что он мёртвый.
+    // Если это когда-нибудь всё же сработает: стартовый интент туда не попадает — NavController
+    // уже обработал его сам, а публичный handleDeepLink() флагом deepLinkHandled не защищён и
+    // отработал бы второй раз.
     LaunchedEffect(newIntent) {
         if (newIntent != null) {
             navController.handleDeepLink(newIntent)
@@ -169,10 +176,11 @@ internal sealed class Screen(val route: String) {
             return "execution/$workoutId"
         }
 
-        // Ссылка для виджета: шаблон URI живёт здесь же, рядом с маршрутом
-        fun createDeepLink(workoutId: Int): String {
-            return "workouttimer://execution/$workoutId"
-        }
+        // Ссылка для виджета: строится из DEEP_LINK_PATTERN, а не дублирует его строкой —
+        // иначе схема окажется захардкожена в двух местах, и расхождение не поймает ни
+        // компилятор, ни тест, только тап по виджету на устройстве.
+        fun createDeepLink(workoutId: Int): String =
+            DEEP_LINK_PATTERN.replace("{workout_id}", workoutId.toString())
 
         fun getWorkoutId(arguments: Bundle?): Int {
             return arguments?.getInt("workout_id") ?: 0
