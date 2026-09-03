@@ -1,6 +1,7 @@
 [versions]
 agp = "8.13.0"
 coreSplashscreen = "1.2.0"
+glance = "1.2.0"
 hiltAndroid = "2.57.2"
 kotlin = "2.2.21"
 coreKtx = "1.17.0"
@@ -30,6 +31,7 @@ kotlinxCoroutinesTest = "1.10.2"
 androidx-compose-material-icons-core = { group = "androidx.compose.material", name = "material-icons-core" }
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "coreSplashscreen" }
+androidx-glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glance" }
 androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }

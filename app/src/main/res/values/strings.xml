@@ -5,4 +5,6 @@
     <string name="h_ago">%1$d ч. назад</string>
     <string name="d_ago">%1$d дн. назад</string>
     <string name="just_now">Только что</string>
+    <string name="widget_empty">Нет тренировок</string>
+    <string name="widget_description">Быстрый старт тренировки</string>
 </resources>

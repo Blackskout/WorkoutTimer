@@ -31,8 +31,9 @@ interface WorkoutDao {
     @Query("DELETE FROM exercises WHERE workoutId = :workoutId")
     suspend fun deleteExercisesByWorkoutId(workoutId: Long)
 
-    @Query("UPDATE workouts SET name = :name, lastUseAt = :lastUseAt WHERE id = :id")
-    suspend fun updateWorkout(id: Int, name: String, lastUseAt: Long)
+    // lastUseAt меняет только updateLastUseAt(): правка тренировки — не её выполнение
+    @Query("UPDATE workouts SET name = :name WHERE id = :id")
+    suspend fun updateWorkout(id: Int, name: String)
 
     @Query("SELECT * FROM workouts WHERE id = :id")
     suspend fun getWorkoutById(id: Int): WorkoutEntity?

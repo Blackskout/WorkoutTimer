@@ -23,8 +23,9 @@ class CreateWorkoutViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(CreateWorkoutState())
     val state = _state.asStateFlow()
-    
+
     private var editingWorkoutId: Int? = null
+    private var editingLastUseAt: Long? = null
 
     fun processCommand(command: CreateWorkoutCommand) {
         when (command) {
@@ -110,7 +111,7 @@ class CreateWorkoutViewModel @Inject constructor(
                             id = editingWorkoutId ?: 0,
                             name = _state.value.workoutName,
                             exercises = validExercises,
-                            lastUseAt = System.currentTimeMillis()
+                            lastUseAt = editingLastUseAt ?: System.currentTimeMillis()
                         )
 
                         if (editingWorkoutId != null) {
@@ -134,6 +135,7 @@ class CreateWorkoutViewModel @Inject constructor(
             val workout = getWorkoutByIdUseCase(workoutId)
             workout?.let { w ->
                 editingWorkoutId = w.id
+                editingLastUseAt = w.lastUseAt
                 _state.update {
                     CreateWorkoutState(
                         workoutName = w.name,

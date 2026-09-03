@@ -13,11 +13,13 @@ import ru.hopes.workouttimer.data.entity.WorkoutSessionEntity
 import ru.hopes.workouttimer.data.mapper.toDomain
 import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.model.WorkoutSession
+import ru.hopes.workouttimer.domain.repository.WidgetUpdater
 import ru.hopes.workouttimer.domain.repository.WorkoutRepository
 import javax.inject.Inject
 
 class WorkoutRepositoryImpl @Inject constructor(
-    private val dao: WorkoutDao
+    private val dao: WorkoutDao,
+    private val widgetUpdater: WidgetUpdater
 ) : WorkoutRepository {
 
 
@@ -41,8 +43,7 @@ class WorkoutRepositoryImpl @Inject constructor(
             // Обновляем тренировку
             dao.updateWorkout(
                 id = workout.id,
-                name = workout.name,
-                lastUseAt = workout.lastUseAt
+                name = workout.name
             )
 
             // Удаляем старые упражнения и добавляем новые
@@ -62,12 +63,14 @@ class WorkoutRepositoryImpl @Inject constructor(
             }
             dao.insertExercises(exerciseEntities)
         }
+        widgetUpdater.requestUpdate()
     }
 
     override suspend fun deleteWorkout(workout: WorkoutEntity) {
         withContext(Dispatchers.IO) {
             dao.deleteWorkout(workout)
         }
+        widgetUpdater.requestUpdate()
     }
 
     override fun searchWorkoutUseCase(query: String): Flow<List<WorkoutEntity>> {
@@ -90,10 +93,12 @@ class WorkoutRepositoryImpl @Inject constructor(
             )
         }
         dao.insertExercises(exerciseEntities)
+        widgetUpdater.requestUpdate()
     }
 
     override suspend fun updateLastUseAt(workoutId: Int) {
         dao.updateLastUseAt(workoutId, System.currentTimeMillis())
+        widgetUpdater.requestUpdate()
     }
 
     override suspend fun updateExerciseNote(exerciseId: Int, note: String) {

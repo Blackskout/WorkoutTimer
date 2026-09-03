@@ -18,6 +18,7 @@ import ru.hopes.workouttimer.data.mapper.toExport
 import ru.hopes.workouttimer.domain.model.export.ExportData
 import ru.hopes.workouttimer.domain.repository.ExportImportRepository
 import ru.hopes.workouttimer.domain.repository.ImportResult
+import ru.hopes.workouttimer.domain.repository.WidgetUpdater
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -26,7 +27,8 @@ import javax.inject.Inject
 
 class ExportImportRepositoryImpl @Inject constructor(
     private val context: Context,
-    private val dao: WorkoutDao
+    private val dao: WorkoutDao,
+    private val widgetUpdater: WidgetUpdater
 ) : ExportImportRepository {
 
     private val json = Json {
@@ -118,6 +120,16 @@ class ExportImportRepositoryImpl @Inject constructor(
                         exerciseEntities
                     )
                     importedCount++
+                }
+
+                if (importedCount > 0) {
+                    // Вызов внутри try/catch (e: Exception) ниже: исключение отсюда вернуло бы
+                    // success = false при фактически успешном импорте. Сейчас это безопасно
+                    // только потому, что GlanceWidgetUpdater сам глотает свои исключения и никогда
+                    // не выбрасывает наружу. Если когда-нибудь появится вторая реализация
+                    // WidgetUpdater, которая пробрасывает ошибки, эта связка молча сломается —
+                    // не убирайте эту гарантию из реализации без пересмотра места вызова.
+                    widgetUpdater.requestUpdate()
                 }
 
                 ImportResult(
