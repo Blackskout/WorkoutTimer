@@ -31,6 +31,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.flow.first
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.domain.model.WidgetWorkout
 import ru.hopes.workouttimer.presentation.MainActivity
@@ -49,8 +50,18 @@ class QuickStartWidget : GlanceAppWidget() {
         // Flow создаётся один раз, а не на каждую рекомпозицию
         val workoutsFlow = getWidgetWorkouts()
 
+        // Дожидаемся первого значения до provideContent: иначе первым кадром коллекции
+        // становится initial = emptyList(), а пустой список в разметке — это «Нет тренировок».
+        // Glance пушит RemoteViews на каждую рекомпозицию, поэтому на холодной БД (перезагрузка
+        // телефона, смерть процесса) пользователь реально видит кадр с ложным пустым состоянием
+        // перед тем как придут настоящие данные. Пока first() не вернулся, система показывает
+        // android:initialLayout — штатный лоадер вместо вранья. Терминация гарантирована:
+        // GetWidgetWorkoutsUseCase ловит ошибки через .catch { emit(emptyList()) }, так что Flow
+        // отдаст значение даже при сбое Room.
+        val initial = workoutsFlow.first()
+
         provideContent {
-            val workouts by workoutsFlow.collectAsState(initial = emptyList())
+            val workouts by workoutsFlow.collectAsState(initial = initial)
             GlanceTheme {
                 WidgetContent(workouts)
             }
