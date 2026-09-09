@@ -49,16 +49,33 @@ class GetWidgetWorkoutsUseCaseTest {
     }
 
     @Test
-    fun `sorts workouts by lastUseAt descending`() = runTest {
+    fun `sorts workouts by lastUseAt ascending`() = runTest {
         val result = useCase(
             workouts = listOf(
                 workoutWith(id = 1, name = "Старая", lastUseAt = 100L),
                 workoutWith(id = 2, name = "Свежая", lastUseAt = 300L),
                 workoutWith(id = 3, name = "Средняя", lastUseAt = 200L)
-            )
+            ),
+            durations = mapOf(1 to 1_000L, 2 to 1_000L, 3 to 1_000L)
         )().first()
 
-        assertEquals(listOf("Свежая", "Средняя", "Старая"), result.map { it.name })
+        assertEquals(listOf("Старая", "Средняя", "Свежая"), result.map { it.name })
+    }
+
+    @Test
+    fun `puts workouts without a single session above the rest`() = runTest {
+        val result = useCase(
+            workouts = listOf(
+                workoutWith(id = 1, name = "Заброшенная", lastUseAt = 100L),
+                workoutWith(id = 2, name = "Новая", lastUseAt = 300L),
+                workoutWith(id = 3, name = "Вчерашняя", lastUseAt = 200L)
+            ),
+            // «Новой» нет в истории сессий, хотя её lastUseAt самый свежий: при создании
+            // тренировки туда пишется now.
+            durations = mapOf(1 to 1_000L, 3 to 1_000L)
+        )().first()
+
+        assertEquals(listOf("Новая", "Заброшенная", "Вчерашняя"), result.map { it.name })
     }
 
     @Test
@@ -71,8 +88,10 @@ class GetWidgetWorkoutsUseCaseTest {
             durations = mapOf(7 to 3_120_000L)
         )().first()
 
-        assertEquals(3_120_000L, result[0].lastDurationMillis)
-        assertNull(result[1].lastDurationMillis)
+        // «Спина» без сессии идёт первой, «Ноги» с длительностью — второй
+        assertEquals("Спина", result[0].name)
+        assertNull(result[0].lastDurationMillis)
+        assertEquals(3_120_000L, result[1].lastDurationMillis)
     }
 
     @Test
