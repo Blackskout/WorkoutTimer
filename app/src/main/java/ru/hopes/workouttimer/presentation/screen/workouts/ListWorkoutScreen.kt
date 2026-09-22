@@ -163,8 +163,9 @@ fun ListWorkoutScreen(
 
 
             itemsIndexed(
-                items = state.workouts, key = { _, workout -> workout.id })
-            { index, workout ->
+                items = state.workouts, key = { _, workoutWithExercises -> workoutWithExercises.workout.id })
+            { index, workoutWithExercises ->
+                val workout = workoutWithExercises.workout
                 WorkoutCard(
                     modifier = Modifier
                         .fillMaxWidth()
