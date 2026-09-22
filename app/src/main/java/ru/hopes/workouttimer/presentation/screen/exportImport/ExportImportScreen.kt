@@ -1,52 +1,49 @@
 package ru.hopes.workouttimer.presentation.screen.exportImport
 
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Upload
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import kotlinx.coroutines.flow.distinctUntilChanged
-import ru.hopes.workouttimer.R
+import ru.hopes.workouttimer.presentation.ui.theme.CardSpacing
+import ru.hopes.workouttimer.presentation.ui.theme.ScreenPadding
+import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportImportScreen(
     onNavigateBack: () -> Unit,
     viewModel: ExportImportViewModel = hiltViewModel()
 ) {
-    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -88,81 +85,145 @@ fun ExportImportScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Экспорт / Импорт",
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            )
-        },
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            // Кнопка экспорта
-            Button(
-                onClick = { viewModel.exportWorkouts() },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = uiState !is ExportImportUiState.Loading
+        Column(modifier = Modifier.padding(paddingValues)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.Upload,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp)
+                IconButton(onClick = onNavigateBack) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Назад",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Text(
+                    text = "Экспорт и импорт",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.weight(1f))
-                Text("Экспортировать все тренировки")
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            ExportImportContent(
+                busy = uiState is ExportImportUiState.Loading,
+                onExportClick = { viewModel.exportWorkouts() },
+                onImportClick = { importLauncher.launch(arrayOf("application/json")) }
+            )
+        }
+    }
+}
 
-            // Кнопка импорта
-            Button(
-                onClick = {
-                    importLauncher.launch(arrayOf("application/json"))
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = uiState !is ExportImportUiState.Loading
+/**
+ * Тело экрана под шапкой: карточки действий и индикатор занятости.
+ * Вынесено из [ExportImportScreen], чтобы превьюшить без `hiltViewModel()`.
+ */
+@Composable
+private fun ExportImportContent(
+    busy: Boolean,
+    onExportClick: () -> Unit,
+    onImportClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier.padding(ScreenPadding),
+        verticalArrangement = Arrangement.spacedBy(CardSpacing)
+    ) {
+        ActionCard(
+            icon = Icons.Default.Upload,
+            title = "Экспортировать тренировки",
+            description = "Сохраняет все тренировки и упражнения в JSON-файл.",
+            enabled = !busy,
+            onClick = onExportClick
+        )
+        ActionCard(
+            icon = Icons.Default.Download,
+            title = "Импортировать тренировки",
+            description = "Добавляет тренировки из файла. Дубликаты переименовываются автоматически.",
+            enabled = !busy,
+            onClick = onImportClick
+        )
+        if (busy) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.Download,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp)
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary
                 )
-                Spacer(modifier = Modifier.weight(1f))
-                Text("Импортировать тренировки")
-            }
-
-            // Индикатор загрузки
-            if (uiState is ExportImportUiState.Loading) {
-                Spacer(modifier = Modifier.height(32.dp))
-                CircularProgressIndicator()
-                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = "Обработка...",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 10.dp)
                 )
             }
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Описание
+@Composable
+private fun ActionCard(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    val shape = MaterialTheme.shapes.medium
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp)
+        )
+        Column {
             Text(
-                text = "Экспорт создает JSON файл со всеми вашими тренировками и упражнениями. Импорт добавляет тренировки из файла, автоматически переименовывая дубликаты.",
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = description,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                modifier = Modifier.padding(top = 4.dp)
             )
         }
+    }
+}
+
+@Preview(backgroundColor = 0xFF0B0B0F, showBackground = true)
+@Composable
+private fun ExportImportContentIdlePreview() {
+    WorkoutTimerTheme {
+        ExportImportContent(busy = false, onExportClick = {}, onImportClick = {})
+    }
+}
+
+@Preview(backgroundColor = 0xFF0B0B0F, showBackground = true)
+@Composable
+private fun ExportImportContentBusyPreview() {
+    WorkoutTimerTheme {
+        ExportImportContent(busy = true, onExportClick = {}, onImportClick = {})
     }
 }
