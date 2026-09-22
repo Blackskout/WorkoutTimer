@@ -27,6 +27,9 @@ class CreateWorkoutViewModel @Inject constructor(
     private var editingWorkoutId: Int? = null
     private var editingLastUseAt: Long? = null
 
+    /** Слепок состояния после загрузки — с ним сравнивается текущее при выходе. */
+    private var savedSnapshot: CreateWorkoutState = CreateWorkoutState()
+
     fun processCommand(command: CreateWorkoutCommand) {
         when (command) {
             is CreateWorkoutCommand.ChangeWorkoutName -> {
@@ -34,13 +37,13 @@ class CreateWorkoutViewModel @Inject constructor(
             }
 
             is CreateWorkoutCommand.AddExercise -> {
-                _state.update {
-                    it.copy(
-                        exercises = it.exercises + ExerciseItem(
-                            id = System.currentTimeMillis().toInt(),
+                _state.update { state ->
+                    val exercises = state.exercises
+                    state.copy(
+                        exercises = exercises + ExerciseItem(
+                            id = (exercises.maxOfOrNull { it.id } ?: 0) + 1,
                             name = "",
                             weight = 0.0,
-                            weightStr = "",
                             sets = 4,
                             reps = 12,
                             restTimeSeconds = 120,
@@ -66,16 +69,18 @@ class CreateWorkoutViewModel @Inject constructor(
                 }
             }
 
-            is CreateWorkoutCommand.UpdateExerciseWeight -> {
-                _state.update {
-                    it.copy(
-                        exercises = it.exercises.map { ex ->
-                            if (ex.id == command.id) {
-                                val weight = command.weightStr.toDoubleOrNull() ?: 0.0
-                                ex.copy(weight = weight, weightStr = command.weightStr)
-                            } else ex
-                        }
-                    )
+            is CreateWorkoutCommand.MoveExercise -> {
+                _state.update { state ->
+                    val items = state.exercises
+                    if (command.from !in items.indices || command.to !in items.indices) {
+                        return@update state
+                    }
+                    val reordered = items.toMutableList().apply {
+                        add(command.to, removeAt(command.from))
+                    }
+                    // order здесь не трогаем: он присваивается при сохранении
+                    // через mapIndexed, поэтому порядок списка и есть порядок упражнений.
+                    state.copy(exercises = reordered)
                 }
             }
 
@@ -130,8 +135,16 @@ class CreateWorkoutViewModel @Inject constructor(
                 _state.update { it.copy(isFinished = true) }
             }
         }
+
+        if (command !is CreateWorkoutCommand.Save && command !is CreateWorkoutCommand.Back) {
+            _state.update { current ->
+                val changed = current.workoutName != savedSnapshot.workoutName ||
+                        current.exercises != savedSnapshot.exercises
+                if (current.hasUnsavedChanges == changed) current else current.copy(hasUnsavedChanges = changed)
+            }
+        }
     }
-    
+
     fun loadWorkout(workoutId: Int) {
         viewModelScope.launch {
             val workout = getWorkoutByIdUseCase(workoutId)
@@ -146,7 +159,6 @@ class CreateWorkoutViewModel @Inject constructor(
                                 id = ex.id,
                                 name = ex.name,
                                 weight = ex.weight,
-                                weightStr = if (ex.weight == 0.0) "" else ex.weight.toString(),
                                 sets = ex.sets,
                                 reps = ex.reps,
                                 restTimeSeconds = (ex.timeMillis / 1000).toInt(),
@@ -156,6 +168,7 @@ class CreateWorkoutViewModel @Inject constructor(
                         isFinished = false
                     )
                 }
+                savedSnapshot = _state.value
             }
         }
     }
@@ -166,7 +179,7 @@ sealed interface CreateWorkoutCommand {
     data class UpdateExercise(val id: Int, val exercise: ExerciseItem) : CreateWorkoutCommand
     data class AddExercise(val dummy: Unit = Unit) : CreateWorkoutCommand
     data class RemoveExercise(val id: Int) : CreateWorkoutCommand
-    data class UpdateExerciseWeight(val id: Int, val weightStr: String) : CreateWorkoutCommand
+    data class MoveExercise(val from: Int, val to: Int) : CreateWorkoutCommand
     data class UpdateExerciseNote(val id: Int, val note: String) : CreateWorkoutCommand
     data object Save : CreateWorkoutCommand
     data object Back : CreateWorkoutCommand
@@ -176,7 +189,6 @@ data class ExerciseItem(
     val id: Int,
     val name: String,
     val weight: Double,
-    val weightStr: String = weight.toString(),
     val sets: Int,
     val reps: Int,
     val restTimeSeconds: Int,
@@ -186,7 +198,8 @@ data class ExerciseItem(
 data class CreateWorkoutState(
     val workoutName: String = "",
     val exercises: List<ExerciseItem> = emptyList(),
-    val isFinished: Boolean = false
+    val isFinished: Boolean = false,
+    val hasUnsavedChanges: Boolean = false
 ) {
     val isSaveEnabled: Boolean
         get() = workoutName.isNotBlank() && exercises.any { it.name.isNotBlank() }
