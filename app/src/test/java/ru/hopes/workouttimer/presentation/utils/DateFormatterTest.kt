@@ -139,4 +139,14 @@ class DateFormatterTest {
     fun `formatDurationCompact печатает ноль`() {
         assertEquals("00:00", DateFormatter.formatDurationCompact(0L))
     }
+
+    @Test
+    fun `formatDurationCompact печатает секунды без минут`() {
+        assertEquals("00:45", DateFormatter.formatDurationCompact(45_000L))
+    }
+
+    @Test
+    fun `formatDurationCompact переходит на часы ровно на шестидесяти минутах`() {
+        assertEquals("1:00:00", DateFormatter.formatDurationCompact(3_600_000L))
+    }
 }
