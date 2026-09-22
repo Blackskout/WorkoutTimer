@@ -134,7 +134,13 @@
 
 **Loading / Error.** Через `EmptyState`; `LoadingState` и `ErrorState` (`:325`, `:344`) удаляются.
 
-**Медиа.** `SystemMediaControllerCompat` (`SystemMediaController.kt:30`) сокращается до одной кнопки запуска Яндекс Музыки — логика поиска приложения и отката в Google Play (`:44–70`) сохраняется без изменений. Кнопки prev / play-pause / next и функция `sendMediaKeyEvent()` (`:126`) удаляются; `androidx.media` остаётся в зависимостях ради `MediaButtonManager`, который обрабатывает физические кнопки гарнитуры и к этому компоненту отношения не имеет.
+**Медиа.** `SystemMediaControllerCompat` (`SystemMediaController.kt:30`) сокращается до одной кнопки запуска Яндекс Музыки — логика поиска приложения и отката в Google Play (`:44–70`) сохраняется без изменений.
+
+Кнопки prev / play-pause / next и функция `sendMediaKeyEvent()` (`:126`) удаляются. Они шлют `KeyEvent` через `AudioManager.dispatchMediaKeyEvent()` — одностороннюю отправку без обратной связи, откуда и задержка, и статичная иконка: состояние плеера приложению неизвестно, `Icons.Default.PlayArrow` прошита на `:105`.
+
+Вместе с ними удаляется `MediaButtonManager.kt` — класс нигде не используется и дублирует ту же отправку через `AudioManager`. Зависимость `androidx.media` не импортируется ни в одном файле и убирается из `build.gradle.kts` и `libs.versions.toml`.
+
+Настоящая замена — `MediaController` поверх `MediaSessionManager`: двусторонняя связь с сессией плеера, реальный `PlaybackState` и метаданные трека. Требует разрешения «Доступ к уведомлениям» (`BIND_NOTIFICATION_LISTENER_SERVICE`) и пустого `NotificationListenerService` в манифесте, которое пользователь включает вручную в системных настройках. В эту спеку не входит: мини-плеер на экране отдыха — отдельное продуктовое решение, и вводить такое разрешение ради кнопок, которыми не пользуются, незачем.
 
 ## Часть 4: Редактор тренировки
 
@@ -205,7 +211,7 @@ Compose-превью для каждого компонента и для каж
 6. Редактор.
 7. История, экспорт/импорт.
 8. Виджет на новую палитру.
-9. Удаление мёртвого кода: `isStaleWorkout`, `Title` в `ListWorkoutScreen.kt:191` (не используется), закомментированные блоки создания тестовых тренировок в `ListWorkoutViewModel.kt:43–121`, `sendMediaKeyEvent`.
+9. Удаление мёртвого кода: `MediaButtonManager` и зависимость `androidx.media`, `isStaleWorkout`, `Title` в `ListWorkoutScreen.kt:191` (не используется), закомментированные блоки создания тестовых тренировок в `ListWorkoutViewModel.kt:43–121`, `sendMediaKeyEvent`.
 
 Каждый шаг после второго оставляет приложение собираемым и запускаемым.
 
