@@ -9,6 +9,8 @@ private val AppColorScheme = darkColorScheme(
     onPrimary = OnAccent,
     secondary = Accent,
     onSecondary = OnAccent,
+    tertiary = Accent,
+    onTertiary = OnAccent,
     background = Background,
     onBackground = TextPrimary,
     surface = SurfaceDark,
@@ -16,11 +18,17 @@ private val AppColorScheme = darkColorScheme(
     surfaceVariant = SurfaceElevated,
     onSurfaceVariant = TextSecondary,
     surfaceContainer = SurfaceElevated,
+    surfaceContainerLowest = Background,
+    surfaceContainerLow = SurfaceDark,
     surfaceContainerHigh = SurfaceElevated,
+    surfaceContainerHighest = SurfaceElevated,
     outline = OutlineDark,
     outlineVariant = OutlineDark,
     error = Destructive,
-    onError = TextPrimary
+    onError = TextPrimary,
+    inverseSurface = SurfaceElevated,
+    inverseOnSurface = TextPrimary,
+    inversePrimary = Accent
 )
 
 @Composable

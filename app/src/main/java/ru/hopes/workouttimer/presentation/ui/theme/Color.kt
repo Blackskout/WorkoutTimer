@@ -12,8 +12,7 @@ val TextSecondary = Color(0xFF8A8A96)
 val TextMuted = Color(0xFF55555F)
 
 val Accent = Color(0xFFC6FF3D)
-val OnAccent = Color(0xFF0B0B0F)
-val Destructive = Color(0xFFFF5C5C)
-
 /** Тёмный край лаймового градиента герой-карты на главном экране. */
 val AccentDark = Color(0xFF9BE01E)
+val OnAccent = Color(0xFF0B0B0F)
+val Destructive = Color(0xFFFF5C5C)
