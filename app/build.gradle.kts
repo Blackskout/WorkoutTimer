@@ -94,6 +94,6 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.material.icons.extended)
-    implementation(libs.androidx.media)
+    implementation(libs.reorderable)
     implementation(libs.kotlinx.serialization.json)
 }
