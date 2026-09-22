@@ -48,7 +48,7 @@ interface WorkoutDao {
         ORDER BY workouts.lastUseAt ASC, workouts.id ASC
         """
     )
-    fun searchWorkouts(query: String): Flow<List<WorkoutEntity>>
+    fun searchWorkouts(query: String): Flow<List<WorkoutWithExercises>>
 
     @Query("UPDATE workouts SET lastUseAt = :lastUseAt WHERE id = :id")
     suspend fun updateLastUseAt(id: Int, lastUseAt: Long)

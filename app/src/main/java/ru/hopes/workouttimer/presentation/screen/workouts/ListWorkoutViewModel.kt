@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -132,7 +133,7 @@ class ListWorkoutViewModel @Inject constructor(
                 val workoutsFlow = if (input.isBlank()) {
                     getAllWorkoutsUseCase()
                 } else {
-                    searchWorkoutsUseCase(input)
+                    searchWorkoutsUseCase(input).map { list -> list.map { it.workout } }
                 }
                 workoutsFlow.combine(getLastSessionDurationsUseCase()) { workouts, durations ->
                     workouts to durations

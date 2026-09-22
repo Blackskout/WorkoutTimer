@@ -73,7 +73,7 @@ class WorkoutRepositoryImpl @Inject constructor(
         widgetUpdater.requestUpdate()
     }
 
-    override fun searchWorkoutUseCase(query: String): Flow<List<WorkoutEntity>> {
+    override fun searchWorkoutUseCase(query: String): Flow<List<WorkoutWithExercises>> {
         return dao.searchWorkouts(query)
     }
 
