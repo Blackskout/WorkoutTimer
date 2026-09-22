@@ -62,7 +62,7 @@ class QuickStartWidget : GlanceAppWidget() {
 
         provideContent {
             val workouts by workoutsFlow.collectAsState(initial = initial)
-            GlanceTheme {
+            GlanceTheme(colors = WidgetColorScheme) {
                 WidgetContent(workouts)
             }
         }
