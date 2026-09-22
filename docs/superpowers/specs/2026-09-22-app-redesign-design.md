@@ -9,9 +9,9 @@
 
 Функционально мешает другое:
 
-- **Список не показывает, что делать дальше.** Тренировки идут в порядке, который задаёт `ORDER BY orderInWorkout DESC` в `WorkoutDao.kt:48` для поиска и полное отсутствие `ORDER BY` в `getAllWorkouts()` (`WorkoutDao.kt:19`). Пользователь держит ротацию в голове и вычисляет следующую тренировку глазами по датам.
-- **Экран выполнения тратит место на мёртвые элементы.** `SystemMediaControllerCompat` (`SystemMediaController.kt:30`) рисует prev/play-pause/next размером 90dp каждая. Кнопки шлют `KeyEvent` через `AudioManager`, срабатывают с задержкой, а иконка play/pause статична — состояние плеера приложению неизвестно, `Icons.Default.PlayArrow` захардкожена на `:105`. Пользователь перестал ими пользоваться именно поэтому: потребность в управлении музыкой на отдыхе осталась, её не закрывает текущая реализация.
-- **Редактор упражнения — пять текстовых полей в одной строке.** `CreateWorkoutScreen.kt:270–330`: поля шириной 68–100dp с числовой клавиатурой, отдых только в целых минутах (`:322`, `minutes.coerceAtLeast(1) * 60`). Порядок упражнений менять нельзя.
+- **Список не показывает, что делать дальше.** Тренировки идут в порядке, который задаёт `ORDER BY orderInWorkout DESC` в `WorkoutDao.kt:48` для поиска и полное отсутствие `ORDER BY` в `getAllWorkouts()` (`WorkoutDao.kt:19–20`). Пользователь держит ротацию в голове и вычисляет следующую тренировку глазами по датам.
+- **Экран выполнения тратит место на мёртвые элементы.** `SystemMediaControllerCompat` (`SystemMediaController.kt:30`) рисует prev/play-pause/next размером 90dp каждая. Кнопки шлют `KeyEvent` через `AudioManager`, срабатывают с задержкой, а иконка play/pause статична — состояние плеера приложению неизвестно, `Icons.Default.PlayArrow` захардкожена на `:103`. Пользователь перестал ими пользоваться именно поэтому: потребность в управлении музыкой на отдыхе осталась, её не закрывает текущая реализация.
+- **Редактор упражнения — четыре текстовых поля в одной строке.** `CreateWorkoutScreen.kt:282–337`: вес, подходы, повторы и отдых полями шириной 68–100dp с числовой клавиатурой, отдых только в целых минутах (`:330`, `minutes.coerceAtLeast(1) * 60`). Порядок упражнений менять нельзя.
 - **Завершение тренировки показывается `AlertDialog`'ом** (`WorkoutExecutionScreen.kt:265`) — главный момент тренировки выглядит как системное уведомление.
 
 ## Цель
@@ -115,11 +115,20 @@
 
 **Очередь.** Секция «Дальше по очереди», карточки с номером позиции, именем, «N упр · MM:SS», давностью и ⋮. Тап — начать тренировку, ⋮ или долгий тап — `ActionSheet`: Начать / Пропустить / Редактировать / История / Удалить.
 
+Формата `MM:SS` в коде нет: `DateFormatter.formatDurationToString` (`DateFormatter.kt:60–69`) отдаёт «42 мин» и «1 ч 5 мин». Добавляется `formatDurationCompact(millis): String` с тестом.
+
 Приглушение «заброшенных» карточек (`isStaleWorkout`, `DateFormatter.kt:34`) удаляется вместе с функцией: в очереди давность видна из позиции.
 
-**Счётчик упражнений.** `ListWorkoutState.workouts` — это `List<WorkoutEntity>`, в котором упражнений нет. Экран переводится на `GetAllWorkoutsWithExerciseUseCase`, уже существующий и уже используемый виджетом; `ListWorkoutState` начинает хранить `List<WorkoutWithExercises>`. `SearchWorkoutsUseCase` возвращает `List<WorkoutEntity>`, поэтому в режиме поиска карточки рисуются без счётчика упражнений — добавлять ещё один запрос ради этого не стоит.
+**Счётчик упражнений и единый тип состояния.** `ListWorkoutState.workouts` — это `List<WorkoutEntity>` (`ListWorkoutViewModel.kt:161`), в котором упражнений нет. Экран переводится на `GetAllWorkoutsWithExerciseUseCase`, уже существующий и уже используемый виджетом.
+
+Обе ветки `flatMapLatest` (`ListWorkoutViewModel.kt:131–142`) пишут в одно поле `workouts`, поэтому поиск обязан отдавать тот же тип. `WorkoutDao.searchWorkouts()` (`:50`) уже помечен `@Transaction`, так что его возвращаемый тип меняется на `Flow<List<WorkoutWithExercises>>` — Room заполнит упражнения сам, без нового запроса. Следом меняются `WorkoutRepository.searchWorkoutUseCase()` (`WorkoutRepository.kt:16`), её реализация и `SearchWorkoutsUseCase`. В результате состояние однотипно, а счётчик упражнений работает и в поиске.
 
 **Пустое состояние.** `EmptyState` с текстом «Нет тренировок» и кнопкой «Создать тренировку».
+
+**Крайние случаи.**
+- Ровно одна тренировка: герой-карта есть, заголовок «Дальше по очереди» и пустой список под ним не рисуются.
+- Новая тренировка становится первой в очереди (см. Часть 6, п. 9) и показывается с подписью «ещё не делали» вместо длительности и давности.
+- В режиме поиска `ActionSheet` доступен со всеми действиями, кроме «Пропустить»: пропуск переставляет очередь, которую в этот момент не видно. Пункт скрывается, пока активен поиск.
 
 ## Часть 3: Экран выполнения
 
@@ -135,9 +144,9 @@
 
 **Loading / Error.** Через `EmptyState`; `LoadingState` и `ErrorState` (`:325`, `:344`) удаляются.
 
-**Медиа.** `SystemMediaControllerCompat` (`SystemMediaController.kt:30`) сокращается до одной кнопки запуска Яндекс Музыки — логика поиска приложения и отката в Google Play (`:44–70`) сохраняется без изменений.
+**Медиа.** `SystemMediaControllerCompat` (`SystemMediaController.kt:30`) сокращается до одной кнопки запуска Яндекс Музыки — логика поиска приложения и отката в Google Play (`IconButton` на `:44–79`, вместе с иконкой `yandex_icon_pain` на `:73–78`) сохраняется без изменений.
 
-Кнопки prev / play-pause / next и функция `sendMediaKeyEvent()` (`:126`) удаляются. Они шлют `KeyEvent` через `AudioManager.dispatchMediaKeyEvent()` — одностороннюю отправку без обратной связи, откуда и задержка, и статичная иконка: состояние плеера приложению неизвестно, `Icons.Default.PlayArrow` прошита на `:105`.
+Кнопки prev / play-pause / next и функция `sendMediaKeyEvent()` (`:126`) удаляются. Они шлют `KeyEvent` через `AudioManager.dispatchMediaKeyEvent()` — одностороннюю отправку без обратной связи, откуда и задержка, и статичная иконка: состояние плеера приложению неизвестно, `Icons.Default.PlayArrow` прошита на `:103`.
 
 Вместе с ними удаляется `MediaButtonManager.kt` — класс нигде не используется и дублирует ту же отправку через `AudioManager`. Зависимость `androidx.media` не импортируется ни в одном файле и убирается из `build.gradle.kts` и `libs.versions.toml`.
 
@@ -147,43 +156,62 @@
 
 ## Часть 4: Редактор тренировки
 
-`CreateWorkoutScreen.kt` переписывается, `CreateWorkoutViewModel` получает одну новую команду.
+`CreateWorkoutScreen.kt` переписывается, `CreateWorkoutViewModel` получает новую команду и теряет одну существующую.
 
 **Список.** Поле «Название тренировки», секция «Упражнения · N», строки со сводкой «80 кг · 4×8 · отдых 2:30» и ручкой ≡. FAB «+» создаёт упражнение и сразу открывает лист редактирования.
 
-**Перетаскивание.** Через `sh.calvin.reorderable:reorderable` — небольшая библиотека без транзитивных зависимостей, добавляется в `libs.versions.toml`. Перетаскивание берётся только за ручку ≡, чтобы не конфликтовать с прокруткой. По отпускании — `CreateWorkoutCommand.MoveExercise(from, to)`: список переставляется, `order` каждого элемента переписывается по новой позиции. Порядок уходит в БД только при сохранении (✓ в шапке) вместе с остальной правкой — как и все прочие изменения редактора.
+**Перетаскивание.** Через `sh.calvin.reorderable:reorderable` версии 3.1.0. Библиотека тянет KMP-артефакты `org.jetbrains.compose.{runtime,animation,foundation}` 1.7.0, которые на Android через Gradle metadata переадресуются на соответствующие `androidx.compose.*` из BOM проекта. Совместимость с BOM 2026.03.00 подтвердит только сборка — это первое, что проверяется на шаге 6 плана; если не сойдётся, перетаскивание пишется вручную на `detectDragGesturesAfterLongPress` поверх `LazyColumn`.
+
+Перетаскивание берётся только за ручку ≡, чтобы не конфликтовать с прокруткой. По отпускании — `CreateWorkoutCommand.MoveExercise(from, to)`, которая просто переставляет элементы в `state.exercises`. Поля `order` у `ExerciseItem` нет (`CreateWorkoutViewModel.kt:173–182`): порядок присваивается при сохранении через `mapIndexed { index, ex -> … order = index + 1 }` (`:96–104`), так что перестановка списка и есть изменение порядка. В БД он уходит только по ✓ в шапке, вместе с остальной правкой.
+
+**Потеря правок при выходе.** Сейчас `CreateWorkoutCommand.Back` просто ставит `isFinished = true` (`CreateWorkoutViewModel.kt:127–129`), а `NavGraph.kt:83–85` делает `popBackStack()` — все изменения теряются молча. С перетаскиванием цена ошибки выше: можно переставить полтренировки и потерять это одним тапом. Добавляется подтверждение выхода при наличии несохранённых изменений — такое же, как на экране выполнения (`WorkoutExecutionScreen.kt:215–236`). Состояние «есть изменения» — сравнение текущего `state` со слепком, сделанным после загрузки.
 
 **Лист редактирования.** Имя (единственное место с клавиатурой), `WheelRow` из четырёх барабанов, заметка, «Готово», «Удалить упражнение»:
 
-| Барабан | Диапазон | Шаг |
-|---|---|---|
-| Вес | 0–300 | 2.5 |
-| Подходы | 1–10 | 1 |
-| Повторы | 1–50 | 1 |
-| Отдых | 0:30–10:00 | 0:15 |
+| Барабан | Диапазон | Шаг | Позиций |
+|---|---|---|---|
+| Вес | 0–300 кг | 0.25 | 1201 |
+| Подходы | 1–10 | 1 | 10 |
+| Повторы | 1–50 | 1 | 50 |
+| Отдых | 0:15–30:00 | 0:15 | 120 |
 
-Отдых сейчас правится в целых минутах (`:322`), а хранится в секундах (`ExerciseEntity.restTimeMillis`), так что шаг 15 секунд ничего не ломает и не требует миграции.
+Шаг веса 0.25 выбран по реальным данным: в тренировках пользователя есть 7, 8, 13, 16, 48, 61, 88 (блочные тренажёры, стек не кратен 2.5), а также 1.25-блины, дающие четверти. Шаг 2.5 молча переписал бы такие веса при первом же сохранении. Барабан всегда открывается на текущем значении, поэтому длина списка не мешает: привычные +2.5 кг — это десять позиций, один флик.
 
-Если у существующего упражнения значение не попадает в шаг барабана (например, вес 47.5 при шаге 2.5 попадает, а 47.3 — нет), барабан встаёт на ближайшее доступное. Такие значения могли попасть в базу только через импорт JSON.
+Диапазон отдыха начинается с 0:15 и доходит до 30:00, потому что сегодня поле принимает любое целое число минут (`CreateWorkoutScreen.kt:325–336`, `minutes.coerceAtLeast(1) * 60` на `:330`) и в данных встречается 25 минут. Обрезать такое значение барабаном нельзя.
+
+**Единицы хранения.** `ExerciseEntity.restTimeMillis` — миллисекунды (`ExerciseEntity.kt:14`, запись `CreateWorkoutViewModel.kt:103`: `timeMillis = ex.restTimeSeconds * 1000L`). В секундах живёт только UI-модель `ExerciseItem.restTimeSeconds` (`:180`). Барабан работает в секундах и попадает в существующую конверсию, поэтому миграция не нужна.
+
+**Значения вне сетки.** Если у существующего упражнения значение не попадает в шаг барабана (0.1 кг, введённая с клавиатуры), барабан встаёт на ближайшее доступное. Такое значение вводится и сейчас — поле веса свободное, с `KeyboardType.Decimal` (`CreateWorkoutScreen.kt:285–293`), — но после перехода на барабаны новых таких значений не появится.
+
+**Вестигиальный код.** Барабан отдаёт `Double`, поэтому `ExerciseItem.weightStr` (`:177`) и команда `UpdateExerciseWeight(id, weightStr: String)` (`:167`, обработчик `:69–80`) удаляются: они существуют только ради текстового ввода веса. `UpdateExercise` остаётся, но вызывается из листа, а не из отдельных полей.
 
 ## Часть 5: История и экспорт/импорт
 
 **История** (`WorkoutHistoryScreen.kt`): строки с `HorizontalDivider` заменяются карточками — дата `titleMedium`, длительность лаймом. Пустое состояние через `EmptyState`.
 
-**Экспорт/импорт** (`ExportImportScreen.kt`): две кнопки и абзац текста внизу заменяются двумя карточками-действиями с иконкой, заголовком и пояснением внутри карточки. В шапке появляется стрелка «назад» — сейчас её нет (`:95`), хотя экран открывается из списка и `onNavigateBack` в него уже передаётся.
+**Экспорт/импорт** (`ExportImportScreen.kt`): две кнопки и абзац текста внизу заменяются двумя карточками-действиями с иконкой, заголовком и пояснением внутри карточки. В шапке появляется стрелка «назад»: `TopAppBar` (`:92`) объявлен без `navigationIcon`, а параметр `onNavigateBack` (`:46`) не используется в теле ни разу, хотя `NavGraph.kt:130` его передаёт.
 
 ## Часть 6: Изменения вне UI
 
 Всё, что меняется за пределами `presentation/`:
 
-1. **`WorkoutDao.getAllWorkouts()` и `getAllWorkoutsWithExercises()`** получают `ORDER BY lastUseAt ASC`.
-2. **Поисковый запрос** (`WorkoutDao.kt:48`): `ORDER BY orderInWorkout DESC` → `ORDER BY workouts.lastUseAt ASC`. Текущая сортировка по полю упражнения в запросе, возвращающем тренировки, выглядит как недосмотр и в новой модели не имеет смысла.
-3. **`GetWidgetWorkoutsUseCase.kt:20`**: `sortedByDescending` → `sortedBy`.
-4. **`WorkoutRepository.updateLastUseAt(workoutId)`** дополняется перегрузкой `setLastUseAt(workoutId, timestamp)` — нужна, чтобы «Отменить» вернула прежнее значение. Существующий метод остаётся точкой входа для завершения тренировки.
-5. **`SkipWorkoutUseCase(workoutId): Long`** — читает текущий `lastUseAt` через `getWorkoutById`, ставит `System.currentTimeMillis()`, возвращает прежнее значение для отмены. Сессию не создаёт. Обновление виджета срабатывает само: `WorkoutRepositoryImpl.updateLastUseAt()` уже дёргает `widgetUpdater.requestUpdate()` (`:101`).
-6. **`UndoSkipWorkoutUseCase(workoutId, previousLastUseAt)`** — возврат прежнего значения через `setLastUseAt`.
-7. **`CreateWorkoutCommand.MoveExercise(from, to)`** в `CreateWorkoutViewModel`.
-8. **`libs.versions.toml`**: добавляется `reorderable`.
+1. **`WorkoutDao.getAllWorkouts()` и `getAllWorkoutsWithExercises()`** получают `ORDER BY lastUseAt ASC, id ASC`. Вторичный ключ обязателен: без него порядок при равных `lastUseAt` недетерминирован, а равные значения реальны — импорт ставит `lastUseAt` из файла (`ExportImportRepositoryImpl.kt:118`).
+2. **Поисковый запрос** (`WorkoutDao.kt:48`): `ORDER BY orderInWorkout DESC` → `ORDER BY workouts.lastUseAt ASC, workouts.id ASC`. Текущая сортировка по полю упражнения в запросе, возвращающем тренировки, выглядит как недосмотр и в новой модели не имеет смысла.
+3. **`WorkoutDao.searchWorkouts()`** (`:50`) меняет тип на `Flow<List<WorkoutWithExercises>>`; за ним — `WorkoutRepository.searchWorkoutUseCase()` (`WorkoutRepository.kt:16`), `WorkoutRepositoryImpl` и `SearchWorkoutsUseCase`.
+4. **`GetWidgetWorkoutsUseCase.kt:20`**: `sortedByDescending` → `sortedBy`.
+5. **`WorkoutRepository`** получает метод `setLastUseAt(workoutId, timestamp)` — нужен, чтобы «Отменить» вернула прежнее значение. Существующий `updateLastUseAt(workoutId)` остаётся точкой входа для завершения тренировки. Реализация `setLastUseAt` **обязана** вызывать `widgetUpdater.requestUpdate()`, как это делает `updateLastUseAt` (`WorkoutRepositoryImpl.kt:99–102`) — иначе «Отменить» починит очередь в приложении и оставит виджет с неправильной.
+6. **`SkipWorkoutUseCase(workoutId): Long`** — читает текущий `lastUseAt`, ставит `System.currentTimeMillis()`, возвращает прежнее значение для отмены. Сессию не создаёт. Читать через `WorkoutRepositoryImpl.getWorkoutById` (`:34–39`) не стоит: он собирает весь `getAllWorkoutsWithExercises()` и ищет по id ради одного `Long`. В DAO есть точечный `getWorkoutById(id)` (`WorkoutDao.kt:38–39`) — репозиторий получает тонкий метод поверх него.
+7. **`UndoSkipWorkoutUseCase(workoutId, previousLastUseAt)`** — возврат прежнего значения через `setLastUseAt`.
+8. **`CreateWorkoutCommand.MoveExercise(from, to)`** добавляется, `UpdateExerciseWeight` удаляется (см. Часть 4).
+9. **Новая тренировка встаёт первой в очереди.** `CreateWorkoutViewModel.kt:114` ставит новой тренировке `lastUseAt = System.currentTimeMillis()`, из-за чего при `ORDER BY lastUseAt ASC` она оказывается последней, хотя её ни разу не делали. Для создания значение становится `0L`; карточка с `lastUseAt == 0L` показывает «ещё не делали» вместо давности и длительности. На путь редактирования это не влияет — там подставляется сохранённый `editingLastUseAt` (`:114`).
+10. **`GetAllWorkoutsUseCase` удаляется** — после перевода списка на `GetAllWorkoutsWithExerciseUseCase` у него не остаётся потребителей. Сам `dao.getAllWorkouts()` остаётся: им пользуется экспорт (`ExportImportRepositoryImpl.kt:90`, `:152`).
+11. **`libs.versions.toml`**: добавляется `reorderable` 3.1.0, удаляется `media` (`:20`, `:63`) и её подключение в `app/build.gradle.kts:97`.
+
+12. **`NavGraph`.** `onWorkoutClick`, `onEditClick`, `onHistoryClick` типизированы как `(WorkoutEntity) -> Unit` (`NavGraph.kt:63–74`) — с новым типом состояния они принимают `WorkoutWithExercises` либо распаковка `.workout` делается внутри экрана; выбирается первое, чтобы экран не знал про Room-обёртку дважды. Заглушка `onLongClick` с `// TODO` (`:58–60`) удаляется: долгий тап теперь открывает `ActionSheet` внутри экрана. «Пропустить» наружу не выводится — это операция над данными, она остаётся во ViewModel и колбэка в `NavGraph` не требует.
+
+**Побочное последствие.** `ExportAllWorkoutsUseCase.kt:29` читает `repo.getAllWorkoutsWithExercise().first()`, поэтому порядок тренировок в экспортном JSON изменится на очередь. Формат и содержимое файла те же, импорт не затрагивается.
+
+**Чего менять не нужно.** `AppModule` (`di/AppModule.kt`) правки не требует: все use case'ы создаются через `@Inject constructor`, провайдеров для них в модуле нет, поэтому новые подцепятся Hilt'ом сами.
 
 ## Тестирование
 
@@ -191,18 +219,19 @@
 
 - `SkipWorkoutUseCase`: ставит текущее время; возвращает прежний `lastUseAt`; не вызывает `addWorkoutSession`.
 - `UndoSkipWorkoutUseCase`: восстанавливает переданное значение.
-- `GetWidgetWorkoutsUseCase`: список отсортирован по возрастанию `lastUseAt` — существующий тест на убывание переписывается.
-- `CreateWorkoutViewModel.MoveExercise`: перестановка вверх и вниз даёт ожидаемый список и непрерывные `order` от 1 до N.
+- `GetWidgetWorkoutsUseCase`: список отсортирован по возрастанию `lastUseAt`.
+- `CreateWorkoutViewModel.MoveExercise`: перестановка вверх и вниз даёт ожидаемый порядок в `state.exercises`. Непрерывность `order` проверяется отдельным тестом через `MoveExercise` + `Save` со слепком аргумента `updateWorkoutUseCase` — на состоянии её проверить нельзя, `order` присваивается только при сохранении.
+- `DateFormatter.formatDurationCompact`: секунды, минуты, часы, ноль.
 
 Compose-превью для каждого компонента и для каждого состояния экрана (очередь, пустой список, поиск; Active, Rest, Finished, Error; редактор со списком и с открытым листом). Превью — основной способ проверять вёрстку без сборки на устройство.
 
 Инструментальные UI-тесты не пишутся: в проекте их нет, а настройка Hilt-окружения для них по объёму сравнима с самим редизайном.
 
-Существующие тесты правятся в трёх местах, остальные (`WorkoutExecutionViewModel`, `WorkoutHistoryViewModel`, маперы, `ScreenDeepLinkTest`, `WidgetSubtitleFormatterTest`) должны продолжать проходить без изменений:
+Существующие тесты правятся в трёх файлах, остальные (`WorkoutExecutionViewModel`, `WorkoutHistoryViewModel`, маперы, `ScreenDeepLinkTest`, `WidgetSubtitleFormatterTest`) должны продолжать проходить без изменений:
 
-- `GetWidgetWorkoutsUseCaseTest` — ожидание порядка переворачивается.
+- `GetWidgetWorkoutsUseCaseTest` — падают **два** теста, а не один. Очевидный `:55–62` (ожидание порядка переворачивается) и неочевидный `puts the last session duration on the matching workout` (`:64–76`): он берёт `result[0]` у набора `id=7 (lastUseAt=100)` / `id=9 (lastUseAt=50)` и ждёт `3_120_000L`, но после `sortedBy` первым станет `id=9` с `null`.
 - `DateFormatterTest:77–95` — три теста `isStaleWorkout` удаляются вместе с функцией.
-- `ListWorkoutViewModelTest:37` — `state.workouts` становится `List<WorkoutWithExercises>`, мок переключается с `GetAllWorkoutsUseCase` на `GetAllWorkoutsWithExerciseUseCase`. Добавляются тесты на «Пропустить» и отмену на уровне ViewModel.
+- `ListWorkoutViewModelTest` — правится шире, чем один тест: `state.workouts` становится `List<WorkoutWithExercises>` (`:37`), мок переключается с `GetAllWorkoutsUseCase` на `GetAllWorkoutsWithExerciseUseCase`, а конструктор ViewModel в `:44–52` меняет форму (см. шаг 9 плана). Добавляются тесты на «Пропустить» и отмену на уровне ViewModel.
 
 ## Порядок реализации
 
@@ -213,9 +242,16 @@ Compose-превью для каждого компонента и для каж
 5. Экран выполнения.
 6. Редактор.
 7. История, экспорт/импорт.
-8. Виджет на новую палитру.
-9. Удаление мёртвого кода: `MediaButtonManager` и зависимость `androidx.media`, `isStaleWorkout`, `Title` в `ListWorkoutScreen.kt:191` (не используется), закомментированные блоки создания тестовых тренировок в `ListWorkoutViewModel.kt:43–121`, `sendMediaKeyEvent`.
+8. Виджет. `QuickStartWidget.kt:65` использует голый `GlanceTheme { }` — то есть системные динамические цвета, — а разметка тянет `GlanceTheme.colors.widgetBackground` (`:78`), `.onSurface` (`:86`), `.onSurfaceVariant` (`:100`). Это не правка литералов: нужен собственный `ColorProviders` с токенами Dark Athletic, который подставляется в `GlanceTheme`.
+9. Удаление мёртвого кода:
+   - `MediaButtonManager.kt`, `sendMediaKeyEvent`, зависимость `androidx.media`;
+   - `isStaleWorkout` и `Title` (`ListWorkoutScreen.kt:191`) — оба не используются;
+   - `GetAllWorkoutsUseCase`;
+   - закомментированные блоки создания тестовых тренировок в `ListWorkoutViewModel.kt:43–121`. После их удаления остаётся пустой `viewModelScope.launch { var order = 1 }` (`:43–44`, `:124`) — он тоже уходит. Вместе с ним из конструктора уходят `addWorkoutUseCase` (`:30`), использовавшийся только там, а также `getWorkoutByIdUseCase` (`:31`) и `savedStateHandle` (`:34`), не используемые уже сейчас.
+   - `colors.xml:3–7` — `purple_200/500/700`, `teal_200/700` из шаблона.
 
 Каждый шаг после второго оставляет приложение собираемым и запускаемым.
 
-Первым коммитом ветки в `.gitignore` добавляется `.superpowers/` — каталог с макетами из брейншторма сейчас попадает в статус git.
+**Строковые ресурсы.** `strings.xml` содержит 8 строк, остальной текст в экранах — русские литералы. Новые экраны следуют тому же смешанному подходу: в `strings.xml` идёт только то, что нужно виджету и ярлыку приложения. Полный перенос текста в ресурсы — отдельная задача, не входит в редизайн.
+
+Первым коммитом ветки в `.gitignore` добавляются `.superpowers/` и `.claude/` — оба каталога сейчас попадают в статус git.
