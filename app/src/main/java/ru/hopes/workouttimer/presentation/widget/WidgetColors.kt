@@ -10,6 +10,14 @@ import ru.hopes.workouttimer.presentation.ui.theme.SurfaceDark
 import ru.hopes.workouttimer.presentation.ui.theme.TextPrimary
 import ru.hopes.workouttimer.presentation.ui.theme.TextSecondary
 
+// Переопределены только роли, которые сейчас реально читает разметка виджета
+// (QuickStartWidget.kt: widgetBackground, onSurface, onSurfaceVariant) — остальные
+// остаются на дефолтах Material3. `widgetBackground` не берётся из surface/background:
+// glance-material3 вычисляет его из secondaryContainer (см. Material3Themes.kt,
+// adjustColorToneForWidgetBackground), поэтому secondaryContainer задан явно. Если в
+// разметку добавится обращение к новой роли — сначала проверить в исходниках
+// glance-material3, из чего она реально выводится, а не полагаться на то, что роль
+// просто существует на объекте ColorProviders.
 private val WidgetScheme = darkColorScheme(
     primary = Accent,
     onPrimary = OnAccent,
@@ -19,7 +27,9 @@ private val WidgetScheme = darkColorScheme(
     onSurface = TextPrimary,
     surfaceVariant = Background,
     onSurfaceVariant = TextSecondary,
-    outline = OutlineDark
+    outline = OutlineDark,
+    // Источник для GlanceTheme.colors.widgetBackground — см. комментарий выше.
+    secondaryContainer = SurfaceDark
 )
 
 /** Виджет не следует системной теме: приложение всегда тёмное. */
