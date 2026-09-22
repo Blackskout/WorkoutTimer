@@ -101,6 +101,17 @@ class WorkoutRepositoryImpl @Inject constructor(
         widgetUpdater.requestUpdate()
     }
 
+    // Виджет обязан обновиться и здесь: иначе «Отменить пропуск» починит очередь
+    // в приложении и оставит на домашнем экране неправильную.
+    override suspend fun setLastUseAt(workoutId: Int, timestamp: Long) {
+        dao.updateLastUseAt(workoutId, timestamp)
+        widgetUpdater.requestUpdate()
+    }
+
+    override suspend fun getLastUseAt(workoutId: Int): Long? {
+        return dao.getWorkoutById(workoutId)?.lastUseAt
+    }
+
     override suspend fun updateExerciseNote(exerciseId: Int, note: String) {
         withContext(Dispatchers.IO) {
             dao.updateExerciseNote(exerciseId, note)

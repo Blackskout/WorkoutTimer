@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import ru.hopes.workouttimer.data.dao.LastSessionDuration
 import ru.hopes.workouttimer.data.dao.WorkoutDao
@@ -143,5 +144,39 @@ class WorkoutRepositoryImplTest {
 
         // Сессия всегда пишется в паре с updateLastUseAt(), второй пуш был бы лишним
         assertEquals(0, updater.updateCount)
+    }
+
+    @Test
+    fun `setLastUseAt пишет переданное время и обновляет виджет`() = runTest {
+        val dao = mockk<WorkoutDao>(relaxed = true)
+        val widgetUpdater = mockk<WidgetUpdater>(relaxed = true)
+        val repo = WorkoutRepositoryImpl(dao, widgetUpdater)
+
+        repo.setLastUseAt(workoutId = 5, timestamp = 1_700_000_000_000L)
+
+        coVerify { dao.updateLastUseAt(5, 1_700_000_000_000L) }
+        coVerify { widgetUpdater.requestUpdate() }
+    }
+
+    @Test
+    fun `getLastUseAt возвращает null для несуществующей тренировки`() = runTest {
+        val dao = mockk<WorkoutDao>(relaxed = true)
+        coEvery { dao.getWorkoutById(42) } returns null
+        val repo = WorkoutRepositoryImpl(dao, mockk(relaxed = true))
+
+        assertNull(repo.getLastUseAt(42))
+    }
+
+    @Test
+    fun `getLastUseAt возвращает сохранённое время`() = runTest {
+        val dao = mockk<WorkoutDao>(relaxed = true)
+        coEvery { dao.getWorkoutById(7) } returns WorkoutEntity(
+            id = 7,
+            name = "Ноги",
+            lastUseAt = 555L
+        )
+        val repo = WorkoutRepositoryImpl(dao, mockk(relaxed = true))
+
+        assertEquals(555L, repo.getLastUseAt(7))
     }
 }
