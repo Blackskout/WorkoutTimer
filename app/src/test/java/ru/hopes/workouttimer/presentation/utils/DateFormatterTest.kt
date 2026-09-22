@@ -119,4 +119,24 @@ class DateFormatterTest {
 
         assertEquals("16 июля 2026, 18:32", result)
     }
+
+    @Test
+    fun `formatDurationCompact печатает минуты и секунды`() {
+        assertEquals("52:10", DateFormatter.formatDurationCompact(3_130_000L))
+    }
+
+    @Test
+    fun `formatDurationCompact дополняет секунды нулём`() {
+        assertEquals("05:07", DateFormatter.formatDurationCompact(307_000L))
+    }
+
+    @Test
+    fun `formatDurationCompact добавляет часы после шестидесяти минут`() {
+        assertEquals("1:05:03", DateFormatter.formatDurationCompact(3_903_000L))
+    }
+
+    @Test
+    fun `formatDurationCompact печатает ноль`() {
+        assertEquals("00:00", DateFormatter.formatDurationCompact(0L))
+    }
 }
