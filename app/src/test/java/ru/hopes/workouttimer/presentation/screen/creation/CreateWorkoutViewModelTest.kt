@@ -32,8 +32,9 @@ class CreateWorkoutViewModelTest {
 
     private fun viewModel(
         add: AddWorkoutUseCase = mockk(relaxed = true),
+        get: GetWorkoutByIdUseCase = mockk(relaxed = true),
         update: UpdateWorkoutUseCase = mockk(relaxed = true)
-    ) = CreateWorkoutViewModel(add, mockk(relaxed = true), update)
+    ) = CreateWorkoutViewModel(add, get, update)
 
     @Test
     fun `новая тренировка сохраняется с нулевым lastUseAt`() = runTest(dispatcher) {
@@ -158,7 +159,7 @@ class CreateWorkoutViewModelTest {
             lastUseAt = 12345L
         )
         coEvery { get(7) } returns existing
-        val vm = CreateWorkoutViewModel(mockk(relaxed = true), get, update)
+        val vm = viewModel(get = get, update = update)
 
         vm.loadWorkout(7)
         testScheduler.advanceUntilIdle()

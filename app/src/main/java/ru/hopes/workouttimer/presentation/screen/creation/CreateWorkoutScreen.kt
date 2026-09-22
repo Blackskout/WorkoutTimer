@@ -340,10 +340,10 @@ private fun ExerciseEditSheetContent(
         mutableIntStateOf(wheelIndexOfNearest(WeightValues, item.weight))
     }
     var setsIndex by remember(item.id) {
-        mutableIntStateOf(SetsValues.indexOf(item.sets).coerceAtLeast(0))
+        mutableIntStateOf(wheelIndexOfNearest(SetsValues.map { it.toDouble() }, item.sets.toDouble()))
     }
     var repsIndex by remember(item.id) {
-        mutableIntStateOf(RepsValues.indexOf(item.reps).coerceAtLeast(0))
+        mutableIntStateOf(wheelIndexOfNearest(RepsValues.map { it.toDouble() }, item.reps.toDouble()))
     }
     var restIndex by remember(item.id) {
         mutableIntStateOf(
