@@ -4,6 +4,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -13,7 +14,10 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import ru.hopes.workouttimer.data.dao.WorkoutWithExercises
@@ -56,6 +60,7 @@ class ListWorkoutViewModelTest {
 
     private fun viewModel(
         workouts: List<WorkoutWithExercises> = emptyList(),
+        searchResults: List<WorkoutWithExercises> = workouts,
         durations: Map<Int, Long> = emptyMap(),
         skip: SkipWorkoutUseCase = mockk(relaxed = true),
         undoSkip: UndoSkipWorkoutUseCase = mockk(relaxed = true)
@@ -64,7 +69,7 @@ class ListWorkoutViewModelTest {
         val search = mockk<SearchWorkoutsUseCase>()
         val getDurations = mockk<GetLastSessionDurationsUseCase>()
         every { getAll() } returns flowOf(workouts)
-        every { search(any()) } returns flowOf(workouts)
+        every { search(any()) } returns flowOf(searchResults)
         every { getDurations() } returns flowOf(durations)
         return ListWorkoutViewModel(
             getAll,
@@ -135,5 +140,103 @@ class ListWorkoutViewModelTest {
         testScheduler.advanceUntilIdle()
 
         assertNull(vm.state.value.skippedWorkout)
+    }
+
+    @Test
+    fun `поиск переключает состояние на результаты SearchWorkoutsUseCase`() = runTest(dispatcher) {
+        val queueWorkouts = listOf(workoutWith(1, "Ноги", 0L))
+        val searchWorkouts = listOf(workoutWith(2, "Спина", 100L))
+        val getAll = mockk<GetAllWorkoutsWithExerciseUseCase>()
+        every { getAll() } returns flowOf(queueWorkouts)
+        val search = mockk<SearchWorkoutsUseCase>()
+        every { search(any()) } returns flowOf(searchWorkouts)
+        val getDurations = mockk<GetLastSessionDurationsUseCase>()
+        every { getDurations() } returns flowOf(emptyMap())
+        val vm = ListWorkoutViewModel(
+            getAll,
+            search,
+            mockk(relaxed = true),
+            getDurations,
+            mockk(relaxed = true),
+            mockk(relaxed = true)
+        )
+        testScheduler.advanceUntilIdle()
+
+        vm.updateSearchQuery("Спина")
+        testScheduler.advanceUntilIdle()
+
+        val state = vm.state.value
+        assertEquals("Спина", state.query)
+        assertTrue(state.isSearching)
+        assertEquals(1, state.workouts.size)
+        assertEquals(2, state.workouts.first().workout.id)
+        assertEquals("Спина", state.workouts.first().workout.name)
+        verify { search("Спина") }
+    }
+
+    @Test
+    fun `очистка поискового запроса возвращает очередь`() = runTest(dispatcher) {
+        val queueWorkouts = listOf(workoutWith(1, "Ноги", 0L))
+        val searchWorkouts = listOf(workoutWith(2, "Спина", 100L))
+        val getAll = mockk<GetAllWorkoutsWithExerciseUseCase>()
+        every { getAll() } returns flowOf(queueWorkouts)
+        val search = mockk<SearchWorkoutsUseCase>()
+        every { search(any()) } returns flowOf(searchWorkouts)
+        val getDurations = mockk<GetLastSessionDurationsUseCase>()
+        every { getDurations() } returns flowOf(emptyMap())
+        val vm = ListWorkoutViewModel(
+            getAll,
+            search,
+            mockk(relaxed = true),
+            getDurations,
+            mockk(relaxed = true),
+            mockk(relaxed = true)
+        )
+        testScheduler.advanceUntilIdle()
+
+        vm.updateSearchQuery("Спина")
+        testScheduler.advanceUntilIdle()
+        assertTrue(vm.state.value.isSearching)
+
+        vm.updateSearchQuery("")
+        testScheduler.advanceUntilIdle()
+
+        val state = vm.state.value
+        assertFalse(state.isSearching)
+        assertEquals(1, state.workouts.size)
+        assertEquals(1, state.workouts.first().workout.id)
+    }
+
+    @Test
+    fun `отклонение снекбара гасит его без отмены пропуска`() = runTest(dispatcher) {
+        val skip = mockk<SkipWorkoutUseCase>()
+        val undo = mockk<UndoSkipWorkoutUseCase>(relaxed = true)
+        coEvery { skip(7) } returns 555L
+        val vm = viewModel(skip = skip, undoSkip = undo)
+        testScheduler.advanceUntilIdle()
+
+        vm.skipWorkout(WorkoutEntity(id = 7, name = "Спина", lastUseAt = 555L))
+        testScheduler.advanceUntilIdle()
+        assertNotNull(vm.state.value.skippedWorkout)
+
+        vm.dismissSkipUndo()
+        testScheduler.advanceUntilIdle()
+
+        assertNull(vm.state.value.skippedWorkout)
+        coVerify(exactly = 0) { undo(any(), any()) }
+    }
+
+    @Test
+    fun `nextWorkout и restOfQueue на границах очереди`() = runTest(dispatcher) {
+        val emptyVm = viewModel(workouts = emptyList())
+        testScheduler.advanceUntilIdle()
+        assertNull(emptyVm.state.value.nextWorkout)
+        assertTrue(emptyVm.state.value.restOfQueue.isEmpty())
+
+        val onlyWorkout = workoutWith(1, "Ноги", 0L)
+        val singleVm = viewModel(workouts = listOf(onlyWorkout))
+        testScheduler.advanceUntilIdle()
+        assertEquals(onlyWorkout, singleVm.state.value.nextWorkout)
+        assertTrue(singleVm.state.value.restOfQueue.isEmpty())
     }
 }
