@@ -111,7 +111,9 @@ class CreateWorkoutViewModel @Inject constructor(
                             id = editingWorkoutId ?: 0,
                             name = _state.value.workoutName,
                             exercises = validExercises,
-                            lastUseAt = editingLastUseAt ?: System.currentTimeMillis()
+                            // 0 означает «ещё не делали»: при сортировке очереди по
+                            // возрастанию новая тренировка встаёт первой, а не последней.
+                            lastUseAt = editingLastUseAt ?: 0L
                         )
 
                         if (editingWorkoutId != null) {
