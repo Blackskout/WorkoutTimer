@@ -17,7 +17,6 @@ sealed class RelativeTime {
 
 private val milesInHour = TimeUnit.HOURS.toMillis(1)
 private val milesInDay = TimeUnit.DAYS.toMillis(1)
-private val milesIn13Days = TimeUnit.DAYS.toMillis(13)
 private val milesIn14Days = TimeUnit.DAYS.toMillis(14)
 
 fun relativeTimeOf(timestamp: Long, now: Long = System.currentTimeMillis()): RelativeTime {
@@ -29,10 +28,6 @@ fun relativeTimeOf(timestamp: Long, now: Long = System.currentTimeMillis()): Rel
         diff < milesIn14Days -> RelativeTime.DaysAgo(TimeUnit.MILLISECONDS.toDays(diff))
         else -> RelativeTime.Absolute(timestamp)
     }
-}
-
-fun isStaleWorkout(timestamp: Long, now: Long = System.currentTimeMillis()): Boolean {
-    return now - timestamp >= milesIn13Days
 }
 
 object DateFormatter {

@@ -74,27 +74,6 @@ class DateFormatterTest {
     }
 
     @Test
-    fun `isStaleWorkout returns false when under 13 days have passed`() {
-        val timestamp = now - TimeUnit.DAYS.toMillis(12)
-
-        assertEquals(false, isStaleWorkout(timestamp, now))
-    }
-
-    @Test
-    fun `isStaleWorkout returns true at exactly 13 days`() {
-        val timestamp = now - TimeUnit.DAYS.toMillis(13)
-
-        assertEquals(true, isStaleWorkout(timestamp, now))
-    }
-
-    @Test
-    fun `isStaleWorkout returns true well beyond 13 days`() {
-        val timestamp = now - TimeUnit.DAYS.toMillis(30)
-
-        assertEquals(true, isStaleWorkout(timestamp, now))
-    }
-
-    @Test
     fun `formatDurationToString shows only minutes under an hour`() {
         assertEquals("42 мин", DateFormatter.formatDurationToString(42 * 60_000L))
     }
