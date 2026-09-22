@@ -13,10 +13,10 @@ import ru.hopes.workouttimer.data.entity.WorkoutSessionEntity
 @Dao
 interface WorkoutDao {
     @Transaction
-    @Query("SELECT * FROM workouts")
+    @Query("SELECT * FROM workouts ORDER BY lastUseAt ASC, id ASC")
     fun getAllWorkoutsWithExercises(): Flow<List<WorkoutWithExercises>>
 
-    @Query("SELECT * FROM workouts")
+    @Query("SELECT * FROM workouts ORDER BY lastUseAt ASC, id ASC")
     fun getAllWorkouts(): Flow<List<WorkoutEntity>>
 
     @Insert
@@ -45,7 +45,7 @@ interface WorkoutDao {
         ON workouts.id == exercises.workoutId
         WHERE workouts.name LIKE '%' || :query || '%'
         OR exercises.name LIKE '%' || :query || '%'
-        ORDER BY orderInWorkout DESC
+        ORDER BY workouts.lastUseAt ASC, workouts.id ASC
         """
     )
     fun searchWorkouts(query: String): Flow<List<WorkoutEntity>>

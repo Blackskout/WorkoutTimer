@@ -17,7 +17,7 @@ class GetWidgetWorkoutsUseCase @Inject constructor(
             getLastSessionDurations()
         ) { workouts, durations ->
             workouts
-                .sortedByDescending { it.workout.lastUseAt }
+                .sortedBy { it.workout.lastUseAt }
                 .map { it.toWidgetWorkout(durations[it.workout.id]) }
         }
             // Виджет с пустым списком лучше системной «ошибки загрузки» на всю плитку
