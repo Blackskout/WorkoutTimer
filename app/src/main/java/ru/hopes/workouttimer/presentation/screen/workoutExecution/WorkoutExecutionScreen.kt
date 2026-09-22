@@ -53,7 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.hopes.workouttimer.domain.model.Exercise
-import ru.hopes.workouttimer.presentation.components.SystemMediaControllerCompat
+import ru.hopes.workouttimer.presentation.components.YandexMusicButton
 import ru.hopes.workouttimer.presentation.utils.DateFormatter
 import ru.hopes.workouttimer.presentation.utils.toCorrectNum
 
@@ -192,7 +192,7 @@ fun WorkoutExecutionScreen(
                 }
 
                 // MediaController для управления музыкой из других приложений
-                SystemMediaControllerCompat()
+                YandexMusicButton()
             }
         }
     }
