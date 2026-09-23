@@ -118,6 +118,12 @@ class WorkoutRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun updateExerciseWeightAndReps(exerciseId: Int, weight: Double, reps: Int) {
+        withContext(Dispatchers.IO) {
+            dao.updateExerciseWeightAndReps(exerciseId, weight, reps)
+        }
+    }
+
     override suspend fun addWorkoutSession(workoutId: Int, startedAt: Long, finishedAt: Long, durationMillis: Long) {
         dao.insertSession(
             WorkoutSessionEntity(

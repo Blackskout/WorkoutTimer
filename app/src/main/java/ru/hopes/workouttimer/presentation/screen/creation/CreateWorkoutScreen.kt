@@ -51,7 +51,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.hopes.workouttimer.presentation.ui.components.AppBottomSheet
 import ru.hopes.workouttimer.presentation.ui.components.EmptyState
 import ru.hopes.workouttimer.presentation.ui.components.PrimaryButton
+import ru.hopes.workouttimer.presentation.ui.components.RepsValues
 import ru.hopes.workouttimer.presentation.ui.components.SectionHeader
+import ru.hopes.workouttimer.presentation.ui.components.WeightValues
 import ru.hopes.workouttimer.presentation.ui.components.WheelPicker
 import ru.hopes.workouttimer.presentation.ui.components.WheelRow
 import ru.hopes.workouttimer.presentation.ui.components.wheelIndexOfNearest
@@ -63,9 +65,7 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.util.Locale
 
-private val WeightValues = generateSequence(0.0) { it + 0.25 }.takeWhile { it <= 300.0 }.toList()
 private val SetsValues = (1..10).toList()
-private val RepsValues = (1..50).toList()
 private val RestValues = (15..1800 step 15).toList()
 
 private fun formatRest(seconds: Int): String =
