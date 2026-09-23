@@ -19,6 +19,13 @@ class GetWidgetWorkoutsUseCase @Inject constructor(
             // DAO уже упорядочивает по lastUseAt ASC, id ASC — sortedBy здесь только
             // должен остаться стабильной сортировкой (как и есть у Kotlin), иначе
             // тай-брейк по id, заданный в WorkoutDao, потеряется при равных lastUseAt.
+            //
+            // «Ещё не делали» определяется по lastUseAt == 0L (так пишет
+            // CreateWorkoutViewModel при создании тренировки), а не по отсутствию
+            // записанной сессии: тренировка, сделанная давно, ещё до того как сессии
+            // стали записываться, сессии в истории не имеет, но «не деланной» не
+            // является — сортировка только по lastUseAt корректно ставит её по
+            // возрасту, а не подменяет статус «ещё не делали».
             workouts
                 .sortedBy { it.workout.lastUseAt }
                 .map { it.toWidgetWorkout(durations[it.workout.id]) }

@@ -55,10 +55,43 @@ class GetWidgetWorkoutsUseCaseTest {
                 workoutWith(id = 1, name = "Старая", lastUseAt = 100L),
                 workoutWith(id = 2, name = "Свежая", lastUseAt = 300L),
                 workoutWith(id = 3, name = "Средняя", lastUseAt = 200L)
-            )
+            ),
+            durations = mapOf(1 to 1_000L, 2 to 1_000L, 3 to 1_000L)
         )().first()
 
         assertEquals(listOf("Старая", "Средняя", "Свежая"), result.map { it.name })
+    }
+
+    @Test
+    fun `puts a newly created workout with lastUseAt zero at the front`() = runTest {
+        val result = useCase(
+            workouts = listOf(
+                workoutWith(id = 1, name = "Старая", lastUseAt = 100L),
+                workoutWith(id = 2, name = "Новая", lastUseAt = 0L),
+                workoutWith(id = 3, name = "Средняя", lastUseAt = 200L)
+            ),
+            // У «Новой» нет записанной сессии — это ожидаемо для только что созданной
+            // тренировки, CreateWorkoutViewModel пишет ей lastUseAt = 0L.
+            durations = mapOf(1 to 1_000L, 3 to 1_000L)
+        )().first()
+
+        assertEquals(listOf("Новая", "Старая", "Средняя"), result.map { it.name })
+    }
+
+    @Test
+    fun `does not hoist an old workout without a recorded session above one with a smaller lastUseAt`() = runTest {
+        // Регрессия на подход master: сортировка по отсутствию сессии подняла бы
+        // «Без сессии» наверх, хотя её lastUseAt больше — а она просто сделана давно,
+        // до того как сессии стали записываться, и «не деланной» не является.
+        val result = useCase(
+            workouts = listOf(
+                workoutWith(id = 1, name = "Без сессии", lastUseAt = 50L),
+                workoutWith(id = 2, name = "С сессией", lastUseAt = 30L)
+            ),
+            durations = mapOf(2 to 1_000L)
+        )().first()
+
+        assertEquals(listOf("С сессией", "Без сессии"), result.map { it.name })
     }
 
     @Test
