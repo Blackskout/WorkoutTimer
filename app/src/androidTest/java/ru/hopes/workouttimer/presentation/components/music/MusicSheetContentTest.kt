@@ -10,6 +10,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeRight
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -48,7 +50,8 @@ class MusicSheetContentTest {
     private fun setContent(
         trackInfo: TrackInfo,
         playing: Boolean = true,
-        onLike: (Boolean) -> Unit = {}
+        onLike: (Boolean) -> Unit = {},
+        onSeek: (Long) -> Unit = {}
     ) {
         composeRule.setContent {
             WorkoutTimerTheme {
@@ -59,7 +62,7 @@ class MusicSheetContentTest {
                         onPlayPause = {},
                         onNext = {},
                         onPrevious = {},
-                        onSeek = {},
+                        onSeek = onSeek,
                         onLike = onLike
                     )
                 }
@@ -145,5 +148,23 @@ class MusicSheetContentTest {
 
         composeRule.runOnIdle { state = MusicState.NoSession }
         composeRule.runOnIdle { assertEquals(false, visibleNow) }
+    }
+
+    /**
+     * Отпустив ползунок, пользователь должен видеть то место, куда он его
+     * привёл, а не то, откуда тянул. Возврат назад читается как «перемотка не
+     * сработала» — ровно тот порок обратной связи, ради которого затевался
+     * весь плеер.
+     */
+    @Test
+    fun после_отпускания_ползунок_остаётся_на_новом_месте() {
+        var seeked: Long? = null
+        setContent(track(), playing = false, onSeek = { seeked = it })
+
+        composeRule.onNodeWithContentDescription("Перемотка").performTouchInput { swipeRight() }
+        composeRule.waitForIdle()
+
+        assertEquals(true, (seeked ?: 0L) > 42_000L)
+        composeRule.onNodeWithText("00:42").assertDoesNotExist()
     }
 }

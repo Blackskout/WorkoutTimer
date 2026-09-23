@@ -232,6 +232,11 @@ private fun SeekRow(
     // ползунок дёргался бы назад на каждом обновлении позиции.
     var dragging by remember { mutableStateOf(false) }
     var draggedMs by remember { mutableStateOf(0f) }
+    // Место, куда пользователь перемотал. Держится, пока сессия не подтвердит
+    // его новым positionUpdatedAt. Без этого после отпускания ползунок прыгал
+    // бы назад, к доперемоточной позиции, — и перемотка читалась бы как
+    // несработавшая, ровно как старые кнопки без обратной связи.
+    var pendingSeekMs by remember(track.positionUpdatedAt) { mutableStateOf<Float?>(null) }
     var tickedMs by remember(track.positionMs, track.positionUpdatedAt) {
         mutableStateOf(track.positionMs.toFloat())
     }
@@ -244,7 +249,7 @@ private fun SeekRow(
         }
     }
 
-    val shown = if (dragging) draggedMs else tickedMs
+    val shown = if (dragging) draggedMs else pendingSeekMs ?: tickedMs
 
     Slider(
         value = shown.coerceIn(0f, track.durationMs.toFloat()),
@@ -253,6 +258,7 @@ private fun SeekRow(
             draggedMs = it
         },
         onValueChangeFinished = {
+            pendingSeekMs = draggedMs
             dragging = false
             onSeek(draggedMs.toLong())
         },
