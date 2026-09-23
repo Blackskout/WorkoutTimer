@@ -48,6 +48,14 @@ android {
             isReturnDefaultValues = true
         }
     }
+
+    // Фейки, нужные и JVM-тестам, и инструментальным: FakeMusicControlRepository
+    // питает и MusicViewModelTest, и MusicSectionTest. Общий каталог вместо
+    // копии файла в двух местах.
+    sourceSets {
+        getByName("test") { java.srcDir("src/sharedTest/java") }
+        getByName("androidTest") { java.srcDir("src/sharedTest/java") }
+    }
 }
 
 tasks.withType<KotlinJvmCompile>().configureEach {
