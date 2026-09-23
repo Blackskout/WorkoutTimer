@@ -327,7 +327,7 @@ fun MusicBarContent(                // без состояния, зовётся
 
 ## Тестирование
 
-**Unit** (`app/src/test/.../data/mapper/MusicStateMapperTest.kt`). Моков не требуется: обе функции принимают `MediaSnapshot` и `TrackInfo` — обычные data class. Платформенные константы (`RATING_HEART`, `ACTION_*`, `METADATA_KEY_*`) инлайнятся компилятором, так что ни одна заглушка `android.jar` не исполняется.
+**Unit** (`app/src/test/.../data/mapper/MusicStateMapperTest.kt`). Обе функции принимают `MediaSnapshot` и `TrackInfo` — обычные data class, так что моки почти не нужны. Платформенные константы (`RATING_HEART`, `ACTION_*`, `STATE_*`) компилятор инлайнит, поэтому ни одна заглушка из `android.jar` не исполняется. Единственное исключение — проверка откатов обложки: нужны три различимых объекта `Bitmap`, а создать его на JVM нельзя, поэтому там берутся `mockk<Bitmap>()`. Методы на них не вызываются, сравниваются только ссылки.
 
 - `STATE_PLAYING` → `Playing`, `STATE_PAUSED` → `Paused`, `STATE_BUFFERING` → `Playing`, `null` / `STATE_STOPPED` → `NoSession`
 - пустые название и исполнитель → прочерки, кнопки доступны
