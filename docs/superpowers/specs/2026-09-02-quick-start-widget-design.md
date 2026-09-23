@@ -37,7 +37,7 @@
 
 1. `WorkoutDao.updateWorkout()` перестаёт трогать колонку: `UPDATE workouts SET name = :name WHERE id = :id`, параметр `lastUseAt` из сигнатуры убирается. Схема не меняется, миграция не нужна.
 2. `WorkoutRepositoryImpl.updateWorkout()` перестаёт передавать значение в DAO.
-3. `CreateWorkoutViewModel.loadWorkout()` запоминает исходный `lastUseAt` рядом с `editingWorkoutId` и подставляет его в модель на пути редактирования, чтобы модель не содержала заведомо неверное значение. На пути создания остаётся `System.currentTimeMillis()`.
+3. `CreateWorkoutViewModel.loadWorkout()` запоминает исходный `lastUseAt` рядом с `editingWorkoutId` и подставляет его в модель на пути редактирования, чтобы модель не содержала заведомо неверное значение. На пути создания подставляется `0L` — «ещё не делали»: по нему новая тренировка встаёт первой в очереди и отличима от сделанной только что.
 
 Что сознательно **не** трогаем:
 
@@ -289,7 +289,7 @@ URI: `workouttimer://execution/{workout_id}`
 **Новые unit-тесты:**
 
 - `GetWidgetWorkoutsUseCaseTest`
-  - сортировка по `lastUseAt` по убыванию
+  - сортировка по `lastUseAt` по возрастанию (дольше всех не делали — сверху)
   - длительность подставляется по `workoutId`
   - `lastDurationMillis == null`, когда сессий не было
   - `exerciseCount` считается по списку упражнений
