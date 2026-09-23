@@ -195,14 +195,26 @@ class ListWorkoutViewModelTest {
             )
             testScheduler.advanceUntilIdle()
 
-            // Пробел набирается посимвольно: "Грудь", "Грудь ", "Грудь и" — если бы
-            // updateSearchQuery триммил сразу, конечный пробел стирался бы и второе
-            // слово нельзя было бы начать набирать.
-            vm.updateSearchQuery("Грудь")
+            // Каждый вызов строится из ТЕКУЩЕГО state.query + новый символ — именно
+            // так реальный TextField вызывает onValueChange (старое значение поля
+            // плюс то, что напечатали). Если бы тест передавал готовые литералы
+            // ("Грудь", "Грудь ", "Грудь и"), он бы не отличал старое поведение от
+            // нового: "Грудь и".trim() == "Грудь и" и под старым, триммящим сразу,
+            // кодом тоже, так как в этой строке нет ни ведущих, ни хвостовых
+            // пробелов. Баг проявляется только на промежуточном шаге, где триммится
+            // именно хвостовой пробел.
+            vm.updateSearchQuery(vm.state.value.query + "Грудь")
             testScheduler.advanceUntilIdle()
-            vm.updateSearchQuery("Грудь ")
+
+            vm.updateSearchQuery(vm.state.value.query + " ")
             testScheduler.advanceUntilIdle()
-            vm.updateSearchQuery("Грудь и")
+            // Ключевая проверка: хвостовой пробел должен остаться в поле. Старый
+            // updateSearchQuery { newQuery.trim() } схлопывал "Грудь " в "Грудь" —
+            // здесь тест ловит баг ещё до того, как символ "и" успел бы приклеиться
+            // вплотную и превратить "Грудь и" в "Грудьи".
+            assertEquals("Грудь ", vm.state.value.query)
+
+            vm.updateSearchQuery(vm.state.value.query + "и")
             testScheduler.advanceUntilIdle()
 
             assertEquals("Грудь и", vm.state.value.query)
