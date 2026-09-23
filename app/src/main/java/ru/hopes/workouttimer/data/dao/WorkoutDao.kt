@@ -12,11 +12,15 @@ import ru.hopes.workouttimer.data.entity.WorkoutSessionEntity
 
 @Dao
 interface WorkoutDao {
+    // id ASC — тай-брейк: импорт может проставить нескольким тренировкам одинаковый
+    // lastUseAt, и без вторичного ключа их порядок в очереди не был бы детерминирован.
     @Transaction
-    @Query("SELECT * FROM workouts")
+    @Query("SELECT * FROM workouts ORDER BY lastUseAt ASC, id ASC")
     fun getAllWorkoutsWithExercises(): Flow<List<WorkoutWithExercises>>
 
-    @Query("SELECT * FROM workouts")
+    // id ASC — тай-брейк: импорт может проставить нескольким тренировкам одинаковый
+    // lastUseAt, и без вторичного ключа их порядок в очереди не был бы детерминирован.
+    @Query("SELECT * FROM workouts ORDER BY lastUseAt ASC, id ASC")
     fun getAllWorkouts(): Flow<List<WorkoutEntity>>
 
     @Insert
@@ -38,6 +42,9 @@ interface WorkoutDao {
     @Query("SELECT * FROM workouts WHERE id = :id")
     suspend fun getWorkoutById(id: Int): WorkoutEntity?
 
+    // workouts.id ASC — тай-брейк: импорт может проставить нескольким тренировкам
+    // одинаковый lastUseAt, и без вторичного ключа их порядок в очереди не был бы
+    // детерминирован.
     @Transaction
     @Query(
         """
@@ -45,10 +52,10 @@ interface WorkoutDao {
         ON workouts.id == exercises.workoutId
         WHERE workouts.name LIKE '%' || :query || '%'
         OR exercises.name LIKE '%' || :query || '%'
-        ORDER BY orderInWorkout DESC
+        ORDER BY workouts.lastUseAt ASC, workouts.id ASC
         """
     )
-    fun searchWorkouts(query: String): Flow<List<WorkoutEntity>>
+    fun searchWorkouts(query: String): Flow<List<WorkoutWithExercises>>
 
     @Query("UPDATE workouts SET lastUseAt = :lastUseAt WHERE id = :id")
     suspend fun updateLastUseAt(id: Int, lastUseAt: Long)

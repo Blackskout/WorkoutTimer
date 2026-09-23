@@ -63,19 +63,35 @@ class GetWidgetWorkoutsUseCaseTest {
     }
 
     @Test
-    fun `puts workouts without a single session above the rest`() = runTest {
+    fun `puts a newly created workout with lastUseAt zero at the front`() = runTest {
         val result = useCase(
             workouts = listOf(
-                workoutWith(id = 1, name = "Заброшенная", lastUseAt = 100L),
-                workoutWith(id = 2, name = "Новая", lastUseAt = 300L),
-                workoutWith(id = 3, name = "Вчерашняя", lastUseAt = 200L)
+                workoutWith(id = 1, name = "Старая", lastUseAt = 100L),
+                workoutWith(id = 2, name = "Новая", lastUseAt = 0L),
+                workoutWith(id = 3, name = "Средняя", lastUseAt = 200L)
             ),
-            // «Новой» нет в истории сессий, хотя её lastUseAt самый свежий: при создании
-            // тренировки туда пишется now.
+            // У «Новой» нет записанной сессии — это ожидаемо для только что созданной
+            // тренировки, CreateWorkoutViewModel пишет ей lastUseAt = 0L.
             durations = mapOf(1 to 1_000L, 3 to 1_000L)
         )().first()
 
-        assertEquals(listOf("Новая", "Заброшенная", "Вчерашняя"), result.map { it.name })
+        assertEquals(listOf("Новая", "Старая", "Средняя"), result.map { it.name })
+    }
+
+    @Test
+    fun `does not hoist an old workout without a recorded session above one with a smaller lastUseAt`() = runTest {
+        // Регрессия на подход master: сортировка по отсутствию сессии подняла бы
+        // «Без сессии» наверх, хотя её lastUseAt больше — а она просто сделана давно,
+        // до того как сессии стали записываться, и «не деланной» не является.
+        val result = useCase(
+            workouts = listOf(
+                workoutWith(id = 1, name = "Без сессии", lastUseAt = 50L),
+                workoutWith(id = 2, name = "С сессией", lastUseAt = 30L)
+            ),
+            durations = mapOf(2 to 1_000L)
+        )().first()
+
+        assertEquals(listOf("С сессией", "Без сессии"), result.map { it.name })
     }
 
     @Test
@@ -88,7 +104,7 @@ class GetWidgetWorkoutsUseCaseTest {
             durations = mapOf(7 to 3_120_000L)
         )().first()
 
-        // «Спина» без сессии идёт первой, «Ноги» с длительностью — второй
+        // После сортировки по возрастанию первой идёт «Спина» (lastUseAt = 50).
         assertEquals("Спина", result[0].name)
         assertNull(result[0].lastDurationMillis)
         assertEquals(3_120_000L, result[1].lastDurationMillis)

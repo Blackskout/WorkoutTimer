@@ -1,6 +1,5 @@
 package ru.hopes.workouttimer.presentation.screen.workouts
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -13,25 +12,25 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import ru.hopes.workouttimer.data.dao.WorkoutWithExercises
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
-import ru.hopes.workouttimer.domain.usecase.AddWorkoutUseCase
 import ru.hopes.workouttimer.domain.usecase.DeleteWorkoutUseCase
-import ru.hopes.workouttimer.domain.usecase.GetAllWorkoutsUseCase
+import ru.hopes.workouttimer.domain.usecase.GetAllWorkoutsWithExerciseUseCase
 import ru.hopes.workouttimer.domain.usecase.GetLastSessionDurationsUseCase
-import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
 import ru.hopes.workouttimer.domain.usecase.SearchWorkoutsUseCase
+import ru.hopes.workouttimer.domain.usecase.SkipWorkoutUseCase
+import ru.hopes.workouttimer.domain.usecase.UndoSkipWorkoutUseCase
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ListWorkoutViewModel @Inject constructor(
-    private val getAllWorkoutsUseCase: GetAllWorkoutsUseCase,
+    private val getAllWorkoutsWithExerciseUseCase: GetAllWorkoutsWithExerciseUseCase,
     private val searchWorkoutsUseCase: SearchWorkoutsUseCase,
-    private val addWorkoutUseCase: AddWorkoutUseCase,
-    private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
     private val deleteWorkoutUseCase: DeleteWorkoutUseCase,
     private val getLastSessionDurationsUseCase: GetLastSessionDurationsUseCase,
-    private val savedStateHandle: SavedStateHandle
+    private val skipWorkoutUseCase: SkipWorkoutUseCase,
+    private val undoSkipWorkoutUseCase: UndoSkipWorkoutUseCase
 ) : ViewModel() {
 
     private val query = MutableStateFlow("")
@@ -40,112 +39,35 @@ class ListWorkoutViewModel @Inject constructor(
     val state = _state.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            var order = 1
-//            addWorkoutUseCase(
-//                Workout(
-//                    0,
-//                    "Тестовый 3",
-//                    listOf(
-//                        Exercise(0, "Жим ног", 180.0, 3, 12, 1500_000, order),
-//                        Exercise(0, "Жим лежа", 35.0, 3, 12, 900_000, order++),
-//                        Exercise(0, "Спина", 61.0, 3, 12, 900_000, order++),
-//                        Exercise(0, "Сгибание лежа", 50.0, 3, 12, 120_000, order++),
-//                        Exercise(0, "Плечи", 8.0, 3, 12, 90_000, order++),
-//                        Exercise(0, "Бицепс", 16.0, 3, 12, 90_000, order++),
-//                        Exercise(0, "Трицепс велосипедои", 7.0, 3, 12, 90_000, order++),
-//                        Exercise(0, "Спина в хаммере", 48.0, 3, 12, 120_000, order++),
-//                    ),
-//                    System.currentTimeMillis()
-//                )
-//            )
-//
-//
-//            addWorkoutUseCase(
-//
-//                    // ПОНЕДЕЛЬНИК
-//                    Workout(
-//                        id = 1,
-//                        name = "Понедельник",
-//                        lastUseAt = System.currentTimeMillis(),
-//                        exercises = listOf(
-//                            Exercise(id = 0, name = "Ягодичный мост", weight = 35.0, sets = 3, reps = 12, timeMillis = 150_000, order = 1),
-//                            Exercise(id = 0, name = "Жим лёжа (скамья на 5)", weight = 25.0, sets = 3, reps = 12, timeMillis = 150_000 , order = 2),
-//                            Exercise(id = 0, name = "Тяга верхнего блока шир. хватом", weight = 61.0, sets = 3, reps = 12, order = 3),
-//                            Exercise(id = 0, name = "Экстензия", weight = 12.5, sets = 3, reps = 12, order = 4),
-//                            Exercise(id = 0, name = "Трицепс с велосипедом", weight = 7.0, sets = 3, reps = 12, order = 5),
-//                            Exercise(id = 0, name = "Плечи", weight = 8.0, sets = 3, reps = 12, order = 6),
-//                            Exercise(id = 0, name = "Бицепс", weight = 13.0, sets = 3, reps = 12, order = 7)
-//                        )
-//                    )
-//            )
-//
-//            addWorkoutUseCase(
-//
-//                // СРЕДА
-//                Workout(
-//                    id = 2,
-//                    name = "Среда",
-//                    lastUseAt = System.currentTimeMillis(),
-//                    exercises = listOf(
-//                        Exercise(id = 0, name = "Тяга верхнего блока шир. хватом", weight = 61.0, sets = 3, reps = 12, order = 1),
-//                        Exercise(id = 0, name = "Жим лёжа (скамья на 5)", weight = 25.0, sets = 3, reps = 12, timeMillis = 150_000, order = 2),
-//                        Exercise(id = 0, name = "Ноги разгибание", weight = 88.0, sets = 3, reps = 12, timeMillis = 150_000, order = 3),
-//                        Exercise(id = 0, name = "Ноги сгибание", weight = 70.0, sets = 3, reps = 12, timeMillis = 150_000, order = 4),
-//                        Exercise(id = 0, name = "Плечи", weight = 8.0, sets = 3, reps = 12, order = 5),
-//                        Exercise(id = 0, name = "Трицепс с велосипедом", weight = 7.0, sets = 3, reps = 12, order = 6),
-//                        Exercise(id = 0, name = "Грудь горизонтальная тяга", weight = 35.0, sets = 3, reps = 12, order = 7),
-//                        Exercise(id = 0, name = "Бицепс", weight = 13.0, sets = 3, reps = 12, order = 8)
-//                    )
-//                )
-//            )
-
-//            addWorkoutUseCase(
-//
-//                // ПЯТНИЦА
-//                Workout(
-//                    id = 3,
-//                    name = "Пятница",
-//                    lastUseAt = System.currentTimeMillis(),
-//                    exercises = listOf(
-//                        Exercise(id = 0, name = "Жим ног", weight = 180.0, sets = 3, reps = 12, timeMillis = 150_000, order = 1),
-//                        Exercise(id = 0, name = "Жим лёжа (скамья на 5)", weight = 25.0, sets = 3, reps = 12, timeMillis = 150_000, order = 2),
-//                        Exercise(id = 0, name = "Тяга верхнего блока шир. хватом", weight = 61.0, sets = 3, reps = 12, order = 3),
-//                        Exercise(id = 0, name = "Сгибание лежа", weight = 50.0, sets = 3, reps = 12, timeMillis = 150_000, order = 4),
-//                        Exercise(id = 0, name = "Плечи", weight = 8.0, sets = 3, reps = 12, order = 5),
-//                        Exercise(id = 0, name = "Бицепс", weight = 13.0, sets = 3, reps = 12, order = 6),
-//                        Exercise(id = 0, name = "Трицепс с велосипедом", weight = 7.0, sets = 3, reps = 12, order = 7),
-//                        Exercise(id = 0, name = "Хаммер на спину", weight = 47.5, sets = 3, reps = 12, timeMillis = 150_000, order = 8)
-//                    )
-//                )
-//            )
-
-
-        }
-
-
         query
             .onEach { input ->
                 _state.update { it.copy(query = input) }
             }
             .flatMapLatest { input ->
-                val workoutsFlow = if (input.isBlank()) {
-                    getAllWorkoutsUseCase()
+                // Триммим только здесь, для запроса в БД — поле state.query хранит
+                // сырой ввод, иначе конечный пробел, набранный пользователем, стирался
+                // бы на каждый символ и многословный запрос набрать было бы нельзя.
+                val trimmedInput = input.trim()
+                val workoutsFlow = if (trimmedInput.isBlank()) {
+                    getAllWorkoutsWithExerciseUseCase()
                 } else {
-                    searchWorkoutsUseCase(input)
+                    searchWorkoutsUseCase(trimmedInput)
                 }
                 workoutsFlow.combine(getLastSessionDurationsUseCase()) { workouts, durations ->
                     workouts to durations
                 }
-            }.onEach { (workouts, durations) ->
+            }
+            .onEach { (workouts, durations) ->
                 _state.update { it.copy(workouts = workouts, lastSessionDurations = durations) }
             }
             .launchIn(viewModelScope)
     }
 
-
     fun updateSearchQuery(newQuery: String) {
-        query.update { newQuery.trim() }
+        // Сырой текст, без trim(): поле — источник для TextField, и обрезка тут
+        // съедала бы пробел сразу после ввода, не давая набрать «Грудь и трицепс».
+        // Обрезка происходит там, где запрос реально уходит в БД (см. flatMapLatest).
+        query.update { newQuery }
     }
 
     fun deleteWorkout(workout: WorkoutEntity) {
@@ -154,11 +76,56 @@ class ListWorkoutViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Отправляет тренировку в конец очереди без записи в историю.
+     * Прежнее время кладётся в состояние, чтобы снекбар мог предложить отмену.
+     */
+    fun skipWorkout(workout: WorkoutEntity) {
+        viewModelScope.launch {
+            val previous = skipWorkoutUseCase(workout.id) ?: return@launch
+            _state.update {
+                it.copy(
+                    skippedWorkout = SkippedWorkout(
+                        id = workout.id,
+                        name = workout.name,
+                        previousLastUseAt = previous
+                    )
+                )
+            }
+        }
+    }
+
+    fun undoSkip() {
+        val skipped = _state.value.skippedWorkout ?: return
+        viewModelScope.launch {
+            undoSkipWorkoutUseCase(skipped.id, skipped.previousLastUseAt)
+            _state.update { it.copy(skippedWorkout = null) }
+        }
+    }
+
+    fun dismissSkipUndo() {
+        _state.update { it.copy(skippedWorkout = null) }
+    }
 }
+
+/** Пропущенная тренировка, пока на экране висит снекбар с отменой. */
+data class SkippedWorkout(
+    val id: Int,
+    val name: String,
+    val previousLastUseAt: Long
+)
 
 data class ListWorkoutState(
     val query: String = "",
-    val workouts: List<WorkoutEntity> = listOf(),
-    val lastSessionDurations: Map<Int, Long> = emptyMap()
-)
+    val workouts: List<WorkoutWithExercises> = listOf(),
+    val lastSessionDurations: Map<Int, Long> = emptyMap(),
+    val skippedWorkout: SkippedWorkout? = null
+) {
+    /** Первая в очереди — та, которую не делали дольше всех. */
+    val nextWorkout: WorkoutWithExercises? get() = workouts.firstOrNull()
 
+    /** Остальные, в порядке очереди. */
+    val restOfQueue: List<WorkoutWithExercises> get() = workouts.drop(1)
+
+    val isSearching: Boolean get() = query.isNotBlank()
+}

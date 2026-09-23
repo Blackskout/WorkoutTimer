@@ -1,43 +1,34 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -47,157 +38,229 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.hopes.workouttimer.domain.model.Exercise
-import ru.hopes.workouttimer.presentation.components.SystemMediaControllerCompat
+import ru.hopes.workouttimer.presentation.components.YandexMusicButton
+import ru.hopes.workouttimer.presentation.ui.components.AppBottomSheet
+import ru.hopes.workouttimer.presentation.ui.components.EmptyState
+import ru.hopes.workouttimer.presentation.ui.components.EyebrowLabel
+import ru.hopes.workouttimer.presentation.ui.components.PrimaryButton
+import ru.hopes.workouttimer.presentation.ui.components.ProgressSegments
+import ru.hopes.workouttimer.presentation.ui.components.RestRing
+import ru.hopes.workouttimer.presentation.ui.components.SectionHeader
+import ru.hopes.workouttimer.presentation.ui.components.StatTile
+import ru.hopes.workouttimer.presentation.ui.theme.ScreenPadding
+import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
 import ru.hopes.workouttimer.presentation.utils.DateFormatter
 import ru.hopes.workouttimer.presentation.utils.toCorrectNum
 
-// screens/WorkoutExecutionScreen.kt
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutExecutionScreen(
     viewModel: WorkoutExecutionViewModel = hiltViewModel(),
-    onExerciseCompleted: () -> Unit, // для навигации назад или к следующему упражнению
+    onExerciseCompleted: () -> Unit,
     workoutId: Int
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val workoutName = viewModel.workoutName
 
-    // Состояние для диалога редактирования заметки
     var showNoteDialog by remember { mutableStateOf(false) }
     var currentEditingExercise by remember { mutableStateOf<Exercise?>(null) }
-
-    // Состояние диалогов подтверждения
     var showExitDialog by remember { mutableStateOf(false) }
     var showFinishDialog by remember { mutableStateOf(false) }
+    var showExercisePicker by remember { mutableStateOf(false) }
 
     // Уходить без подтверждения нечего терять только в Loading/Error/Finished:
     // в Finished сессия уже сохранена, в остальных двух её ещё нет.
     val hasUnsavedProgress =
         uiState is WorkoutExecutionState.Active || uiState is WorkoutExecutionState.Rest
 
-    // Загружаем тренировку при первом запуске
     LaunchedEffect(workoutId) {
         viewModel.loadWorkout(workoutId)
     }
 
-    // Системная кнопка/жест «Назад» — тот же диалог, что и стрелка в TopAppBar
-    BackHandler(enabled = hasUnsavedProgress) {
-        showExitDialog = true
+    BackHandler(enabled = hasUnsavedProgress) { showExitDialog = true }
+
+    val finishedState = uiState as? WorkoutExecutionState.Finished
+    if (finishedState != null) {
+        FinishedContent(
+            workoutName = viewModel.workoutName,
+            durationMillis = finishedState.durationMillis,
+            onDone = onExerciseCompleted
+        )
+        return
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(text = workoutName.ifEmpty { "Тренировка" }) },
-                navigationIcon = {
-                    IconButton(
-                        onClick = {
-                            if (hasUnsavedProgress) showExitDialog = true else onExerciseCompleted()
-                        }
-                    ) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
-                    }
-                }
-            )
-        }
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            Column(
+            val currentState = uiState
+            val currentExercise = when (currentState) {
+                is WorkoutExecutionState.Active -> currentState.exercise
+                is WorkoutExecutionState.Rest -> currentState.exercise
+                else -> null
+            }
+
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = ScreenPadding, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-
-                val currentState = uiState
-                if (currentState is WorkoutExecutionState.Rest || currentState is WorkoutExecutionState.Active) {
-                    val currentEx = when (currentState) {
-                        is WorkoutExecutionState.Rest -> currentState.exercise
-                        is WorkoutExecutionState.Active -> currentState.exercise
-                        else -> null
-                    }
-
-                    currentEx?.let {
-                        ExercisesDropdown(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 8.dp),
-                            exercises = viewModel.exercises,
-                            selectedExercise = it,
-                            onExerciseSelected = { viewModel.moveToSelectedExercise(it) }
+                IconButton(onClick = {
+                    if (hasUnsavedProgress) showExitDialog = true else onExerciseCompleted()
+                }) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Назад",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    if (currentExercise != null) {
+                        ExerciseChip(
+                            name = currentExercise.name,
+                            position = viewModel.currentExerciseNumber,
+                            total = viewModel.totalExercises,
+                            onClick = { showExercisePicker = true }
+                        )
+                    } else {
+                        Text(
+                            text = viewModel.workoutName.ifEmpty { "Тренировка" },
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
+                Box(modifier = Modifier.size(48.dp))
+            }
 
-                Box(modifier = Modifier.weight(1f)) {
-                    when (val currentState = uiState) {
-                        is WorkoutExecutionState.Loading -> {
-                            LoadingState()
+            if (currentExercise != null && viewModel.totalExercises > 0) {
+                ProgressSegments(
+                    total = viewModel.totalExercises,
+                    currentIndex = viewModel.currentExerciseNumber - 1,
+                    modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 8.dp)
+                )
+            }
+
+            Box(modifier = Modifier.weight(1f)) {
+                when (currentState) {
+                    is WorkoutExecutionState.Loading -> LoadingContent()
+
+                    is WorkoutExecutionState.Error -> EmptyState(
+                        icon = Icons.Default.ErrorOutline,
+                        title = "Не удалось загрузить",
+                        subtitle = currentState.message,
+                        actionText = "Повторить",
+                        onAction = { viewModel.loadWorkout(workoutId) }
+                    )
+
+                    is WorkoutExecutionState.Active -> ActiveContent(
+                        state = currentState,
+                        onEditNote = {
+                            currentEditingExercise = it
+                            showNoteDialog = true
                         }
+                    )
 
-                        is WorkoutExecutionState.Error -> {
-                            ErrorState(
-                                message = currentState.message,
-                                onRetry = { viewModel.loadWorkout(workoutId) }
-                            )
+                    is WorkoutExecutionState.Rest -> RestContent(
+                        state = currentState,
+                        onEditNote = {
+                            currentEditingExercise = it
+                            showNoteDialog = true
                         }
+                    )
 
-                        is WorkoutExecutionState.Rest -> {
-                            RestTimerContent(
-                                restState = currentState,
-                                currentExerciseNumber = viewModel.currentExerciseNumber,
-                                totalExercises = viewModel.totalExercises,
-                                onSkipTimer = { viewModel.skipRest() },
-                                onEditNote = { exercise ->
-                                    currentEditingExercise = exercise
-                                    showNoteDialog = true
+                    is WorkoutExecutionState.Finished -> Unit
+                }
+            }
+
+            if (currentState is WorkoutExecutionState.Active ||
+                currentState is WorkoutExecutionState.Rest
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = ScreenPadding, end = ScreenPadding, bottom = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    YandexMusicButton()
+                    if (currentState is WorkoutExecutionState.Active) {
+                        PrimaryButton(
+                            text = "Закончить подход",
+                            onClick = {
+                                if (viewModel.isLastSetOfWorkout) {
+                                    showFinishDialog = true
+                                } else {
+                                    viewModel.onExerciseFinished()
                                 }
-                            )
-
-                        }
-
-                        is WorkoutExecutionState.Active -> {
-                            ActiveExerciseContent(
-                                activeState = currentState,
-                                currentExerciseNumber = viewModel.currentExerciseNumber,
-                                totalExercises = viewModel.totalExercises,
-                                onExerciseFinished = {
-                                    if (viewModel.isLastSetOfWorkout) {
-                                        showFinishDialog = true
-                                    } else {
-                                        viewModel.onExerciseFinished()
-                                    }
-                                },
-                                onEditNote = { exercise ->
-                                    currentEditingExercise = exercise
-                                    showNoteDialog = true
-                                }
-                            )
-
-                        }
-
-                        is WorkoutExecutionState.Finished -> {
-                            // Отображается диалогом завершения ниже
-                        }
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        PrimaryButton(
+                            text = "Пропустить отдых",
+                            onClick = { viewModel.skipRest() },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
-
-                // MediaController для управления музыкой из других приложений
-                SystemMediaControllerCompat()
             }
         }
     }
 
-    // Диалог редактирования заметки
+    if (showExercisePicker) {
+        AppBottomSheet(onDismiss = { showExercisePicker = false }) {
+            Text(
+                text = "Упражнения",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 8.dp)
+            )
+            viewModel.exercises.forEachIndexed { index, exercise ->
+                val isCurrent = index + 1 == viewModel.currentExerciseNumber
+                val isDone = index + 1 < viewModel.currentExerciseNumber
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            viewModel.moveToSelectedExercise(exercise)
+                            showExercisePicker = false
+                        }
+                        .padding(horizontal = ScreenPadding, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${index + 1}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = exercise.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = when {
+                            isCurrent -> MaterialTheme.colorScheme.primary
+                            isDone -> MaterialTheme.colorScheme.onSurfaceVariant
+                            else -> MaterialTheme.colorScheme.onSurface
+                        },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+
     currentEditingExercise?.let { exercise ->
         if (showNoteDialog) {
             NoteEditDialog(
@@ -211,423 +274,250 @@ fun WorkoutExecutionScreen(
         }
     }
 
-    // Подтверждение выхода: прогресс нигде не сохраняется, пока тренировка не дойдёт до конца
     if (showExitDialog) {
         AlertDialog(
             onDismissRequest = { showExitDialog = false },
             title = { Text("Выйти из тренировки?") },
             text = { Text("Прогресс не будет сохранён.") },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        showExitDialog = false
-                        onExerciseCompleted()
-                    }
-                ) {
-                    Text("Выйти")
-                }
+                TextButton(onClick = {
+                    showExitDialog = false
+                    onExerciseCompleted()
+                }) { Text("Выйти") }
             },
             dismissButton = {
-                TextButton(onClick = { showExitDialog = false }) {
-                    Text("Отмена")
-                }
+                TextButton(onClick = { showExitDialog = false }) { Text("Отмена") }
             }
         )
     }
 
-    // Подтверждение завершения: следующий шаг уже запишет сессию в историю
     if (showFinishDialog) {
         AlertDialog(
             onDismissRequest = { showFinishDialog = false },
             title = { Text("Завершить тренировку?") },
-            text = { Text("Это последний подход. Тренировка будет завершена и сохранена в историю.") },
+            text = { Text("Это последний подход. Тренировка будет сохранена в историю.") },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        showFinishDialog = false
-                        viewModel.onExerciseFinished()
-                    }
-                ) {
-                    Text("Завершить")
-                }
+                TextButton(onClick = {
+                    showFinishDialog = false
+                    viewModel.onExerciseFinished()
+                }) { Text("Завершить") }
             },
             dismissButton = {
-                TextButton(onClick = { showFinishDialog = false }) {
-                    Text("Отмена")
-                }
-            }
-        )
-    }
-
-    // Диалог завершения тренировки
-    val finishedState = uiState as? WorkoutExecutionState.Finished
-    if (finishedState != null) {
-        AlertDialog(
-            onDismissRequest = {},
-            title = { Text("Тренировка завершена") },
-            text = { Text("Время: ${DateFormatter.formatDurationToString(finishedState.durationMillis)}") },
-            confirmButton = {
-                TextButton(onClick = onExerciseCompleted) {
-                    Text("ОК")
-                }
+                TextButton(onClick = { showFinishDialog = false }) { Text("Отмена") }
             }
         )
     }
 }
 
 @Composable
-private fun ExercisesDropdown(
-    modifier: Modifier = Modifier,
-    exercises: List<Exercise>,
-    selectedExercise: Exercise,
-    onExerciseSelected: (Exercise) -> Unit
+private fun ExerciseChip(
+    name: String,
+    position: Int,
+    total: Int,
+    onClick: () -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-
-    ExposedDropdownMenuBox(
-        modifier = modifier.fillMaxWidth(),
-        expanded = expanded,
-        onExpandedChange = { expanded = it }
+    val shape = MaterialTheme.shapes.large
+    Row(
+        modifier = Modifier
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        TextField(
+        Text(
+            text = name,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false)
+        )
+        Text(
+            text = " · $position/$total",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Icon(
+            Icons.Default.ExpandMore,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+@Composable
+private fun ActiveContent(
+    state: WorkoutExecutionState.Active,
+    onEditNote: (Exercise) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = ScreenPadding),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        EyebrowLabel(
+            text = "Подход ${state.currentSet} из ${state.totalSets}",
+            modifier = Modifier.padding(top = 18.dp)
+        )
+        Text(
+            text = state.exercise.name,
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 10.dp)
+        )
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
-            value = selectedExercise.name,
-            onValueChange = {},
-            readOnly = true,
-            trailingIcon = {
-                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-            }
+                .padding(top = 22.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            StatTile(
+                value = state.weight.toCorrectNum(),
+                unit = "кг",
+                modifier = Modifier.weight(1f)
+            )
+            StatTile(
+                value = state.reps.toString(),
+                unit = "повт",
+                modifier = Modifier.weight(1f)
+            )
+        }
+        NoteBlock(
+            note = state.exercise.note,
+            onEdit = { onEditNote(state.exercise) },
+            modifier = Modifier.padding(top = 14.dp)
         )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            exercises.forEach { exercise ->
-                DropdownMenuItem(
-                    text = {
-                        Text(exercise.name)
-                    },
-                    onClick = {
-                        onExerciseSelected(exercise)
-                        expanded = false
-                    }
-                )
-            }
-        }
-    }
-
-}
-
-
-@Composable
-fun LoadingState() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            CircularProgressIndicator()
-            Text(
-                text = "Загрузка тренировки, пожалуйста подождите...",
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
     }
 }
 
 @Composable
-fun ErrorState(
-    message: String,
-    onRetry: () -> Unit
-) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.error
-            )
-            Button(onClick = onRetry) {
-                Text("Повторить")
-            }
-        }
-    }
-}
-
-@Composable
-fun RestTimerContent(
-    restState: WorkoutExecutionState.Rest,
-    currentExerciseNumber: Int,
-    totalExercises: Int,
-    onSkipTimer: () -> Unit,
+private fun RestContent(
+    state: WorkoutExecutionState.Rest,
     onEditNote: (Exercise) -> Unit
 ) {
     Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween,
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = ScreenPadding),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-
-        Text(
-            text = "Упражнение $currentExerciseNumber/$totalExercises",
-            style = MaterialTheme.typography.bodyMedium
+        EyebrowLabel(
+            text = "Отдых · далее подход ${state.currentSet}",
+            modifier = Modifier.padding(top = 18.dp)
         )
-
-        Text(
-            text = "Далее: подход ${restState.currentSet}",
-            style = MaterialTheme.typography.titleMedium
+        RestRing(
+            timeLeftMillis = state.restTimeMillis,
+            totalTimeMillis = state.totalRestTimeMillis,
+            modifier = Modifier.padding(top = 14.dp)
         )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        CircularTimer(
-            timeLeftMillis = restState.restTimeMillis,
-            totalTimeMillis = restState.totalRestTimeMillis
-        )
-
         Text(
-            text = restState.exercise.name,
+            text = state.exercise.name,
             style = MaterialTheme.typography.headlineMedium,
-            fontSize = 20.sp,
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 14.dp)
         )
-
-        Row {
-            Text(
-                text = "${restState.exercise.weight.toCorrectNum()} кг",
-                style = MaterialTheme.typography.bodyLarge
-            )
-
-            Spacer(Modifier.width(16.dp))
-
-            Text(
-                text = "${restState.exercise.reps} повторений",
-                style = MaterialTheme.typography.bodyLarge
-            )
-        }
-
-        HorizontalDivider(
-            modifier = Modifier.padding(vertical = 4.dp),
-            thickness = 1.dp,      // Толщина
-            color = Color.Gray     // Цвет
+        Text(
+            text = "${state.exercise.weight.toCorrectNum()} кг · ${state.exercise.reps} повторений",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp)
         )
-
-
-        // Кнопка и текст заметки
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Заметка:",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                IconButton(
-                    onClick = { onEditNote(restState.exercise) },
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .size(16.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = "Редактировать заметку",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            if (restState.exercise.note.isNotBlank()) {
-                Text(
-                    text = restState.exercise.note,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center
-                )
-            } else {
-                Text(
-                    text = "Нет заметок",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Button(
-            onClick = onSkipTimer,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Закончить отдых досрочно")
-        }
+        NoteBlock(
+            note = state.exercise.note,
+            onEdit = { onEditNote(state.exercise) },
+            modifier = Modifier.padding(top = 14.dp)
+        )
     }
 }
 
 @Composable
-fun CircularTimer(
-    timeLeftMillis: Long,
-    totalTimeMillis: Long
+private fun NoteBlock(
+    note: String,
+    onEdit: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val timeLeftSeconds = (timeLeftMillis / 1000).toInt()
-    val formattedTime = String.format("%02d:%02d", timeLeftSeconds / 60, timeLeftSeconds % 60)
-
-    // 1. Считаем "целевой" прогресс (куда полоска должна прийти сейчас)
-    val targetProgress = if (totalTimeMillis > 0L) {
-        (timeLeftMillis.toFloat() / totalTimeMillis.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.small)
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SectionHeader(text = "Заметка", modifier = Modifier.weight(1f))
+            IconButton(onClick = onEdit) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = "Редактировать заметку",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+        Text(
+            text = note.ifBlank { "Нет заметок" },
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (note.isBlank()) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            modifier = Modifier.padding(top = 4.dp)
+        )
     }
+}
 
-    // 2. Анимируем значение.
-    // targetValue меняется рывками (как приходит из ViewModel),
-    // а animatedProgress меняется плавно.
-    val animatedProgress by animateFloatAsState(
-        targetValue = targetProgress,
-        animationSpec = tween(
-            durationMillis = 200, // Ставим время, равное частоте обновления во ViewModel (delay)
-            easing = LinearEasing // Важно: Линейная скорость (время течет равномерно)
-        ),
-        label = "TimerAnimation"
+@Composable
+private fun FinishedContent(
+    workoutName: String,
+    durationMillis: Long,
+    onDone: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(ScreenPadding),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        EyebrowLabel(text = "Готово")
+        Text(
+            text = DateFormatter.formatDurationCompact(durationMillis),
+            style = MaterialTheme.typography.displayLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(top = 10.dp)
+        )
+        Text(
+            text = workoutName.ifEmpty { "Тренировка" },
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        Box(modifier = Modifier.height(36.dp))
+        PrimaryButton(text = "На главную", onClick = onDone)
+    }
+}
+
+@Composable
+private fun LoadingContent() {
+    // Спека Часть 3 требует Loading/Error через EmptyState — раньше здесь
+    // был голый спиннер, из состояний соответствовал только Error.
+    EmptyState(
+        icon = Icons.Default.HourglassEmpty,
+        title = "Загрузка тренировки",
+        subtitle = "Секунду…"
     )
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier.size(200.dp)
-    ) {
-        CircularProgressIndicator(
-            progress = { animatedProgress }, // 3. Передаем анимированное значение
-            modifier = Modifier.fillMaxSize(),
-        )
-        Text(
-            text = formattedTime,
-            style = MaterialTheme.typography.headlineLarge
-        )
-    }
 }
-
-@Composable
-fun ActiveExerciseContent(
-    activeState: WorkoutExecutionState.Active,
-    currentExerciseNumber: Int,
-    totalExercises: Int,
-    onExerciseFinished: () -> Unit,
-    onEditNote: (Exercise) -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween,
-        modifier = Modifier.fillMaxSize()
-    ) {
-
-        Text(
-            text = "Упражнение $currentExerciseNumber/$totalExercises",
-            style = MaterialTheme.typography.bodyMedium
-        )
-
-        Text(
-            text = "Подход ${activeState.currentSet} / ${activeState.totalSets}",
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Text(
-            text = activeState.exercise.name,
-            fontSize = 20.sp,
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Row {
-            Text(
-                text = "${activeState.weight.toCorrectNum()} кг",
-                style = MaterialTheme.typography.bodyLarge
-            )
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Text(
-                text = "${activeState.reps} повторений",
-                style = MaterialTheme.typography.bodyLarge
-            )
-        }
-
-        HorizontalDivider(
-            modifier = Modifier.padding(vertical = 4.dp),
-            thickness = 1.dp,      // Толщина
-            color = Color.Gray     // Цвет
-        )
-
-        // Кнопка и текст заметки
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Заметка:",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                IconButton(
-                    onClick = { onEditNote(activeState.exercise) },
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .size(16.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = "Редактировать заметку",
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-            if (activeState.exercise.note.isNotBlank()) {
-                Text(
-                    text = activeState.exercise.note,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center
-                )
-            } else {
-                Text(
-                    text = "Нет заметок",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(64.dp))
-
-        Button(
-            onClick = onExerciseFinished,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Закончить упражнение")
-        }
-    }
-}
-
 
 @Composable
 private fun NoteEditDialog(
@@ -636,15 +526,9 @@ private fun NoteEditDialog(
     onSave: (String) -> Unit
 ) {
     var noteText by remember { mutableStateOf(exercise.note) }
-
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "Заметка для упражнения",
-                style = MaterialTheme.typography.titleLarge
-            )
-        },
+        title = { Text("Заметка к упражнению") },
         text = {
             OutlinedTextField(
                 value = noteText,
@@ -656,18 +540,67 @@ private fun NoteEditDialog(
             )
         },
         confirmButton = {
-            TextButton(
-                onClick = { onSave(noteText) }
-            ) {
-                Text("Сохранить")
-            }
+            TextButton(onClick = { onSave(noteText) }) { Text("Сохранить") }
         },
         dismissButton = {
-            TextButton(
-                onClick = onDismiss
-            ) {
-                Text("Отмена")
-            }
+            TextButton(onClick = onDismiss) { Text("Отмена") }
         }
     )
+}
+
+private val previewExercise = Exercise(
+    id = 1,
+    name = "Жим лёжа",
+    weight = 80.0,
+    sets = 4,
+    reps = 8,
+    timeMillis = 90_000L,
+    order = 0,
+    note = "Держать локти ближе к корпусу"
+)
+
+@Preview(backgroundColor = 0xFF0B0B0F, showBackground = true)
+@Composable
+private fun ActiveContentPreview() {
+    WorkoutTimerTheme {
+        ActiveContent(
+            state = WorkoutExecutionState.Active(
+                exercise = previewExercise,
+                currentSet = 2,
+                totalSets = 4,
+                weight = 80.0,
+                reps = 8
+            ),
+            onEditNote = {}
+        )
+    }
+}
+
+@Preview(backgroundColor = 0xFF0B0B0F, showBackground = true)
+@Composable
+private fun RestContentPreview() {
+    WorkoutTimerTheme {
+        RestContent(
+            state = WorkoutExecutionState.Rest(
+                exercise = previewExercise,
+                currentSet = 3,
+                totalSets = 4,
+                restTimeMillis = 45_000L,
+                totalRestTimeMillis = 90_000L
+            ),
+            onEditNote = {}
+        )
+    }
+}
+
+@Preview(backgroundColor = 0xFF0B0B0F, showBackground = true)
+@Composable
+private fun FinishedContentPreview() {
+    WorkoutTimerTheme {
+        FinishedContent(
+            workoutName = "Верх тела",
+            durationMillis = 2_715_000L,
+            onDone = {}
+        )
+    }
 }

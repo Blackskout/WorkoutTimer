@@ -17,3 +17,5 @@ local.properties
 *.apk
 output-metadata.json
 /note/noteTODO.txt
+.superpowers/
+.claude/

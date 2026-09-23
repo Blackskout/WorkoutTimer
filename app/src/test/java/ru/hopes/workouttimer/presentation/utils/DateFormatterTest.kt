@@ -74,27 +74,6 @@ class DateFormatterTest {
     }
 
     @Test
-    fun `isStaleWorkout returns false when under 13 days have passed`() {
-        val timestamp = now - TimeUnit.DAYS.toMillis(12)
-
-        assertEquals(false, isStaleWorkout(timestamp, now))
-    }
-
-    @Test
-    fun `isStaleWorkout returns true at exactly 13 days`() {
-        val timestamp = now - TimeUnit.DAYS.toMillis(13)
-
-        assertEquals(true, isStaleWorkout(timestamp, now))
-    }
-
-    @Test
-    fun `isStaleWorkout returns true well beyond 13 days`() {
-        val timestamp = now - TimeUnit.DAYS.toMillis(30)
-
-        assertEquals(true, isStaleWorkout(timestamp, now))
-    }
-
-    @Test
     fun `formatDurationToString shows only minutes under an hour`() {
         assertEquals("42 мин", DateFormatter.formatDurationToString(42 * 60_000L))
     }
@@ -118,5 +97,35 @@ class DateFormatterTest {
         val result = DateFormatter.formatSessionDateTime(calendar.timeInMillis)
 
         assertEquals("16 июля 2026, 18:32", result)
+    }
+
+    @Test
+    fun `formatDurationCompact печатает минуты и секунды`() {
+        assertEquals("52:10", DateFormatter.formatDurationCompact(3_130_000L))
+    }
+
+    @Test
+    fun `formatDurationCompact дополняет секунды нулём`() {
+        assertEquals("05:07", DateFormatter.formatDurationCompact(307_000L))
+    }
+
+    @Test
+    fun `formatDurationCompact добавляет часы после шестидесяти минут`() {
+        assertEquals("1:05:03", DateFormatter.formatDurationCompact(3_903_000L))
+    }
+
+    @Test
+    fun `formatDurationCompact печатает ноль`() {
+        assertEquals("00:00", DateFormatter.formatDurationCompact(0L))
+    }
+
+    @Test
+    fun `formatDurationCompact печатает секунды без минут`() {
+        assertEquals("00:45", DateFormatter.formatDurationCompact(45_000L))
+    }
+
+    @Test
+    fun `formatDurationCompact переходит на часы ровно на шестидесяти минутах`() {
+        assertEquals("1:00:00", DateFormatter.formatDurationCompact(3_600_000L))
     }
 }

@@ -55,9 +55,6 @@ fun NavGraph(
                 onAddWorkoutClick = {
                     navController.navigate(Screen.CreateWorkout.route)
                 },
-                onLongClick = {
-                    // TODO
-                },
                 // КОГДА КЛИКНУЛИ:
                 // Мы собираем ссылку вручную: "execution_screen/5"
                 onWorkoutClick = { workout ->

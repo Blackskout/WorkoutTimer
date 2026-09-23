@@ -73,7 +73,7 @@ class WorkoutRepositoryImpl @Inject constructor(
         widgetUpdater.requestUpdate()
     }
 
-    override fun searchWorkoutUseCase(query: String): Flow<List<WorkoutEntity>> {
+    override fun searchWorkoutUseCase(query: String): Flow<List<WorkoutWithExercises>> {
         return dao.searchWorkouts(query)
     }
 
@@ -99,6 +99,17 @@ class WorkoutRepositoryImpl @Inject constructor(
     override suspend fun updateLastUseAt(workoutId: Int) {
         dao.updateLastUseAt(workoutId, System.currentTimeMillis())
         widgetUpdater.requestUpdate()
+    }
+
+    // Виджет обязан обновиться и здесь: иначе «Отменить пропуск» починит очередь
+    // в приложении и оставит на домашнем экране неправильную.
+    override suspend fun setLastUseAt(workoutId: Int, timestamp: Long) {
+        dao.updateLastUseAt(workoutId, timestamp)
+        widgetUpdater.requestUpdate()
+    }
+
+    override suspend fun getLastUseAt(workoutId: Int): Long? {
+        return dao.getWorkoutById(workoutId)?.lastUseAt
     }
 
     override suspend fun updateExerciseNote(exerciseId: Int, note: String) {

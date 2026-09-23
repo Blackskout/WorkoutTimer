@@ -17,7 +17,6 @@ sealed class RelativeTime {
 
 private val milesInHour = TimeUnit.HOURS.toMillis(1)
 private val milesInDay = TimeUnit.DAYS.toMillis(1)
-private val milesIn13Days = TimeUnit.DAYS.toMillis(13)
 private val milesIn14Days = TimeUnit.DAYS.toMillis(14)
 
 fun relativeTimeOf(timestamp: Long, now: Long = System.currentTimeMillis()): RelativeTime {
@@ -29,10 +28,6 @@ fun relativeTimeOf(timestamp: Long, now: Long = System.currentTimeMillis()): Rel
         diff < milesIn14Days -> RelativeTime.DaysAgo(TimeUnit.MILLISECONDS.toDays(diff))
         else -> RelativeTime.Absolute(timestamp)
     }
-}
-
-fun isStaleWorkout(timestamp: Long, now: Long = System.currentTimeMillis()): Boolean {
-    return now - timestamp >= milesIn13Days
 }
 
 object DateFormatter {
@@ -70,5 +65,22 @@ object DateFormatter {
 
     fun formatSessionDateTime(timestamp: Long): String {
         return sessionDateTimeFormatter.format(timestamp)
+    }
+
+    /**
+     * Компактная длительность для карточек очереди: «52:10», «1:05:03».
+     * В отличие от [formatDurationToString] не округляет до минут — в зале
+     * секунды прошлой тренировки видно, и они складываются в ощущение прогресса.
+     */
+    fun formatDurationCompact(millis: Long): String {
+        val totalSeconds = (millis / 1000).coerceAtLeast(0L)
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        val seconds = totalSeconds % 60
+        return if (hours > 0) {
+            String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            String.format(Locale.US, "%02d:%02d", minutes, seconds)
+        }
     }
 }

@@ -13,8 +13,10 @@ interface WorkoutRepository {
         suspend fun addWorkout(workout: Workout)
         suspend fun updateWorkout(workout: Workout)
         suspend fun deleteWorkout(workout: WorkoutEntity)
-        fun searchWorkoutUseCase(query: String): Flow<List<WorkoutEntity>>
+        fun searchWorkoutUseCase(query: String): Flow<List<WorkoutWithExercises>>
         suspend fun updateLastUseAt(workoutId: Int)
+        suspend fun setLastUseAt(workoutId: Int, timestamp: Long)
+        suspend fun getLastUseAt(workoutId: Int): Long?
         suspend fun updateExerciseNote(exerciseId: Int, note: String)
         suspend fun addWorkoutSession(workoutId: Int, startedAt: Long, finishedAt: Long, durationMillis: Long)
         fun getSessionsForWorkout(workoutId: Int): Flow<List<WorkoutSession>>

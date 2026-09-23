@@ -62,7 +62,7 @@ class QuickStartWidget : GlanceAppWidget() {
 
         provideContent {
             val workouts by workoutsFlow.collectAsState(initial = initial)
-            GlanceTheme {
+            GlanceTheme(colors = WidgetColorScheme) {
                 WidgetContent(workouts)
             }
         }
@@ -133,7 +133,7 @@ private fun WorkoutRow(workout: WidgetWorkout) {
             )
         )
         Text(
-            text = formatWidgetSubtitle(workout.exerciseCount, workout.lastDurationMillis),
+            text = formatWidgetSubtitle(workout.exerciseCount, workout.lastUseAt, workout.lastDurationMillis),
             maxLines = 1,
             style = TextStyle(
                 color = GlanceTheme.colors.onSurfaceVariant,
