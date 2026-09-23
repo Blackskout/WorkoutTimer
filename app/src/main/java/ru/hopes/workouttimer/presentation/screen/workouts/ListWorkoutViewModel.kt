@@ -44,10 +44,14 @@ class ListWorkoutViewModel @Inject constructor(
                 _state.update { it.copy(query = input) }
             }
             .flatMapLatest { input ->
-                val workoutsFlow = if (input.isBlank()) {
+                // Триммим только здесь, для запроса в БД — поле state.query хранит
+                // сырой ввод, иначе конечный пробел, набранный пользователем, стирался
+                // бы на каждый символ и многословный запрос набрать было бы нельзя.
+                val trimmedInput = input.trim()
+                val workoutsFlow = if (trimmedInput.isBlank()) {
                     getAllWorkoutsWithExerciseUseCase()
                 } else {
-                    searchWorkoutsUseCase(input)
+                    searchWorkoutsUseCase(trimmedInput)
                 }
                 workoutsFlow.combine(getLastSessionDurationsUseCase()) { workouts, durations ->
                     workouts to durations
@@ -60,7 +64,10 @@ class ListWorkoutViewModel @Inject constructor(
     }
 
     fun updateSearchQuery(newQuery: String) {
-        query.update { newQuery.trim() }
+        // Сырой текст, без trim(): поле — источник для TextField, и обрезка тут
+        // съедала бы пробел сразу после ввода, не давая набрать «Грудь и трицепс».
+        // Обрезка происходит там, где запрос реально уходит в БД (см. flatMapLatest).
+        query.update { newQuery }
     }
 
     fun deleteWorkout(workout: WorkoutEntity) {

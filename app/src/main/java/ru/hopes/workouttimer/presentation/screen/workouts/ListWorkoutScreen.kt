@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -66,6 +66,7 @@ import ru.hopes.workouttimer.data.entity.WorkoutEntity
 import ru.hopes.workouttimer.presentation.ui.components.ActionSheet
 import ru.hopes.workouttimer.presentation.ui.components.ActionSheetItem
 import ru.hopes.workouttimer.presentation.ui.components.EmptyState
+import ru.hopes.workouttimer.presentation.ui.components.EyebrowLabel
 import ru.hopes.workouttimer.presentation.ui.components.SectionHeader
 import ru.hopes.workouttimer.presentation.ui.theme.Accent
 import ru.hopes.workouttimer.presentation.ui.theme.AccentDark
@@ -308,12 +309,14 @@ private fun QueueContent(
             }
         }
 
+        // rows — это state.restOfQueue (drop(1) от очереди), герой уже занял позицию 1,
+        // поэтому первая строка тут — позиция 2. itemsIndexed вместо indexOf(item):
+        // O(1) вместо O(n) на строку и без сравнения вложенных exercises по equals.
         val rows = if (state.isSearching) state.workouts else state.restOfQueue
-        items(rows, key = { it.workout.id }) { item ->
-            val position = state.workouts.indexOf(item) + 1
+        itemsIndexed(rows, key = { _, item -> item.workout.id }) { index, item ->
             WorkoutRow(
                 item = item,
-                position = if (state.isSearching) null else position,
+                position = if (state.isSearching) null else index + 2,
                 durationMillis = state.lastSessionDurations[item.workout.id],
                 onClick = { onWorkoutClick(item.workout) },
                 onMenu = { onMenuClick(item.workout) }
@@ -349,18 +352,17 @@ private fun NextWorkoutCard(
     ) {
         IconButton(
             onClick = onMenu,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .size(28.dp)
+            modifier = Modifier.align(Alignment.TopEnd)
         ) {
-            Icon(Icons.Default.MoreVert, contentDescription = "Действия", tint = OnAccent)
+            Icon(
+                Icons.Default.MoreVert,
+                contentDescription = "Действия",
+                tint = OnAccent,
+                modifier = Modifier.size(28.dp)
+            )
         }
         Column {
-            Text(
-                text = "СЛЕДУЮЩАЯ",
-                style = MaterialTheme.typography.labelSmall,
-                color = OnAccent.copy(alpha = 0.7f)
-            )
+            EyebrowLabel(text = "Следующая", color = OnAccent.copy(alpha = 0.7f))
             Text(
                 text = item.workout.name,
                 style = MaterialTheme.typography.headlineMedium,
@@ -370,7 +372,7 @@ private fun NextWorkoutCard(
                 modifier = Modifier.padding(top = 4.dp)
             )
             Text(
-                text = metaLine(item, durationMillis),
+                text = "${metaLine(item, durationMillis)} · ${subtitleFor(item.workout.lastUseAt)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = OnAccent.copy(alpha = 0.8f),
                 fontWeight = FontWeight.Medium,
@@ -452,11 +454,12 @@ private fun WorkoutRow(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        IconButton(onClick = onMenu, modifier = Modifier.size(24.dp)) {
+        IconButton(onClick = onMenu) {
             Icon(
                 Icons.Default.MoreVert,
                 contentDescription = "Действия",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
             )
         }
     }
@@ -502,14 +505,14 @@ private fun QueueContentSixWorkoutsPreview() {
         QueueContent(
             state = ListWorkoutState(
                 workouts = listOf(
-                    previewWorkout(1, "Грудь и трицепс", 0L, 6),
+                    previewWorkout(4, "Плечи", now - 5 * dayMillis, 4),
                     previewWorkout(2, "Спина и бицепс", now - dayMillis, 5),
                     previewWorkout(3, "Ноги", now - 2 * dayMillis, 7),
-                    previewWorkout(4, "Плечи", now - 5 * dayMillis, 4),
+                    previewWorkout(1, "Грудь и трицепс", 0L, 6),
                     previewWorkout(5, "Кардио", now - 10 * dayMillis, 3),
                     previewWorkout(6, "Пресс", now - 20 * dayMillis, 5)
                 ),
-                lastSessionDurations = mapOf(1 to 3_125_000L)
+                lastSessionDurations = mapOf(4 to 3_125_000L)
             ),
             onWorkoutClick = {},
             onMenuClick = {},

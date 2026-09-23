@@ -25,7 +25,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
-import java.util.Locale
+import ru.hopes.workouttimer.presentation.utils.DateFormatter
 
 @Composable
 fun RestRing(
@@ -80,23 +80,21 @@ fun RestRing(
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = formatClock(timeLeftMillis),
+                // Время отдыха ограничено RestValues (15…1800 сек, т.е. до 30 минут),
+                // поэтому часовая ветка formatDurationCompact никогда не включается,
+                // а вывод для минут:секунд совпадает с прежним локальным formatClock.
+                text = DateFormatter.formatDurationCompact(timeLeftMillis),
                 style = MaterialTheme.typography.displayLarge,
                 fontSize = 52.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "из ${formatClock(totalTimeMillis)}",
+                text = "из ${DateFormatter.formatDurationCompact(totalTimeMillis)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
-}
-
-private fun formatClock(millis: Long): String {
-    val totalSeconds = (millis / 1000).coerceAtLeast(0L)
-    return String.format(Locale.US, "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
 }
 
 @Preview(backgroundColor = 0xFF0B0B0F, showBackground = true)

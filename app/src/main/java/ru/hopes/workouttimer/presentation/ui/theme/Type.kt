@@ -48,6 +48,9 @@ val Typography = Typography(
         fontWeight = FontWeight.Bold,
         fontSize = 11.sp,
         lineHeight = 14.sp,
-        letterSpacing = 1.5.sp
+        letterSpacing = 1.5.sp,
+        // Этим стилем рендерятся «ПОДХОД 3 ИЗ 4» и бейджи позиций в очереди —
+        // табличные цифры нужны и здесь.
+        fontFeatureSettings = Numeric.fontFeatureSettings
     )
 )

@@ -16,6 +16,9 @@ class GetWidgetWorkoutsUseCase @Inject constructor(
             getAllWorkoutsWithExercise(),
             getLastSessionDurations()
         ) { workouts, durations ->
+            // DAO уже упорядочивает по lastUseAt ASC, id ASC — sortedBy здесь только
+            // должен остаться стабильной сортировкой (как и есть у Kotlin), иначе
+            // тай-брейк по id, заданный в WorkoutDao, потеряется при равных lastUseAt.
             workouts
                 .sortedBy { it.workout.lastUseAt }
                 .map { it.toWidgetWorkout(durations[it.workout.id]) }

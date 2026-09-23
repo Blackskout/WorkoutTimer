@@ -175,6 +175,41 @@ class ListWorkoutViewModelTest {
     }
 
     @Test
+    fun `многословный запрос с пробелом внутри доходит до SearchWorkoutsUseCase целиком`() =
+        runTest(dispatcher) {
+            val queueWorkouts = listOf(workoutWith(1, "Ноги", 0L))
+            val searchWorkouts = listOf(workoutWith(2, "Грудь и трицепс", 100L))
+            val getAll = mockk<GetAllWorkoutsWithExerciseUseCase>()
+            every { getAll() } returns flowOf(queueWorkouts)
+            val search = mockk<SearchWorkoutsUseCase>()
+            every { search(any()) } returns flowOf(searchWorkouts)
+            val getDurations = mockk<GetLastSessionDurationsUseCase>()
+            every { getDurations() } returns flowOf(emptyMap())
+            val vm = ListWorkoutViewModel(
+                getAll,
+                search,
+                mockk(relaxed = true),
+                getDurations,
+                mockk(relaxed = true),
+                mockk(relaxed = true)
+            )
+            testScheduler.advanceUntilIdle()
+
+            // Пробел набирается посимвольно: "Грудь", "Грудь ", "Грудь и" — если бы
+            // updateSearchQuery триммил сразу, конечный пробел стирался бы и второе
+            // слово нельзя было бы начать набирать.
+            vm.updateSearchQuery("Грудь")
+            testScheduler.advanceUntilIdle()
+            vm.updateSearchQuery("Грудь ")
+            testScheduler.advanceUntilIdle()
+            vm.updateSearchQuery("Грудь и")
+            testScheduler.advanceUntilIdle()
+
+            assertEquals("Грудь и", vm.state.value.query)
+            verify { search("Грудь и") }
+        }
+
+    @Test
     fun `очистка поискового запроса возвращает очередь`() = runTest(dispatcher) {
         val queueWorkouts = listOf(workoutWith(1, "Ноги", 0L))
         val searchWorkouts = listOf(workoutWith(2, "Спина", 100L))

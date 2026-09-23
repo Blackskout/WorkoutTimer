@@ -12,10 +12,14 @@ import ru.hopes.workouttimer.data.entity.WorkoutSessionEntity
 
 @Dao
 interface WorkoutDao {
+    // id ASC — тай-брейк: импорт может проставить нескольким тренировкам одинаковый
+    // lastUseAt, и без вторичного ключа их порядок в очереди не был бы детерминирован.
     @Transaction
     @Query("SELECT * FROM workouts ORDER BY lastUseAt ASC, id ASC")
     fun getAllWorkoutsWithExercises(): Flow<List<WorkoutWithExercises>>
 
+    // id ASC — тай-брейк: импорт может проставить нескольким тренировкам одинаковый
+    // lastUseAt, и без вторичного ключа их порядок в очереди не был бы детерминирован.
     @Query("SELECT * FROM workouts ORDER BY lastUseAt ASC, id ASC")
     fun getAllWorkouts(): Flow<List<WorkoutEntity>>
 
@@ -38,6 +42,9 @@ interface WorkoutDao {
     @Query("SELECT * FROM workouts WHERE id = :id")
     suspend fun getWorkoutById(id: Int): WorkoutEntity?
 
+    // workouts.id ASC — тай-брейк: импорт может проставить нескольким тренировкам
+    // одинаковый lastUseAt, и без вторичного ключа их порядок в очереди не был бы
+    // детерминирован.
     @Transaction
     @Query(
         """

@@ -20,8 +20,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +52,7 @@ import ru.hopes.workouttimer.presentation.ui.components.EyebrowLabel
 import ru.hopes.workouttimer.presentation.ui.components.PrimaryButton
 import ru.hopes.workouttimer.presentation.ui.components.ProgressSegments
 import ru.hopes.workouttimer.presentation.ui.components.RestRing
+import ru.hopes.workouttimer.presentation.ui.components.SectionHeader
 import ru.hopes.workouttimer.presentation.ui.components.StatTile
 import ru.hopes.workouttimer.presentation.ui.theme.ScreenPadding
 import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
@@ -451,13 +452,8 @@ private fun NoteBlock(
             .padding(12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "ЗАМЕТКА",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = onEdit, modifier = Modifier.size(20.dp)) {
+            SectionHeader(text = "Заметка", modifier = Modifier.weight(1f))
+            IconButton(onClick = onEdit) {
                 Icon(
                     Icons.Default.Edit,
                     contentDescription = "Редактировать заметку",
@@ -514,9 +510,13 @@ private fun FinishedContent(
 
 @Composable
 private fun LoadingContent() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-    }
+    // Спека Часть 3 требует Loading/Error через EmptyState — раньше здесь
+    // был голый спиннер, из состояний соответствовал только Error.
+    EmptyState(
+        icon = Icons.Default.HourglassEmpty,
+        title = "Загрузка тренировки",
+        subtitle = "Секунду…"
+    )
 }
 
 @Composable

@@ -12,6 +12,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import ru.hopes.workouttimer.R
+import ru.hopes.workouttimer.presentation.ui.theme.PrimaryButtonHeight
 
 /**
  * Кнопка запуска плеера. Управление воспроизведением отсюда убрано:
@@ -44,7 +45,8 @@ fun YandexMusicButton(
                 }
             }
         },
-        modifier = modifier.size(58.dp)
+        // Совпадает с высотой PrimaryButton рядом в том же Row (WorkoutExecutionScreen).
+        modifier = modifier.size(PrimaryButtonHeight)
     ) {
         Icon(
             modifier = Modifier.size(44.dp),

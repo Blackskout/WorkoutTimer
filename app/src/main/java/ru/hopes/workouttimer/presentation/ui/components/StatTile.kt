@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -41,6 +42,10 @@ fun StatTile(
             fontSize = 34.sp,
             fontWeight = FontWeight.ExtraBold,
             letterSpacing = (-1).sp,
+            // 34.sp не входит в типографскую шкалу (Type.kt) — там нет подходящего
+            // слота (ближайший — displayLarge на 64sp), поэтому размер оставлен явным,
+            // а табличные цифры заданы через style, как того требует спека для чисел.
+            style = TextStyle(fontFeatureSettings = "tnum"),
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
