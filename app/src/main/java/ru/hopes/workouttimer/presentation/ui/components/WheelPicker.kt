@@ -2,10 +2,8 @@ package ru.hopes.workouttimer.presentation.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,9 +22,13 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.HorizontalAlignmentLine
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Measured
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
@@ -138,6 +140,16 @@ fun <T> WheelPicker(
 
 /**
  * Несколько барабанов в ряд с общей полосой выделения по центру.
+ *
+ * Стандартный [Row] с `Arrangement.SpaceEvenly` тут не подходит: без веса на
+ * детях каждый неweighted ребёнок получает на измерение всю оставшуюся
+ * главную ось (`mainAxisMax - уже занятое`), поэтому первый [WheelPicker]
+ * (его LazyColumn с fillMaxWidth() внутри) забирает всю ширину ряда, а
+ * следующим достаётся 0 — что и превращало «подх»/«повт» в невидимые
+ * барабаны, а «отдых» — в полоску у края экрана. Раскладка ниже сама делит
+ * ширину строки поровну между детьми через собственный [Layout], поэтому
+ * барабаны не нужно снабжать `Modifier.weight` на каждом месте вызова —
+ * забыть об этом невозможно, гарантия внутри WheelRow.
  */
 @Composable
 fun WheelRow(
@@ -153,12 +165,49 @@ fun WheelRow(
                 .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            content = content
-        )
+        Layout(
+            content = { EqualWidthRowScope.content() },
+            modifier = Modifier.fillMaxWidth()
+        ) { measurables, constraints ->
+            if (measurables.isEmpty()) {
+                return@Layout layout(constraints.minWidth, constraints.minHeight) {}
+            }
+            val childWidth = constraints.maxWidth / measurables.size
+            val childConstraints = Constraints(
+                minWidth = childWidth,
+                maxWidth = childWidth,
+                minHeight = constraints.minHeight,
+                maxHeight = constraints.maxHeight
+            )
+            val placeables = measurables.map { it.measure(childConstraints) }
+            val rowHeight = placeables.maxOf { it.height }
+            layout(constraints.maxWidth, rowHeight) {
+                var x = 0
+                placeables.forEach { placeable ->
+                    placeable.placeRelative(x, 0)
+                    x += childWidth
+                }
+            }
+        }
     }
+}
+
+/**
+ * [RowScope], нужный только для сигнатуры `content: @Composable RowScope.() -> Unit`
+ * у [WheelRow]. Реальное измерение делает наш [Layout] выше и всегда делит
+ * ширину поровну, поэтому `weight`/`align` тут намеренно ничего не делают —
+ * их некому обещать, никакого настоящего [Row] под капотом уже нет.
+ */
+private object EqualWidthRowScope : RowScope {
+    override fun Modifier.weight(weight: Float, fill: Boolean): Modifier = this
+
+    override fun Modifier.align(alignment: Alignment.Vertical): Modifier = this
+
+    override fun Modifier.alignBy(alignmentLine: HorizontalAlignmentLine): Modifier = this
+
+    override fun Modifier.alignBy(alignmentLineBlock: (Measured) -> Int): Modifier = this
+
+    override fun Modifier.alignByBaseline(): Modifier = this
 }
 
 @Preview(backgroundColor = 0xFF0B0B0F, showBackground = true)
