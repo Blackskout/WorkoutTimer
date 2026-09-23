@@ -45,7 +45,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.hopes.workouttimer.domain.model.Exercise
-import ru.hopes.workouttimer.presentation.components.YandexMusicButton
+import ru.hopes.workouttimer.presentation.components.music.MusicSection
 import ru.hopes.workouttimer.presentation.ui.components.AppBottomSheet
 import ru.hopes.workouttimer.presentation.ui.components.EmptyState
 import ru.hopes.workouttimer.presentation.ui.components.EyebrowLabel
@@ -189,14 +189,20 @@ fun WorkoutExecutionScreen(
             if (currentState is WorkoutExecutionState.Active ||
                 currentState is WorkoutExecutionState.Rest
             ) {
+                MusicSection(
+                    isResting = currentState is WorkoutExecutionState.Rest,
+                    modifier = Modifier.padding(
+                        start = ScreenPadding,
+                        end = ScreenPadding,
+                        bottom = 10.dp
+                    )
+                )
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(start = ScreenPadding, end = ScreenPadding, bottom = 20.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    YandexMusicButton()
                     if (currentState is WorkoutExecutionState.Active) {
                         PrimaryButton(
                             text = "Закончить подход",

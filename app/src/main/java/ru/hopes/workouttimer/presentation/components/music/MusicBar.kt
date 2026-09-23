@@ -25,6 +25,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,7 +39,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.domain.model.MusicState
 import ru.hopes.workouttimer.domain.model.TrackInfo
@@ -196,5 +203,60 @@ private fun Artwork(track: TrackInfo, size: Dp = 40.dp) {
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+/**
+ * Полоска вместе со шторкой. Экран выполнения знает только про неё и
+ * передаёт одну вещь — идёт ли сейчас отдых.
+ */
+@Composable
+fun MusicSection(
+    isResting: Boolean,
+    modifier: Modifier = Modifier,
+    viewModel: MusicViewModel = hiltViewModel()
+) {
+    val state by viewModel.state.collectAsState()
+    val expanded = rememberMusicSheetVisibility(isResting = isResting, state = state)
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Разрешение выдаётся в системных настройках, Activity при этом не
+    // умирает, поэтому проверяем его заново при каждом возврате на экран.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    MusicBarContent(
+        state = state,
+        onPlayPause = viewModel::playPause,
+        onNext = viewModel::next,
+        onPrevious = viewModel::previous,
+        onOpenPlayer = viewModel::openPlayer,
+        onGrantPermission = viewModel::grantPermission,
+        onExpand = { expanded.value = true },
+        modifier = modifier
+    )
+
+    val current = state
+    val track = when (current) {
+        is MusicState.Playing -> current.track
+        is MusicState.Paused -> current.track
+        else -> null
+    }
+    if (expanded.value && track != null) {
+        MusicSheet(
+            track = track,
+            playing = current is MusicState.Playing,
+            onDismiss = { expanded.value = false },
+            onPlayPause = viewModel::playPause,
+            onNext = viewModel::next,
+            onPrevious = viewModel::previous,
+            onSeek = viewModel::seekTo,
+            onLike = viewModel::setLiked
+        )
     }
 }
