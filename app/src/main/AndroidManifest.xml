@@ -12,11 +12,6 @@
         <package android:name="ru.yandex.music" />
     </queries>
 
-<!--экспериментально-->
-    <queries>
-        <package android:name="ru.yandex.music" />
-    </queries>
-
     <application
         android:name=".WorkoutApp"
         android:allowBackup="true"
@@ -56,6 +51,16 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <service
+            android:name=".presentation.service.MediaAccessService"
+            android:exported="true"
+            android:label="Управление музыкой"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
         <receiver
             android:name=".presentation.widget.QuickStartWidgetReceiver"
