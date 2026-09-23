@@ -3,6 +3,7 @@ package ru.hopes.workouttimer.presentation.components.music
 import android.os.SystemClock
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -160,40 +162,60 @@ fun ColumnScope.MusicSheetContent(
         SeekRow(track = track, playing = playing, onSeek = onSeek)
     }
 
-    Row(
+    // Раскладка как в самой Яндекс Музыке: тройка транспорта строго по центру
+    // экрана, лайк отдельно у правого края. Если поставить его четвёртым в
+    // ряд, центр группы уезжает влево от обложки.
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(top = 16.dp, start = ScreenPadding, end = ScreenPadding)
     ) {
-        IconButton(onClick = onPrevious, enabled = track.canSkipPrevious) {
-            Icon(
-                Icons.Default.SkipPrevious,
-                contentDescription = "Предыдущий трек",
-                modifier = Modifier.size(36.dp)
-            )
-        }
-        IconButton(onClick = onPlayPause) {
-            Icon(
-                imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = if (playing) "Пауза" else "Играть",
-                modifier = Modifier.size(44.dp)
-            )
-        }
-        IconButton(onClick = onNext, enabled = track.canSkipNext) {
-            Icon(
-                Icons.Default.SkipNext,
-                contentDescription = "Следующий трек",
-                modifier = Modifier.size(36.dp)
-            )
+        Row(
+            modifier = Modifier.align(Alignment.Center),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onPrevious, enabled = track.canSkipPrevious) {
+                Icon(
+                    Icons.Default.SkipPrevious,
+                    contentDescription = "Предыдущий трек",
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+            // Главная кнопка — круг акцентного цвета, как PrimaryButton
+            // на самом экране выполнения.
+            Box(
+                modifier = Modifier
+                    .size(68.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+                    .clickable(onClick = onPlayPause),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (playing) "Пауза" else "Играть",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(34.dp)
+                )
+            }
+            IconButton(onClick = onNext, enabled = track.canSkipNext) {
+                Icon(
+                    Icons.Default.SkipNext,
+                    contentDescription = "Следующий трек",
+                    modifier = Modifier.size(36.dp)
+                )
+            }
         }
         if (track.canRate) {
-            IconButton(onClick = { onLike(track.isLiked != true) }) {
+            IconButton(
+                onClick = { onLike(track.isLiked != true) },
+                modifier = Modifier.align(Alignment.CenterEnd)
+            ) {
                 Icon(
                     imageVector = if (track.isLiked == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = if (track.isLiked == true) "Убрать лайк" else "Лайк",
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(30.dp)
                 )
             }
         }
