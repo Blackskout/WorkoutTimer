@@ -109,6 +109,14 @@ fun ListWorkoutScreen(
         }
     }
 
+    // Сбой операции с БД. Снекбар — единственный след ошибки: раньше исключение
+    // из viewModelScope роняло приложение, теперь оно доезжает сюда.
+    LaunchedEffect(state.errorMessage) {
+        val message = state.errorMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.dismissError()
+    }
+
     workoutToDelete?.let { target ->
         AlertDialog(
             onDismissRequest = { workoutToDelete = null },

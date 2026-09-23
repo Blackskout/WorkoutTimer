@@ -86,10 +86,14 @@ fun CreateWorkoutScreen(
         workoutId?.let { viewModel.loadWorkout(it) }
     }
 
-    if (state.isFinished) {
-        onFinished()
-        return
+    // Навигация — эффект, а не часть композиции. Тело composable выполняется
+    // заново на каждую перекомпоновку, и вызов onFinished() прямо здесь снимал
+    // экран со стека по нескольку раз подряд, утаскивая за собой и предыдущий.
+    LaunchedEffect(state.isFinished) {
+        if (state.isFinished) onFinished()
     }
+
+    if (state.isFinished) return
 
     // Перетаскивание можно потерять одним тапом «назад» — подтверждаем выход.
     BackHandler(enabled = state.hasUnsavedChanges) { showExitDialog = true }

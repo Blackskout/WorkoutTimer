@@ -6,6 +6,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -63,7 +64,8 @@ class ListWorkoutViewModelTest {
         searchResults: List<WorkoutWithExercises> = workouts,
         durations: Map<Int, Long> = emptyMap(),
         skip: SkipWorkoutUseCase = mockk(relaxed = true),
-        undoSkip: UndoSkipWorkoutUseCase = mockk(relaxed = true)
+        undoSkip: UndoSkipWorkoutUseCase = mockk(relaxed = true),
+        delete: DeleteWorkoutUseCase = mockk(relaxed = true)
     ): ListWorkoutViewModel {
         val getAll = mockk<GetAllWorkoutsWithExerciseUseCase>()
         val search = mockk<SearchWorkoutsUseCase>()
@@ -74,7 +76,7 @@ class ListWorkoutViewModelTest {
         return ListWorkoutViewModel(
             getAll,
             search,
-            mockk<DeleteWorkoutUseCase>(relaxed = true),
+            delete,
             getDurations,
             skip,
             undoSkip
@@ -271,6 +273,89 @@ class ListWorkoutViewModelTest {
 
         assertNull(vm.state.value.skippedWorkout)
         coVerify(exactly = 0) { undo(any(), any()) }
+    }
+
+    // Ошибки БД. Если исключение не поймать внутри viewModelScope, оно уходит
+    // в дефолтный обработчик потока — на Android это падение процесса, а не
+    // тихий отказ. Под старым кодом эти тесты падают самим RuntimeException:
+    // runTest сообщает о непойманном исключении из чужого скоупа.
+
+    @Test
+    fun `ошибка БД при удалении показывает сообщение вместо падения`() = runTest(dispatcher) {
+        val delete = mockk<DeleteWorkoutUseCase>()
+        coEvery { delete(any()) } throws RuntimeException("disk I/O error")
+        val vm = viewModel(delete = delete)
+        testScheduler.advanceUntilIdle()
+
+        vm.deleteWorkout(WorkoutEntity(id = 3, name = "Ноги", lastUseAt = 0L))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("Не удалось удалить тренировку", vm.state.value.errorMessage)
+    }
+
+    @Test
+    fun `ошибка БД при пропуске показывает сообщение и не предлагает отмену`() =
+        runTest(dispatcher) {
+            val skip = mockk<SkipWorkoutUseCase>()
+            coEvery { skip(any()) } throws RuntimeException("database is locked")
+            val vm = viewModel(skip = skip)
+            testScheduler.advanceUntilIdle()
+
+            vm.skipWorkout(WorkoutEntity(id = 7, name = "Спина", lastUseAt = 555L))
+            testScheduler.advanceUntilIdle()
+
+            assertEquals("Не удалось пропустить тренировку", vm.state.value.errorMessage)
+            // Пропуск не состоялся — отменять нечего, снекбар с «Отменить» показывать нельзя.
+            assertNull(vm.state.value.skippedWorkout)
+        }
+
+    @Test
+    fun `ошибка БД при отмене пропуска показывает сообщение вместо падения`() =
+        runTest(dispatcher) {
+            val skip = mockk<SkipWorkoutUseCase>()
+            coEvery { skip(7) } returns 555L
+            val undo = mockk<UndoSkipWorkoutUseCase>()
+            coEvery { undo(any(), any()) } throws RuntimeException("database is locked")
+            val vm = viewModel(skip = skip, undoSkip = undo)
+            testScheduler.advanceUntilIdle()
+
+            vm.skipWorkout(WorkoutEntity(id = 7, name = "Спина", lastUseAt = 555L))
+            testScheduler.advanceUntilIdle()
+            vm.undoSkip()
+            testScheduler.advanceUntilIdle()
+
+            assertEquals("Не удалось отменить пропуск", vm.state.value.errorMessage)
+        }
+
+    @Test
+    fun `отмена корутины не превращается в сообщение об ошибке`() = runTest(dispatcher) {
+        val delete = mockk<DeleteWorkoutUseCase>()
+        // CancellationException — это тоже Exception. Если ловить его наравне с
+        // остальными, штатное закрытие экрана показывало бы ошибку.
+        coEvery { delete(any()) } throws CancellationException("экран закрыт")
+        val vm = viewModel(delete = delete)
+        testScheduler.advanceUntilIdle()
+
+        vm.deleteWorkout(WorkoutEntity(id = 3, name = "Ноги", lastUseAt = 0L))
+        testScheduler.advanceUntilIdle()
+
+        assertNull(vm.state.value.errorMessage)
+    }
+
+    @Test
+    fun `показанное сообщение об ошибке гасится`() = runTest(dispatcher) {
+        val delete = mockk<DeleteWorkoutUseCase>()
+        coEvery { delete(any()) } throws RuntimeException("disk I/O error")
+        val vm = viewModel(delete = delete)
+        testScheduler.advanceUntilIdle()
+
+        vm.deleteWorkout(WorkoutEntity(id = 3, name = "Ноги", lastUseAt = 0L))
+        testScheduler.advanceUntilIdle()
+        assertNotNull(vm.state.value.errorMessage)
+
+        vm.dismissError()
+
+        assertNull(vm.state.value.errorMessage)
     }
 
     @Test
