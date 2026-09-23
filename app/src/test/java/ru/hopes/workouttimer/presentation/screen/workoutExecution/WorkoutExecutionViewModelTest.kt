@@ -490,4 +490,93 @@ class WorkoutExecutionViewModelTest {
         assertTrue(viewModel.uiState.value is WorkoutExecutionState.Rest)
         assertFalse(viewModel.isLastSetOfWorkout)
     }
+
+    @Test
+    fun `updateExerciseWeightAndReps stores the new values`() = runTest {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, mockk<AddWorkoutSessionUseCase>())
+
+        viewModel.loadWorkout(1)
+        viewModel.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, reps = 8)
+
+        coVerify(exactly = 1) {
+            workoutRepository.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, reps = 8)
+        }
+    }
+
+    // Плитки на экране выполнения берут числа из Active.weight/Active.reps, а не из
+    // Active.exercise, поэтому правка обязана обновить и отдельные поля состояния тоже.
+    @Test
+    fun `updateExerciseWeightAndReps refreshes the tiles of the current exercise`() = runTest {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val viewModel = buildViewModel(
+            getWorkoutByIdUseCase,
+            mockk<WorkoutRepository>(relaxed = true),
+            mockk<AddWorkoutSessionUseCase>()
+        )
+
+        viewModel.loadWorkout(1)
+        viewModel.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, reps = 8)
+
+        val state = viewModel.uiState.value as WorkoutExecutionState.Active
+        assertEquals(12.5, state.weight, 0.0)
+        assertEquals(8, state.reps)
+        assertEquals(12.5, state.exercise.weight, 0.0)
+        assertEquals(8, state.exercise.reps)
+    }
+
+    @Test
+    fun `updateExerciseWeightAndReps refreshes the exercise shown while resting`() = runTest {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val viewModel = buildViewModel(
+            getWorkoutByIdUseCase,
+            mockk<WorkoutRepository>(relaxed = true),
+            mockk<AddWorkoutSessionUseCase>()
+        )
+
+        viewModel.loadWorkout(1)
+        viewModel.onExerciseFinished() // sets=2, currentSet 1<2 -> Rest
+        viewModel.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, reps = 8)
+
+        val state = viewModel.uiState.value as WorkoutExecutionState.Rest
+        assertEquals(12.5, state.exercise.weight, 0.0)
+        assertEquals(8, state.exercise.reps)
+    }
+
+    @Test
+    fun `updateExerciseWeightAndReps of another exercise reaches it only when its turn comes`() = runTest {
+        val first = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
+        val second = Exercise(id = 2, name = "Pull", weight = 20.0, sets = 1, reps = 6, timeMillis = 1_000, order = 2)
+        val workout = Workout(id = 1, name = "Test", exercises = listOf(first, second), lastUseAt = 0L)
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns workout
+        val viewModel = buildViewModel(
+            getWorkoutByIdUseCase,
+            mockk<WorkoutRepository>(relaxed = true),
+            mockk<AddWorkoutSessionUseCase>()
+        )
+
+        viewModel.loadWorkout(1)
+        viewModel.updateExerciseWeightAndReps(exerciseId = 2, weight = 25.0, reps = 9)
+
+        val stillFirst = viewModel.uiState.value as WorkoutExecutionState.Active
+        assertEquals(10.0, stillFirst.weight, 0.0)
+        assertEquals(5, stillFirst.reps)
+
+        viewModel.moveToSelectedExercise(second)
+
+        val nowSecond = viewModel.uiState.value as WorkoutExecutionState.Active
+        assertEquals(25.0, nowSecond.weight, 0.0)
+        assertEquals(9, nowSecond.reps)
+    }
 }

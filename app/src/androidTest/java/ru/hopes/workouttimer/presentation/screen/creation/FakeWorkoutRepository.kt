@@ -45,6 +45,8 @@ class FakeWorkoutRepository : WorkoutRepository {
 
     override suspend fun updateExerciseNote(exerciseId: Int, note: String) = Unit
 
+    override suspend fun updateExerciseWeightAndReps(exerciseId: Int, weight: Double, reps: Int) = Unit
+
     override suspend fun addWorkoutSession(
         workoutId: Int,
         startedAt: Long,

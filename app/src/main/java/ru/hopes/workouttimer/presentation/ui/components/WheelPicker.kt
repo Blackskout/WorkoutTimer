@@ -35,8 +35,21 @@ import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
 import kotlin.math.abs
 
 private val ItemHeight = 42.dp
+
+// Высота подписи барабана зафиксирована, потому что по ней WheelRow считает, где
+// нарисовать полосу выделения: подпись стоит над барабаном, и без этой
+// договорённости полоса уехала бы с выбранного значения.
+private val LabelHeight = 22.dp
 private const val VISIBLE_ITEMS = 5
 private const val EDGE_ITEMS = VISIBLE_ITEMS / 2
+
+/**
+ * Значения барабанов веса и повторов. Лежат здесь, а не в экране создания, потому
+ * что правка на ходу обязана предлагать ровно тот же шаг: иначе вес, выставленный
+ * в зале, не лёг бы на сетку значений редактора тренировки.
+ */
+val WeightValues: List<Double> = generateSequence(0.0) { it + 0.25 }.takeWhile { it <= 300.0 }.toList()
+val RepsValues: List<Int> = (1..50).toList()
 
 /**
  * Индекс значения, ближайшего к [target]. Нужен, чтобы вес, введённый когда-то
@@ -98,6 +111,16 @@ fun <T> WheelPicker(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Box(
+            modifier = Modifier.height(LabelHeight),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
         LazyColumn(
             state = state,
             flingBehavior = fling,
@@ -129,12 +152,6 @@ fun <T> WheelPicker(
             }
             items(count = EDGE_ITEMS) { Box(modifier = Modifier.height(ItemHeight)) }
         }
-        Text(
-            text = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp)
-        )
     }
 }
 
@@ -157,9 +174,13 @@ fun WheelRow(
     content: @Composable RowScope.() -> Unit
 ) {
     Box(modifier = modifier.fillMaxWidth()) {
+        // Полоса привязана к слоту барабана, а не к середине колонки: подпись
+        // сверху сделала бы колонку выше барабана, и центрированная полоса
+        // встала бы между значениями.
         Box(
             modifier = Modifier
-                .align(Alignment.Center)
+                .align(Alignment.TopStart)
+                .padding(top = LabelHeight + ItemHeight * EDGE_ITEMS)
                 .fillMaxWidth()
                 .height(ItemHeight)
                 .clip(MaterialTheme.shapes.small)

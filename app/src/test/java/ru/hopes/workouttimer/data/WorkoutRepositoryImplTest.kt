@@ -179,4 +179,14 @@ class WorkoutRepositoryImplTest {
 
         assertEquals(555L, repo.getLastUseAt(7))
     }
+
+    @Test
+    fun `updateExerciseWeightAndReps доходит до DAO целиком`() = runTest {
+        val dao = mockk<WorkoutDao>(relaxed = true)
+        val repo = WorkoutRepositoryImpl(dao, mockk(relaxed = true))
+
+        repo.updateExerciseWeightAndReps(exerciseId = 3, weight = 82.5, reps = 6)
+
+        coVerify(exactly = 1) { dao.updateExerciseWeightAndReps(id = 3, weight = 82.5, reps = 6) }
+    }
 }

@@ -18,6 +18,7 @@ interface WorkoutRepository {
         suspend fun setLastUseAt(workoutId: Int, timestamp: Long)
         suspend fun getLastUseAt(workoutId: Int): Long?
         suspend fun updateExerciseNote(exerciseId: Int, note: String)
+        suspend fun updateExerciseWeightAndReps(exerciseId: Int, weight: Double, reps: Int)
         suspend fun addWorkoutSession(workoutId: Int, startedAt: Long, finishedAt: Long, durationMillis: Long)
         fun getSessionsForWorkout(workoutId: Int): Flow<List<WorkoutSession>>
         fun getLastSessionDurations(): Flow<Map<Int, Long>>

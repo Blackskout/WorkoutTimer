@@ -396,6 +396,34 @@ class WorkoutExecutionViewModel @Inject constructor(
         }
     }
 
+    fun updateExerciseWeightAndReps(exerciseId: Int, weight: Double, reps: Int) {
+        registerInteraction()
+        viewModelScope.launch {
+            workoutRepository.updateExerciseWeightAndReps(exerciseId, weight, reps)
+
+            val index = exercises.indexOfFirst { it.id == exerciseId }
+            if (index == -1) return@launch
+            val updatedExercise = exercises[index].copy(weight = weight, reps = reps)
+            exercises = exercises.toMutableList().apply {
+                set(index, updatedExercise)
+            }
+
+            // Плитки в Active берут числа из state.weight и state.reps, а не из
+            // state.exercise, поэтому одного обновления упражнения им мало.
+            _uiState.update { state ->
+                when {
+                    state is WorkoutExecutionState.Active && state.exercise.id == exerciseId ->
+                        state.copy(exercise = updatedExercise, weight = weight, reps = reps)
+
+                    state is WorkoutExecutionState.Rest && state.exercise.id == exerciseId ->
+                        state.copy(exercise = updatedExercise)
+
+                    else -> state
+                }
+            }
+        }
+    }
+
     internal fun registerInteraction(now: Long = System.currentTimeMillis()) {
         if (lastInteractionAt != 0L) {
             val gap = now - lastInteractionAt

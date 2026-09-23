@@ -72,6 +72,7 @@ fun WorkoutExecutionScreen(
     var showExitDialog by remember { mutableStateOf(false) }
     var showFinishDialog by remember { mutableStateOf(false) }
     var showExercisePicker by remember { mutableStateOf(false) }
+    var weightSheetExercise by remember { mutableStateOf<Exercise?>(null) }
 
     // Уходить без подтверждения нечего терять только в Loading/Error/Finished:
     // в Finished сессия уже сохранена, в остальных двух её ещё нет.
@@ -168,7 +169,8 @@ fun WorkoutExecutionScreen(
                         onEditNote = {
                             currentEditingExercise = it
                             showNoteDialog = true
-                        }
+                        },
+                        onEditWeightAndReps = { weightSheetExercise = it }
                     )
 
                     is WorkoutExecutionState.Rest -> RestContent(
@@ -176,7 +178,8 @@ fun WorkoutExecutionScreen(
                         onEditNote = {
                             currentEditingExercise = it
                             showNoteDialog = true
-                        }
+                        },
+                        onEditWeightAndReps = { weightSheetExercise = it }
                     )
 
                     is WorkoutExecutionState.Finished -> Unit
@@ -258,6 +261,20 @@ fun WorkoutExecutionScreen(
                     )
                 }
             }
+        }
+    }
+
+    weightSheetExercise?.let { exercise ->
+        AppBottomSheet(onDismiss = { weightSheetExercise = null }) {
+            WeightRepsSheetContent(
+                exerciseName = exercise.name,
+                weight = exercise.weight,
+                reps = exercise.reps,
+                onApply = { weight, reps ->
+                    viewModel.updateExerciseWeightAndReps(exercise.id, weight, reps)
+                    weightSheetExercise = null
+                }
+            )
         }
     }
 
@@ -351,7 +368,8 @@ private fun ExerciseChip(
 @Composable
 private fun ActiveContent(
     state: WorkoutExecutionState.Active,
-    onEditNote: (Exercise) -> Unit
+    onEditNote: (Exercise) -> Unit,
+    onEditWeightAndReps: (Exercise) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -380,12 +398,14 @@ private fun ActiveContent(
             StatTile(
                 value = state.weight.toCorrectNum(),
                 unit = "кг",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                onClick = { onEditWeightAndReps(state.exercise) }
             )
             StatTile(
                 value = state.reps.toString(),
                 unit = "повт",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                onClick = { onEditWeightAndReps(state.exercise) }
             )
         }
         NoteBlock(
@@ -399,7 +419,8 @@ private fun ActiveContent(
 @Composable
 private fun RestContent(
     state: WorkoutExecutionState.Rest,
-    onEditNote: (Exercise) -> Unit
+    onEditNote: (Exercise) -> Unit,
+    onEditWeightAndReps: (Exercise) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -424,11 +445,17 @@ private fun RestContent(
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 14.dp)
         )
+        // Отдых — самый удобный момент, чтобы поправить вес на следующий подход,
+        // поэтому строка ведёт в тот же лист, что и плитки в Active.
         Text(
             text = "${state.exercise.weight.toCorrectNum()} кг · ${state.exercise.reps} повторений",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 6.dp)
+            modifier = Modifier
+                .padding(top = 6.dp)
+                .clip(MaterialTheme.shapes.small)
+                .clickable { onEditWeightAndReps(state.exercise) }
+                .padding(horizontal = 8.dp, vertical = 4.dp)
         )
         NoteBlock(
             note = state.exercise.note,
@@ -571,7 +598,8 @@ private fun ActiveContentPreview() {
                 weight = 80.0,
                 reps = 8
             ),
-            onEditNote = {}
+            onEditNote = {},
+            onEditWeightAndReps = {}
         )
     }
 }
@@ -588,7 +616,8 @@ private fun RestContentPreview() {
                 restTimeMillis = 45_000L,
                 totalRestTimeMillis = 90_000L
             ),
-            onEditNote = {}
+            onEditNote = {},
+            onEditWeightAndReps = {}
         )
     }
 }
