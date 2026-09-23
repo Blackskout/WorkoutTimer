@@ -33,6 +33,7 @@ fun WorkoutWithExercises.toWidgetWorkout(lastDurationMillis: Long?): WidgetWorko
         id = workout.id,
         name = workout.name,
         exerciseCount = exercises.size,
+        lastUseAt = workout.lastUseAt,
         lastDurationMillis = lastDurationMillis
     )
 }
