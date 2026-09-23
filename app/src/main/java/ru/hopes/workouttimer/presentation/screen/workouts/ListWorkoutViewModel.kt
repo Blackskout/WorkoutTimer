@@ -3,6 +3,7 @@ package ru.hopes.workouttimer.presentation.screen.workouts
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -70,8 +71,26 @@ class ListWorkoutViewModel @Inject constructor(
         query.update { newQuery }
     }
 
-    fun deleteWorkout(workout: WorkoutEntity) {
+    /**
+     * Запускает работу с БД так, чтобы сбой превращался в сообщение на экране,
+     * а не в падение. Непойманное исключение из `viewModelScope.launch` уходит
+     * в дефолтный обработчик потока, то есть роняет приложение целиком.
+     */
+    private fun launchGuarded(message: String, block: suspend () -> Unit) {
         viewModelScope.launch {
+            try {
+                block()
+            } catch (e: CancellationException) {
+                // Штатная отмена скоупа (экран закрыт) — не ошибка, пробрасываем.
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(errorMessage = message) }
+            }
+        }
+    }
+
+    fun deleteWorkout(workout: WorkoutEntity) {
+        launchGuarded("Не удалось удалить тренировку") {
             deleteWorkoutUseCase(workout)
         }
     }
@@ -81,8 +100,8 @@ class ListWorkoutViewModel @Inject constructor(
      * Прежнее время кладётся в состояние, чтобы снекбар мог предложить отмену.
      */
     fun skipWorkout(workout: WorkoutEntity) {
-        viewModelScope.launch {
-            val previous = skipWorkoutUseCase(workout.id) ?: return@launch
+        launchGuarded("Не удалось пропустить тренировку") {
+            val previous = skipWorkoutUseCase(workout.id) ?: return@launchGuarded
             _state.update {
                 it.copy(
                     skippedWorkout = SkippedWorkout(
@@ -97,7 +116,7 @@ class ListWorkoutViewModel @Inject constructor(
 
     fun undoSkip() {
         val skipped = _state.value.skippedWorkout ?: return
-        viewModelScope.launch {
+        launchGuarded("Не удалось отменить пропуск") {
             undoSkipWorkoutUseCase(skipped.id, skipped.previousLastUseAt)
             _state.update { it.copy(skippedWorkout = null) }
         }
@@ -105,6 +124,10 @@ class ListWorkoutViewModel @Inject constructor(
 
     fun dismissSkipUndo() {
         _state.update { it.copy(skippedWorkout = null) }
+    }
+
+    fun dismissError() {
+        _state.update { it.copy(errorMessage = null) }
     }
 }
 
@@ -119,7 +142,9 @@ data class ListWorkoutState(
     val query: String = "",
     val workouts: List<WorkoutWithExercises> = listOf(),
     val lastSessionDurations: Map<Int, Long> = emptyMap(),
-    val skippedWorkout: SkippedWorkout? = null
+    val skippedWorkout: SkippedWorkout? = null,
+    /** Сбой операции с БД; показывается снекбаром и гасится `dismissError()`. */
+    val errorMessage: String? = null
 ) {
     /** Первая в очереди — та, которую не делали дольше всех. */
     val nextWorkout: WorkoutWithExercises? get() = workouts.firstOrNull()
