@@ -2,8 +2,10 @@ package ru.hopes.workouttimer.presentation.components.music
 
 import android.os.SystemClock
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
@@ -83,7 +85,8 @@ fun MusicSheet(
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onSeek: (Long) -> Unit,
-    onLike: (Boolean) -> Unit
+    onLike: (Boolean) -> Unit,
+    onOpenPlayer: () -> Unit
 ) {
     AppBottomSheet(onDismiss = onDismiss) {
         MusicSheetContent(
@@ -93,7 +96,8 @@ fun MusicSheet(
             onNext = onNext,
             onPrevious = onPrevious,
             onSeek = onSeek,
-            onLike = onLike
+            onLike = onLike,
+            onOpenPlayer = onOpenPlayer
         )
     }
 }
@@ -102,6 +106,7 @@ fun MusicSheet(
  * Извлечено из MusicSheet по той же причине, что и ActionSheetContent:
  * ModalBottomSheet требует Window и не поднимается ни в @Preview, ни в тесте.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ColumnScope.MusicSheetContent(
     track: TrackInfo,
@@ -110,15 +115,26 @@ fun ColumnScope.MusicSheetContent(
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onSeek: (Long) -> Unit,
-    onLike: (Boolean) -> Unit
+    onLike: (Boolean) -> Unit,
+    onOpenPlayer: () -> Unit
 ) {
+    // Долгий тап, а не обычный: во время отдыха легко мазнуть по самой
+    // большой мишени экрана, а промах уводил бы из приложения посреди
+    // подхода. Пустой onClick оставлен ради ripple — единственного намёка,
+    // что обложка живая, не считая подписи жеста для talkback.
     Box(
         modifier = Modifier
             .align(Alignment.CenterHorizontally)
             .padding(top = 8.dp)
             .size(220.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surface),
+            .background(MaterialTheme.colorScheme.surface)
+            .combinedClickable(
+                onClick = {},
+                onLongClick = onOpenPlayer,
+                onLongClickLabel = "Открыть Яндекс Музыку"
+            )
+            .semantics { contentDescription = "Обложка трека" },
         contentAlignment = Alignment.Center
     ) {
         val bitmap = track.artwork
