@@ -256,7 +256,8 @@ fun MusicSection(
             onNext = viewModel::next,
             onPrevious = viewModel::previous,
             onSeek = viewModel::seekTo,
-            onLike = viewModel::setLiked
+            onLike = viewModel::setLiked,
+            onOpenPlayer = viewModel::openPlayer
         )
     }
 }

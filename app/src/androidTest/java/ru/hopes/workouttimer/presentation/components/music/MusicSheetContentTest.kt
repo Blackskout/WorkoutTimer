@@ -10,6 +10,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -51,7 +52,8 @@ class MusicSheetContentTest {
         trackInfo: TrackInfo,
         playing: Boolean = true,
         onLike: (Boolean) -> Unit = {},
-        onSeek: (Long) -> Unit = {}
+        onSeek: (Long) -> Unit = {},
+        onOpenPlayer: () -> Unit = {}
     ) {
         composeRule.setContent {
             WorkoutTimerTheme {
@@ -63,7 +65,8 @@ class MusicSheetContentTest {
                         onNext = {},
                         onPrevious = {},
                         onSeek = onSeek,
-                        onLike = onLike
+                        onLike = onLike,
+                        onOpenPlayer = onOpenPlayer
                     )
                 }
             }
@@ -148,6 +151,29 @@ class MusicSheetContentTest {
 
         composeRule.runOnIdle { state = MusicState.NoSession }
         composeRule.runOnIdle { assertEquals(false, visibleNow) }
+    }
+
+    @Test
+    fun долгий_тап_по_обложке_открывает_плеер() {
+        var opened = 0
+        setContent(track(), onOpenPlayer = { opened++ })
+
+        composeRule.onNodeWithContentDescription("Обложка трека").performTouchInput { longClick() }
+        composeRule.waitForIdle()
+
+        assertEquals(1, opened)
+    }
+
+    /** Короткий тап не должен уводить из приложения посреди отдыха. */
+    @Test
+    fun обычный_тап_по_обложке_не_открывает_плеер() {
+        var opened = 0
+        setContent(track(), onOpenPlayer = { opened++ })
+
+        composeRule.onNodeWithContentDescription("Обложка трека").performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(0, opened)
     }
 
     /**
