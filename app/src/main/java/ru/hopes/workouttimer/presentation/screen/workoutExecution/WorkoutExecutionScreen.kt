@@ -39,11 +39,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.presentation.components.music.MusicSection
 import ru.hopes.workouttimer.presentation.ui.components.AppBottomSheet
@@ -121,7 +123,7 @@ fun WorkoutExecutionScreen(
                 }) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Назад",
+                        contentDescription = stringResource(R.string.common_back),
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -135,7 +137,7 @@ fun WorkoutExecutionScreen(
                         )
                     } else {
                         Text(
-                            text = viewModel.workoutName.ifEmpty { "Тренировка" },
+                            text = viewModel.workoutName.ifEmpty { stringResource(R.string.execution_workout_fallback) },
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -158,9 +160,9 @@ fun WorkoutExecutionScreen(
 
                     is WorkoutExecutionState.Error -> EmptyState(
                         icon = Icons.Default.ErrorOutline,
-                        title = "Не удалось загрузить",
-                        subtitle = currentState.message,
-                        actionText = "Повторить",
+                        title = stringResource(R.string.execution_load_error_title),
+                        subtitle = stringResource(R.string.execution_load_error_subtitle),
+                        actionText = stringResource(R.string.execution_retry),
                         onAction = { viewModel.loadWorkout(workoutId) }
                     )
 
@@ -205,7 +207,7 @@ fun WorkoutExecutionScreen(
                 ) {
                     if (currentState is WorkoutExecutionState.Active) {
                         PrimaryButton(
-                            text = "Закончить подход",
+                            text = stringResource(R.string.execution_finish_set),
                             onClick = {
                                 if (viewModel.isLastSetOfWorkout) {
                                     showFinishDialog = true
@@ -217,7 +219,7 @@ fun WorkoutExecutionScreen(
                         )
                     } else {
                         PrimaryButton(
-                            text = "Пропустить отдых",
+                            text = stringResource(R.string.execution_skip_rest),
                             onClick = { viewModel.skipRest() },
                             modifier = Modifier.weight(1f)
                         )
@@ -230,7 +232,7 @@ fun WorkoutExecutionScreen(
     if (showExercisePicker) {
         AppBottomSheet(onDismiss = { showExercisePicker = false }) {
             Text(
-                text = "Упражнения",
+                text = stringResource(R.string.execution_exercises),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 8.dp)
@@ -300,16 +302,16 @@ fun WorkoutExecutionScreen(
     if (showExitDialog) {
         AlertDialog(
             onDismissRequest = { showExitDialog = false },
-            title = { Text("Выйти из тренировки?") },
-            text = { Text("Прогресс не будет сохранён.") },
+            title = { Text(stringResource(R.string.execution_exit_title)) },
+            text = { Text(stringResource(R.string.execution_exit_message)) },
             confirmButton = {
                 TextButton(onClick = {
                     showExitDialog = false
                     onExerciseCompleted()
-                }) { Text("Выйти") }
+                }) { Text(stringResource(R.string.common_exit)) }
             },
             dismissButton = {
-                TextButton(onClick = { showExitDialog = false }) { Text("Отмена") }
+                TextButton(onClick = { showExitDialog = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -317,16 +319,16 @@ fun WorkoutExecutionScreen(
     if (showFinishDialog) {
         AlertDialog(
             onDismissRequest = { showFinishDialog = false },
-            title = { Text("Завершить тренировку?") },
-            text = { Text("Это последний подход. Тренировка будет сохранена в историю.") },
+            title = { Text(stringResource(R.string.execution_finish_title)) },
+            text = { Text(stringResource(R.string.execution_finish_message)) },
             confirmButton = {
                 TextButton(onClick = {
                     showFinishDialog = false
                     viewModel.onExerciseFinished()
-                }) { Text("Завершить") }
+                }) { Text(stringResource(R.string.execution_finish_confirm)) }
             },
             dismissButton = {
-                TextButton(onClick = { showFinishDialog = false }) { Text("Отмена") }
+                TextButton(onClick = { showFinishDialog = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -385,7 +387,7 @@ private fun ActiveContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         EyebrowLabel(
-            text = "Подход ${state.currentSet} из ${state.totalSets}",
+            text = stringResource(R.string.execution_set_of, state.currentSet, state.totalSets),
             modifier = Modifier.padding(top = 18.dp)
         )
         Text(
@@ -403,13 +405,13 @@ private fun ActiveContent(
         ) {
             StatTile(
                 value = state.weight.toCorrectNum(),
-                unit = "кг",
+                unit = stringResource(R.string.common_unit_kg),
                 modifier = Modifier.weight(1f),
                 onClick = { onEditWeightAndReps(state.exercise) }
             )
             StatTile(
                 value = state.reps.toString(),
-                unit = "повт",
+                unit = stringResource(R.string.common_unit_reps),
                 modifier = Modifier.weight(1f),
                 onClick = { onEditWeightAndReps(state.exercise) }
             )
@@ -436,7 +438,7 @@ private fun RestContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         EyebrowLabel(
-            text = "Отдых · далее подход ${state.currentSet}",
+            text = stringResource(R.string.execution_rest_next_set, state.currentSet),
             modifier = Modifier.padding(top = 18.dp)
         )
         RestRing(
@@ -454,7 +456,11 @@ private fun RestContent(
         // Отдых — самый удобный момент, чтобы поправить вес на следующий подход,
         // поэтому строка ведёт в тот же лист, что и плитки в Active.
         Text(
-            text = "${state.exercise.weight.toCorrectNum()} кг · ${state.exercise.reps} повторений",
+            text = stringResource(
+                R.string.execution_rest_weight_reps,
+                state.exercise.weight.toCorrectNum(),
+                state.exercise.reps
+            ),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
@@ -485,18 +491,18 @@ private fun NoteBlock(
             .padding(12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SectionHeader(text = "Заметка", modifier = Modifier.weight(1f))
+            SectionHeader(text = stringResource(R.string.common_note), modifier = Modifier.weight(1f))
             IconButton(onClick = onEdit) {
                 Icon(
                     Icons.Default.Edit,
-                    contentDescription = "Редактировать заметку",
+                    contentDescription = stringResource(R.string.execution_edit_note),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(16.dp)
                 )
             }
         }
         Text(
-            text = note.ifBlank { "Нет заметок" },
+            text = note.ifBlank { stringResource(R.string.execution_no_notes) },
             style = MaterialTheme.typography.bodyMedium,
             color = if (note.isBlank()) {
                 MaterialTheme.colorScheme.onSurfaceVariant
@@ -522,7 +528,7 @@ private fun FinishedContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        EyebrowLabel(text = "Готово")
+        EyebrowLabel(text = stringResource(R.string.common_done))
         Text(
             text = DateFormatter.formatDurationCompact(durationMillis),
             style = MaterialTheme.typography.displayLarge,
@@ -530,14 +536,14 @@ private fun FinishedContent(
             modifier = Modifier.padding(top = 10.dp)
         )
         Text(
-            text = workoutName.ifEmpty { "Тренировка" },
+            text = workoutName.ifEmpty { stringResource(R.string.execution_workout_fallback) },
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp)
         )
         Box(modifier = Modifier.height(36.dp))
-        PrimaryButton(text = "На главную", onClick = onDone)
+        PrimaryButton(text = stringResource(R.string.execution_to_home), onClick = onDone)
     }
 }
 
@@ -547,8 +553,8 @@ private fun LoadingContent() {
     // был голый спиннер, из состояний соответствовал только Error.
     EmptyState(
         icon = Icons.Default.HourglassEmpty,
-        title = "Загрузка тренировки",
-        subtitle = "Секунду…"
+        title = stringResource(R.string.execution_loading_title),
+        subtitle = stringResource(R.string.execution_loading_subtitle)
     )
 }
 
@@ -561,22 +567,22 @@ private fun NoteEditDialog(
     var noteText by remember { mutableStateOf(exercise.note) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Заметка к упражнению") },
+        title = { Text(stringResource(R.string.execution_note_dialog_title)) },
         text = {
             OutlinedTextField(
                 value = noteText,
                 onValueChange = { noteText = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Введите заметку...") },
+                placeholder = { Text(stringResource(R.string.execution_note_placeholder)) },
                 minLines = 3,
                 maxLines = 6
             )
         },
         confirmButton = {
-            TextButton(onClick = { onSave(noteText) }) { Text("Сохранить") }
+            TextButton(onClick = { onSave(noteText) }) { Text(stringResource(R.string.common_save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Отмена") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
         }
     )
 }

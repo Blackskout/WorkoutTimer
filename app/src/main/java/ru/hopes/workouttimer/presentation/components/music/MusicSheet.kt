@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -45,6 +46,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.data.mapper.currentPositionMs
 import ru.hopes.workouttimer.domain.model.MusicState
 import ru.hopes.workouttimer.domain.model.TrackInfo
@@ -118,6 +120,7 @@ fun ColumnScope.MusicSheetContent(
     onLike: (Boolean) -> Unit,
     onOpenPlayer: () -> Unit
 ) {
+    val artworkDescription = stringResource(R.string.music_artwork)
     // Долгий тап, а не обычный: во время отдыха легко мазнуть по самой
     // большой мишени экрана, а промах уводил бы из приложения посреди
     // подхода. Пустой onClick оставлен ради ripple — единственного намёка,
@@ -132,9 +135,9 @@ fun ColumnScope.MusicSheetContent(
             .combinedClickable(
                 onClick = {},
                 onLongClick = onOpenPlayer,
-                onLongClickLabel = "Открыть Яндекс Музыку"
+                onLongClickLabel = stringResource(R.string.music_open_yandex)
             )
-            .semantics { contentDescription = "Обложка трека" },
+            .semantics { contentDescription = artworkDescription },
         contentAlignment = Alignment.Center
     ) {
         val bitmap = track.artwork
@@ -194,7 +197,7 @@ fun ColumnScope.MusicSheetContent(
             IconButton(onClick = onPrevious, enabled = track.canSkipPrevious) {
                 Icon(
                     Icons.Default.SkipPrevious,
-                    contentDescription = "Предыдущий трек",
+                    contentDescription = stringResource(R.string.music_previous),
                     modifier = Modifier.size(36.dp)
                 )
             }
@@ -210,7 +213,7 @@ fun ColumnScope.MusicSheetContent(
             ) {
                 Icon(
                     imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (playing) "Пауза" else "Играть",
+                    contentDescription = stringResource(if (playing) R.string.music_pause else R.string.music_play),
                     tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(34.dp)
                 )
@@ -218,7 +221,7 @@ fun ColumnScope.MusicSheetContent(
             IconButton(onClick = onNext, enabled = track.canSkipNext) {
                 Icon(
                     Icons.Default.SkipNext,
-                    contentDescription = "Следующий трек",
+                    contentDescription = stringResource(R.string.music_next),
                     modifier = Modifier.size(36.dp)
                 )
             }
@@ -230,7 +233,9 @@ fun ColumnScope.MusicSheetContent(
             ) {
                 Icon(
                     imageVector = if (track.isLiked == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = if (track.isLiked == true) "Убрать лайк" else "Лайк",
+                    contentDescription = stringResource(
+                        if (track.isLiked == true) R.string.music_unlike else R.string.music_like
+                    ),
                     modifier = Modifier.size(30.dp)
                 )
             }
@@ -247,6 +252,7 @@ private fun SeekRow(
     // Пока палец на слайдере, входящие обновления игнорируются: иначе
     // ползунок дёргался бы назад на каждом обновлении позиции.
     var dragging by remember { mutableStateOf(false) }
+    val seekDescription = stringResource(R.string.music_seek)
     var draggedMs by remember { mutableStateOf(0f) }
     // Место, куда пользователь перемотал. Держится, пока сессия не подтвердит
     // его новым positionUpdatedAt. Без этого после отпускания ползунок прыгал
@@ -282,7 +288,7 @@ private fun SeekRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 16.dp, start = ScreenPadding, end = ScreenPadding)
-            .semantics { contentDescription = "Перемотка" }
+            .semantics { contentDescription = seekDescription }
     )
     Row(
         modifier = Modifier

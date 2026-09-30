@@ -1,5 +1,6 @@
 package ru.hopes.workouttimer.presentation.screen.workouts
 
+import ru.hopes.workouttimer.R
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -290,7 +291,7 @@ class ListWorkoutViewModelTest {
         vm.deleteWorkout(WorkoutEntity(id = 3, name = "Ноги", lastUseAt = 0L))
         testScheduler.advanceUntilIdle()
 
-        assertEquals("Не удалось удалить тренировку", vm.state.value.errorMessage)
+        assertEquals(R.string.list_error_delete, vm.state.value.errorMessage)
     }
 
     @Test
@@ -304,7 +305,7 @@ class ListWorkoutViewModelTest {
             vm.skipWorkout(WorkoutEntity(id = 7, name = "Спина", lastUseAt = 555L))
             testScheduler.advanceUntilIdle()
 
-            assertEquals("Не удалось пропустить тренировку", vm.state.value.errorMessage)
+            assertEquals(R.string.list_error_skip, vm.state.value.errorMessage)
             // Пропуск не состоялся — отменять нечего, снекбар с «Отменить» показывать нельзя.
             assertNull(vm.state.value.skippedWorkout)
         }
@@ -324,7 +325,7 @@ class ListWorkoutViewModelTest {
             vm.undoSkip()
             testScheduler.advanceUntilIdle()
 
-            assertEquals("Не удалось отменить пропуск", vm.state.value.errorMessage)
+            assertEquals(R.string.list_error_undo_skip, vm.state.value.errorMessage)
         }
 
     @Test

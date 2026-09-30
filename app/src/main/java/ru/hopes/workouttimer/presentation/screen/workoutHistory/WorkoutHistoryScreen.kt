@@ -24,10 +24,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.domain.model.WorkoutSession
 import ru.hopes.workouttimer.presentation.ui.components.EmptyState
 import ru.hopes.workouttimer.presentation.ui.theme.CardSpacing
@@ -60,12 +62,12 @@ fun WorkoutHistoryScreen(
                 IconButton(onClick = onNavigateBack) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Назад",
+                        contentDescription = stringResource(R.string.common_back),
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Text(
-                    text = state.workoutName.ifEmpty { "История" },
+                    text = state.workoutName.ifEmpty { stringResource(R.string.list_action_history) },
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -85,8 +87,8 @@ private fun HistoryContent(sessions: List<WorkoutSession>) {
     if (sessions.isEmpty()) {
         EmptyState(
             icon = Icons.Default.History,
-            title = "История пуста",
-            subtitle = "Завершите тренировку — она появится здесь"
+            title = stringResource(R.string.history_empty_title),
+            subtitle = stringResource(R.string.history_empty_subtitle)
         )
     } else {
         LazyColumn(

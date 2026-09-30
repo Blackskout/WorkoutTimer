@@ -10,8 +10,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.presentation.ui.components.PrimaryButton
 import ru.hopes.workouttimer.presentation.ui.components.RepsValues
 import ru.hopes.workouttimer.presentation.ui.components.WeightValues
@@ -56,19 +58,19 @@ internal fun WeightRepsSheetContent(
                 items = WeightValues,
                 selectedIndex = weightIndex,
                 onSelected = { weightIndex = it },
-                label = "кг",
+                label = stringResource(R.string.common_unit_kg),
                 format = { it.toCorrectNum() }
             )
             WheelPicker(
                 items = RepsValues,
                 selectedIndex = repsIndex,
                 onSelected = { repsIndex = it },
-                label = "повт",
+                label = stringResource(R.string.common_unit_reps),
                 format = { it.toString() }
             )
         }
         PrimaryButton(
-            text = "Готово",
+            text = stringResource(R.string.common_done),
             onClick = { onApply(WeightValues[weightIndex], RepsValues[repsIndex]) }
         )
     }

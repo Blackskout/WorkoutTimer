@@ -34,14 +34,14 @@ class TimerNotificationService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
-                val exerciseName = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: "Упражнение"
+                val exerciseName = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: getString(R.string.create_fab_exercise)
                 val currentSet = intent.getIntExtra(EXTRA_CURRENT_SET, 1)
                 val totalSets = intent.getIntExtra(EXTRA_TOTAL_SETS, 1)
                 val timeLeft = intent.getLongExtra(EXTRA_TIME_LEFT, 0L)
                 startForeground(notificationId, createNotification(exerciseName, currentSet, totalSets, timeLeft))
             }
             ACTION_UPDATE -> {
-                val exerciseName = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: "Упражнение"
+                val exerciseName = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: getString(R.string.create_fab_exercise)
                 val currentSet = intent.getIntExtra(EXTRA_CURRENT_SET, 1)
                 val totalSets = intent.getIntExtra(EXTRA_TOTAL_SETS, 1)
                 val timeLeft = intent.getLongExtra(EXTRA_TIME_LEFT, 0L)
@@ -52,13 +52,13 @@ class TimerNotificationService : Service() {
                 stopSelf()
             }
             ACTION_SHOW_FINISHED -> {
-                val exerciseName = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: "Упражнение"
+                val exerciseName = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: getString(R.string.create_fab_exercise)
                 val currentSet = intent.getIntExtra(EXTRA_CURRENT_SET, 1)
                 val totalSets = intent.getIntExtra(EXTRA_TOTAL_SETS, 1)
                 notificationManager.notify(finishedNotificationId, createFinishedNotification(exerciseName, currentSet, totalSets))
             }
             ACTION_SHOW_IDLE_REMINDER -> {
-                val exerciseName = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: "Упражнение"
+                val exerciseName = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: getString(R.string.create_fab_exercise)
                 val currentSet = intent.getIntExtra(EXTRA_CURRENT_SET, 1)
                 val totalSets = intent.getIntExtra(EXTRA_TOTAL_SETS, 1)
                 notificationManager.notify(idleReminderNotificationId, createIdleReminderNotification(exerciseName, currentSet, totalSets))
@@ -71,10 +71,10 @@ class TimerNotificationService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
-                "Таймер отдыха",
+                getString(R.string.notification_channel_timer),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Отображение обратного отсчета таймера во время отдыха между подходами"
+                description = getString(R.string.notification_channel_timer_description)
                 setShowBadge(false)
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
             }
@@ -86,10 +86,10 @@ class TimerNotificationService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 finishedChannelId,
-                "Завершение отдыха",
+                getString(R.string.notification_channel_rest_finished),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Уведомление о завершении отдыха между подходами"
+                description = getString(R.string.notification_channel_rest_finished_description)
                 setShowBadge(false)
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
                 enableVibration(true)
@@ -122,8 +122,8 @@ class TimerNotificationService : Service() {
         )
 
         val timeText = formatTime(timeLeftMillis)
-        val title = "Отдых: $timeText"
-        val content = "$exerciseName — Подход $currentSet из $totalSets"
+        val title = getString(R.string.notification_rest_title, timeText)
+        val content = getString(R.string.notification_set_content, exerciseName, currentSet, totalSets)
 
         return NotificationCompat.Builder(this, channelId)
             .setContentTitle(title)
@@ -155,8 +155,8 @@ class TimerNotificationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = "Отдых завершён!"
-        val content = "$exerciseName — Подход $currentSet из $totalSets"
+        val title = getString(R.string.notification_rest_finished_title)
+        val content = getString(R.string.notification_set_content, exerciseName, currentSet, totalSets)
 
         return NotificationCompat.Builder(this, finishedChannelId)
             .setContentTitle(title)
@@ -176,10 +176,10 @@ class TimerNotificationService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 idleReminderChannelId,
-                "Напоминание о тренировке",
+                getString(R.string.notification_channel_idle),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Напоминание вернуться в приложение, если подход давно не завершён"
+                description = getString(R.string.notification_channel_idle_description)
                 setShowBadge(false)
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
             }
@@ -203,8 +203,8 @@ class TimerNotificationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = "Вы всё ещё тренируетесь?"
-        val content = "$exerciseName — Подход $currentSet из $totalSets. Не забудьте закончить подход."
+        val title = getString(R.string.notification_idle_title)
+        val content = getString(R.string.notification_idle_content, exerciseName, currentSet, totalSets)
 
         return NotificationCompat.Builder(this, idleReminderChannelId)
             .setContentTitle(title)

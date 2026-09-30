@@ -11,12 +11,14 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.data.dao.WorkoutDao
 import ru.hopes.workouttimer.data.entity.ExerciseEntity
 import ru.hopes.workouttimer.data.mapper.toDomain
 import ru.hopes.workouttimer.data.mapper.toExport
 import ru.hopes.workouttimer.domain.model.export.ExportData
 import ru.hopes.workouttimer.domain.repository.ExportImportRepository
+import ru.hopes.workouttimer.domain.repository.ImportError
 import ru.hopes.workouttimer.domain.repository.ImportResult
 import ru.hopes.workouttimer.domain.repository.WidgetUpdater
 import java.io.File
@@ -59,7 +61,7 @@ class ExportImportRepositoryImpl @Inject constructor(
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 
-        val chooser = Intent.createChooser(shareIntent, "Поделиться тренировками")
+        val chooser = Intent.createChooser(shareIntent, context.getString(R.string.export_share_title))
         chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(chooser)
     }
@@ -73,7 +75,7 @@ class ExportImportRepositoryImpl @Inject constructor(
                     success = false,
                     importedCount = 0,
                     skippedCount = 0,
-                    errorMessage = "Не удалось прочитать файл"
+                    error = ImportError.ReadFailed
                 )
 
                 val exportData = json.decodeFromString<ExportData>(jsonContent)
@@ -83,7 +85,7 @@ class ExportImportRepositoryImpl @Inject constructor(
                         success = false,
                         importedCount = 0,
                         skippedCount = 0,
-                        errorMessage = "Файл не содержит тренировок"
+                        error = ImportError.NoWorkouts
                     )
                 }
 
@@ -142,7 +144,7 @@ class ExportImportRepositoryImpl @Inject constructor(
                     success = false,
                     importedCount = 0,
                     skippedCount = 0,
-                    errorMessage = "Ошибка импорта: ${e.message}"
+                    error = ImportError.Failed(e.message)
                 )
             }
         }
@@ -160,9 +162,9 @@ class ExportImportRepositoryImpl @Inject constructor(
         }
 
         var counter = 1
-        var uniqueName = "$originalName (копия)"
+        var uniqueName = context.getString(R.string.export_copy_name, originalName)
         while (existingNames.contains(uniqueName)) {
-            uniqueName = "$originalName (копия $counter)"
+            uniqueName = context.getString(R.string.export_copy_name_numbered, originalName, counter)
             counter++
         }
         return uniqueName

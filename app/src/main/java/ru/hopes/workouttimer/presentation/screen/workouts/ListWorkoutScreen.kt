@@ -54,12 +54,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.data.dao.WorkoutWithExercises
 import ru.hopes.workouttimer.data.entity.ExerciseEntity
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
@@ -93,14 +96,16 @@ fun ListWorkoutScreen(
     var menuFor by remember { mutableStateOf<WorkoutEntity?>(null) }
     var searchVisible by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val resources = LocalResources.current
+    val undoLabel = stringResource(R.string.common_undo)
 
     // Снекбар отмены пропуска. dismissSkipUndo() гасит состояние и по таймауту,
     // иначе «Отменить» осталась бы доступной после того, как снекбар исчез.
     LaunchedEffect(state.skippedWorkout) {
         val skipped = state.skippedWorkout ?: return@LaunchedEffect
         val result = snackbarHostState.showSnackbar(
-            message = "${skipped.name} пропущена",
-            actionLabel = "Отменить"
+            message = resources.getString(R.string.list_skipped_snackbar, skipped.name),
+            actionLabel = undoLabel
         )
         if (result == SnackbarResult.ActionPerformed) {
             viewModel.undoSkip()
@@ -112,26 +117,26 @@ fun ListWorkoutScreen(
     // Сбой операции с БД. Снекбар — единственный след ошибки: раньше исключение
     // из viewModelScope роняло приложение, теперь оно доезжает сюда.
     LaunchedEffect(state.errorMessage) {
-        val message = state.errorMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message)
+        val messageRes = state.errorMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(resources.getString(messageRes))
         viewModel.dismissError()
     }
 
     workoutToDelete?.let { target ->
         AlertDialog(
             onDismissRequest = { workoutToDelete = null },
-            title = { Text("Удалить тренировку?") },
-            text = { Text("«${target.name}» и её история будут удалены. Это действие нельзя отменить.") },
+            title = { Text(stringResource(R.string.list_delete_title)) },
+            text = { Text(stringResource(R.string.list_delete_message, target.name)) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteWorkout(target)
                     workoutToDelete = null
                 }) {
-                    Text("Удалить", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { workoutToDelete = null }) { Text("Отмена") }
+                TextButton(onClick = { workoutToDelete = null }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -139,7 +144,7 @@ fun ListWorkoutScreen(
     menuFor?.let { target ->
         val items = buildList {
             add(
-                ActionSheetItem("Начать", Icons.Default.PlayArrow, {
+                ActionSheetItem(stringResource(R.string.list_action_start), Icons.Default.PlayArrow, {
                     menuFor = null
                     onWorkoutClick(target)
                 })
@@ -148,26 +153,26 @@ fun ListWorkoutScreen(
             // он переставил бы порядок, которого пользователь сейчас не наблюдает.
             if (!state.isSearching) {
                 add(
-                    ActionSheetItem("Пропустить", Icons.Default.SkipNext, {
+                    ActionSheetItem(stringResource(R.string.list_action_skip), Icons.Default.SkipNext, {
                         menuFor = null
                         viewModel.skipWorkout(target)
-                    }, subtitle = "в конец очереди")
+                    }, subtitle = stringResource(R.string.list_action_skip_subtitle))
                 )
             }
             add(
-                ActionSheetItem("Редактировать", Icons.Default.Edit, {
+                ActionSheetItem(stringResource(R.string.list_action_edit), Icons.Default.Edit, {
                     menuFor = null
                     onEditClick(target)
                 })
             )
             add(
-                ActionSheetItem("История", Icons.Default.History, {
+                ActionSheetItem(stringResource(R.string.list_action_history), Icons.Default.History, {
                     menuFor = null
                     onHistoryClick(target)
                 })
             )
             add(
-                ActionSheetItem("Удалить", Icons.Default.Delete, {
+                ActionSheetItem(stringResource(R.string.common_delete), Icons.Default.Delete, {
                     menuFor = null
                     workoutToDelete = target
                 }, destructive = true)
@@ -193,7 +198,7 @@ fun ListWorkoutScreen(
                 shape = MaterialTheme.shapes.medium
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
-                Text("Новая", modifier = Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.list_fab_new), modifier = Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold)
             }
         }
     ) { innerPadding ->
@@ -205,7 +210,7 @@ fun ListWorkoutScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Тренировки",
+                    text = stringResource(R.string.list_title),
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.weight(1f)
@@ -216,14 +221,14 @@ fun ListWorkoutScreen(
                 }) {
                     Icon(
                         Icons.Default.Search,
-                        contentDescription = "Поиск",
+                        contentDescription = stringResource(R.string.list_search),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 IconButton(onClick = onExportImportClick) {
                     Icon(
                         Icons.Default.Share,
-                        contentDescription = "Экспорт и импорт",
+                        contentDescription = stringResource(R.string.list_export_import),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -236,7 +241,7 @@ fun ListWorkoutScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = ScreenPadding),
-                    placeholder = { Text("Название тренировки или упражнения") },
+                    placeholder = { Text(stringResource(R.string.list_search_placeholder)) },
                     singleLine = true,
                     shape = MaterialTheme.shapes.small,
                     colors = TextFieldDefaults.colors(
@@ -273,13 +278,13 @@ private fun QueueContent(
     if (state.workouts.isEmpty()) {
         EmptyState(
             icon = Icons.Default.FitnessCenter,
-            title = if (state.isSearching) "Ничего не найдено" else "Нет тренировок",
-            subtitle = if (state.isSearching) {
-                "Попробуйте другой запрос"
-            } else {
-                "Создайте первую — она сразу встанет первой в очереди"
-            },
-            actionText = if (state.isSearching) null else "Создать тренировку",
+            title = stringResource(
+                if (state.isSearching) R.string.list_search_empty_title else R.string.list_empty_title
+            ),
+            subtitle = stringResource(
+                if (state.isSearching) R.string.list_search_empty_subtitle else R.string.list_empty_subtitle
+            ),
+            actionText = if (state.isSearching) null else stringResource(R.string.list_empty_action),
             onAction = if (state.isSearching) null else onAddWorkoutClick
         )
         return
@@ -310,7 +315,7 @@ private fun QueueContent(
             if (state.restOfQueue.isNotEmpty()) {
                 item(key = "queue-header") {
                     SectionHeader(
-                        text = "Дальше по очереди",
+                        text = stringResource(R.string.list_queue_header),
                         modifier = Modifier.padding(top = SectionSpacing, bottom = 2.dp)
                     )
                 }
@@ -334,13 +339,14 @@ private fun QueueContent(
 }
 
 /** Подпись давности. `lastUseAt == 0` означает «ещё не делали» (см. Task 12). */
+@Composable
 private fun subtitleFor(lastUseAt: Long): String {
-    if (lastUseAt == 0L) return "ещё не делали"
+    if (lastUseAt == 0L) return stringResource(R.string.common_never_done)
     val days = ((System.currentTimeMillis() - lastUseAt) / 86_400_000L).toInt()
     return when {
-        days <= 0 -> "сегодня"
-        days == 1 -> "вчера"
-        else -> "$days дн. назад"
+        days <= 0 -> stringResource(R.string.list_today)
+        days == 1 -> stringResource(R.string.list_yesterday)
+        else -> stringResource(R.string.d_ago, days)
     }
 }
 
@@ -364,13 +370,13 @@ private fun NextWorkoutCard(
         ) {
             Icon(
                 Icons.Default.MoreVert,
-                contentDescription = "Действия",
+                contentDescription = stringResource(R.string.list_actions),
                 tint = OnAccent,
                 modifier = Modifier.size(28.dp)
             )
         }
         Column {
-            EyebrowLabel(text = "Следующая", color = OnAccent.copy(alpha = 0.7f))
+            EyebrowLabel(text = stringResource(R.string.list_next), color = OnAccent.copy(alpha = 0.7f))
             Text(
                 text = item.workout.name,
                 style = MaterialTheme.typography.headlineMedium,
@@ -397,7 +403,7 @@ private fun NextWorkoutCard(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "НАЧАТЬ",
+                    text = stringResource(R.string.list_start_button),
                     color = Accent,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 14.sp,
@@ -465,7 +471,7 @@ private fun WorkoutRow(
         IconButton(onClick = onMenu) {
             Icon(
                 Icons.Default.MoreVert,
-                contentDescription = "Действия",
+                contentDescription = stringResource(R.string.list_actions),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
             )
@@ -473,12 +479,17 @@ private fun WorkoutRow(
     }
 }
 
+@Composable
 private fun metaLine(item: WorkoutWithExercises, durationMillis: Long?): String {
-    val exercises = "${item.exercises.size} упр"
+    val count = item.exercises.size
     return if (durationMillis != null) {
-        "$exercises · ${DateFormatter.formatDurationCompact(durationMillis)}"
+        stringResource(
+            R.string.list_meta_with_duration,
+            count,
+            DateFormatter.formatDurationCompact(durationMillis)
+        )
     } else {
-        exercises
+        stringResource(R.string.list_meta, count)
     }
 }
 

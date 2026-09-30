@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,14 +69,14 @@ fun MusicBarContent(
 ) {
     when (state) {
         MusicState.PermissionRequired -> HintRow(
-            text = "Разрешить управление музыкой",
+            text = stringResource(R.string.music_grant_access),
             onClick = onGrantPermission,
             modifier = modifier,
             icon = { Icon(Icons.Default.NotificationsActive, contentDescription = null) }
         )
 
         MusicState.NoSession -> HintRow(
-            text = "Включить музыку",
+            text = stringResource(R.string.music_launch),
             onClick = onOpenPlayer,
             modifier = modifier,
             icon = {
@@ -134,6 +135,7 @@ private fun PlayerRow(
     onExpand: () -> Unit,
     modifier: Modifier
 ) {
+    val openPlayerDescription = stringResource(R.string.music_open_player)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -147,7 +149,7 @@ private fun PlayerRow(
             modifier = Modifier
                 .weight(1f)
                 .clickable(onClick = onExpand)
-                .semantics { contentDescription = "Открыть плеер" }
+                .semantics { contentDescription = openPlayerDescription }
                 .padding(end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -163,16 +165,16 @@ private fun PlayerRow(
             )
         }
         IconButton(onClick = onPrevious, enabled = track.canSkipPrevious) {
-            Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек")
+            Icon(Icons.Default.SkipPrevious, contentDescription = stringResource(R.string.music_previous))
         }
         IconButton(onClick = onPlayPause) {
             Icon(
                 imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = if (playing) "Пауза" else "Играть"
+                contentDescription = stringResource(if (playing) R.string.music_pause else R.string.music_play)
             )
         }
         IconButton(onClick = onNext, enabled = track.canSkipNext) {
-            Icon(Icons.Default.SkipNext, contentDescription = "Следующий трек")
+            Icon(Icons.Default.SkipNext, contentDescription = stringResource(R.string.music_next))
         }
     }
 }

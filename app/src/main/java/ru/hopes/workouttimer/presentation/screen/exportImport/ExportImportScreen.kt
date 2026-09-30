@@ -32,9 +32,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import ru.hopes.workouttimer.R
+import ru.hopes.workouttimer.domain.repository.ImportError
 import ru.hopes.workouttimer.presentation.ui.theme.CardSpacing
 import ru.hopes.workouttimer.presentation.ui.theme.ScreenPadding
 import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
@@ -46,6 +50,7 @@ fun ExportImportScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val resources = LocalResources.current
 
     // Лаунчер для выбора файла импорта
     val importLauncher = rememberLauncherForActivityResult(
@@ -60,24 +65,31 @@ fun ExportImportScreen(
     LaunchedEffect(uiState) {
         when (val state = uiState) {
             is ExportImportUiState.ExportSuccess -> {
-                snackbarHostState.showSnackbar("Экспорт завершен")
+                snackbarHostState.showSnackbar(resources.getString(R.string.export_done))
                 viewModel.resetState()
             }
             is ExportImportUiState.ImportSuccess -> {
                 val result = state.result
                 if (result.success) {
                     snackbarHostState.showSnackbar(
-                        "Импортировано тренировок: ${result.importedCount}"
+                        resources.getString(R.string.export_imported_count, result.importedCount)
                     )
                 } else {
                     snackbarHostState.showSnackbar(
-                        result.errorMessage ?: "Ошибка импорта"
+                        when (val error = result.error) {
+                            ImportError.ReadFailed -> resources.getString(R.string.export_error_read)
+                            ImportError.NoWorkouts -> resources.getString(R.string.export_error_empty)
+                            is ImportError.Failed -> error.detail
+                                ?.let { resources.getString(R.string.export_error_import_detail, it) }
+                                ?: resources.getString(R.string.export_error_import)
+                            null -> resources.getString(R.string.export_error_import)
+                        }
                     )
                 }
                 viewModel.resetState()
             }
             is ExportImportUiState.Error -> {
-                snackbarHostState.showSnackbar(state.message)
+                snackbarHostState.showSnackbar(state.detail ?: resources.getString(state.fallback))
                 viewModel.resetState()
             }
             else -> {}
@@ -98,12 +110,12 @@ fun ExportImportScreen(
                 IconButton(onClick = onNavigateBack) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Назад",
+                        contentDescription = stringResource(R.string.common_back),
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Text(
-                    text = "Экспорт и импорт",
+                    text = stringResource(R.string.list_export_import),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -134,15 +146,15 @@ private fun ExportImportContent(
     ) {
         ActionCard(
             icon = Icons.Default.Upload,
-            title = "Экспортировать тренировки",
-            description = "Сохраняет все тренировки и упражнения в JSON-файл.",
+            title = stringResource(R.string.export_action_title),
+            description = stringResource(R.string.export_action_description),
             enabled = !busy,
             onClick = onExportClick
         )
         ActionCard(
             icon = Icons.Default.Download,
-            title = "Импортировать тренировки",
-            description = "Добавляет тренировки из файла. Дубликаты переименовываются автоматически.",
+            title = stringResource(R.string.import_action_title),
+            description = stringResource(R.string.import_action_description),
             enabled = !busy,
             onClick = onImportClick
         )
@@ -160,7 +172,7 @@ private fun ExportImportContent(
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = "Обработка...",
+                    text = stringResource(R.string.export_busy),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 10.dp)

@@ -14,5 +14,12 @@ data class ImportResult(
     val success: Boolean,
     val importedCount: Int,
     val skippedCount: Int,
-    val errorMessage: String? = null
+    val error: ImportError? = null
 )
+
+/** Причина неудачного импорта; текст для пользователя собирает экран. */
+sealed interface ImportError {
+    data object ReadFailed : ImportError
+    data object NoWorkouts : ImportError
+    data class Failed(val detail: String?) : ImportError
+}

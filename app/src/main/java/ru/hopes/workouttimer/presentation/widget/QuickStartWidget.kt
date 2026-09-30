@@ -133,7 +133,8 @@ private fun WorkoutRow(workout: WidgetWorkout) {
             )
         )
         Text(
-            text = formatWidgetSubtitle(workout.exerciseCount, workout.lastUseAt, workout.lastDurationMillis),
+            text = widgetSubtitleOf(workout.exerciseCount, workout.lastUseAt, workout.lastDurationMillis)
+                .format(context),
             maxLines = 1,
             style = TextStyle(
                 color = GlanceTheme.colors.onSurfaceVariant,
