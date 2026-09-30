@@ -8,6 +8,7 @@ import io.mockk.mockk
 import io.mockk.Runs
 import io.mockk.just
 import io.mockk.slot
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -21,6 +22,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import ru.hopes.workouttimer.domain.model.Exercise
+import ru.hopes.workouttimer.domain.model.ExerciseUnit
+import ru.hopes.workouttimer.domain.model.RecordedSet
 import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.repository.WorkoutRepository
 import ru.hopes.workouttimer.domain.usecase.FinishWorkoutSessionUseCase
@@ -580,5 +583,130 @@ class WorkoutExecutionViewModelTest {
         val nowSecond = viewModel.uiState.value as WorkoutExecutionState.Active
         assertEquals(25.0, nowSecond.weight, 0.0)
         assertEquals(9, nowSecond.reps)
+    }
+
+    private fun workoutOf(vararg exercises: Exercise) =
+        Workout(id = 1, name = "Test", exercises = exercises.toList(), lastUseAt = 0L)
+
+    private fun ex(id: Int, name: String, sets: Int, weight: Double = 50.0, reps: Int = 8) =
+        Exercise(id = id, name = name, weight = weight, sets = sets, reps = reps,
+            timeMillis = 1_000, order = id, catalogId = id.toLong() * 10)
+
+    @Test
+    fun `last set of the workout is recorded together with the session`() = runTest {
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } returns workoutOf(ex(1, "Присед", sets = 2))
+        val repo = mockk<WorkoutRepository>(relaxed = true)
+        val finish = mockk<FinishWorkoutSessionUseCase>()
+        val setsSlot = slot<List<RecordedSet>>()
+        coEvery { finish(any(), any(), any(), any(), capture(setsSlot)) } returns Unit
+        val vm = buildViewModel(getWorkout, repo, finish)
+
+        vm.loadWorkout(1)
+        vm.onExerciseFinished()   // подход 1 → отдых
+        vm.skipRest()
+        vm.onExerciseFinished()   // подход 2 — последний
+
+        assertEquals(
+            listOf(
+                RecordedSet(10L, "Присед", 50.0, 0.0, 8, ExerciseUnit.KG),
+                RecordedSet(10L, "Присед", 50.0, 0.0, 8, ExerciseUnit.KG)
+            ),
+            setsSlot.captured
+        )
+    }
+
+    @Test
+    fun `jumping to another exercise records only finished sets`() = runTest {
+        val squat = ex(1, "Присед", sets = 3)
+        val press = ex(2, "Жим", sets = 1)
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } returns workoutOf(squat, press)
+        val finish = mockk<FinishWorkoutSessionUseCase>()
+        val setsSlot = slot<List<RecordedSet>>()
+        coEvery { finish(any(), any(), any(), any(), capture(setsSlot)) } returns Unit
+        val vm = buildViewModel(getWorkout, mockk(relaxed = true), finish)
+
+        vm.loadWorkout(1)
+        vm.onExerciseFinished()            // присед, подход 1
+        vm.moveToSelectedExercise(press)   // бросили присед
+        vm.onExerciseFinished()            // жим — последнее упражнение, последний подход
+
+        assertEquals(listOf("Присед", "Жим"), setsSlot.captured.map { it.exerciseName })
+    }
+
+    @Test
+    fun `leaving without finishing records nothing`() = runTest {
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } returns workoutOf(ex(1, "Присед", sets = 3))
+        val finish = mockk<FinishWorkoutSessionUseCase>(relaxed = true)
+        val vm = buildViewModel(getWorkout, mockk(relaxed = true), finish)
+
+        vm.loadWorkout(1)
+        vm.onExerciseFinished()
+
+        coVerify(exactly = 0) { finish(any(), any(), any(), any(), any()) }
+        assertEquals(1, vm.recordedSets.size)
+    }
+
+    @Test
+    fun `edited tiles are recorded right away even if the db write is slow`() = runTest {
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } returns workoutOf(ex(1, "Присед", sets = 1))
+        val repo = mockk<WorkoutRepository>(relaxed = true)
+        val gate = CompletableDeferred<Unit>()
+        coEvery { repo.updateExerciseWeightAndReps(any(), any(), any()) } coAnswers { gate.await() }
+        val finish = mockk<FinishWorkoutSessionUseCase>()
+        val setsSlot = slot<List<RecordedSet>>()
+        coEvery { finish(any(), any(), any(), any(), capture(setsSlot)) } returns Unit
+        val vm = buildViewModel(getWorkout, repo, finish)
+
+        vm.loadWorkout(1)
+        vm.updateExerciseWeightAndReps(exerciseId = 1, weight = 62.5, reps = 6) // запись в БД висит
+        vm.onExerciseFinished()
+
+        assertEquals(62.5, setsSlot.captured.single().weight, 0.0)
+        assertEquals(6, setsSlot.captured.single().reps)
+        gate.complete(Unit)
+    }
+
+    @Test
+    fun `double tap on the last set gives one session and one set`() = runTest {
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } returns workoutOf(ex(1, "Присед", sets = 1))
+        val gate = CompletableDeferred<Unit>()
+        val finish = mockk<FinishWorkoutSessionUseCase>()
+        coEvery { finish(any(), any(), any(), any(), any()) } coAnswers { gate.await() }
+        val vm = buildViewModel(getWorkout, mockk(relaxed = true), finish)
+
+        vm.loadWorkout(1)
+        vm.onExerciseFinished()
+        vm.onExerciseFinished()   // второй тап, пока запись висит
+        gate.complete(Unit)
+
+        coVerify(exactly = 1) { finish(any(), any(), any(), any(), any()) }
+        assertEquals(1, vm.recordedSets.size)
+    }
+
+    @Test
+    fun `failed finish keeps sets, reports error and retry does not duplicate the last set`() = runTest {
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } returns workoutOf(ex(1, "Присед", sets = 1))
+        val finish = mockk<FinishWorkoutSessionUseCase>()
+        val attempts = mutableListOf<List<RecordedSet>>()
+        coEvery { finish(any(), any(), any(), any(), capture(attempts)) } throws
+            IllegalStateException("disk full") andThen Unit
+        val vm = buildViewModel(getWorkout, mockk(relaxed = true), finish)
+
+        vm.loadWorkout(1)
+        vm.onExerciseFinished()
+        assertTrue(vm.finishError.value)
+        assertTrue(vm.uiState.value is WorkoutExecutionState.Active)
+
+        vm.dismissFinishError()
+        vm.onExerciseFinished()   // повтор
+
+        assertEquals(1, attempts.last().size)
+        assertTrue(vm.uiState.value is WorkoutExecutionState.Finished)
     }
 }

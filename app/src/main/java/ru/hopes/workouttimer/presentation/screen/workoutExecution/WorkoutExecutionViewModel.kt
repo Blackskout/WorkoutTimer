@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.domain.model.Exercise
+import ru.hopes.workouttimer.domain.model.RecordedSet
 import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.repository.WorkoutRepository
 import ru.hopes.workouttimer.domain.usecase.FinishWorkoutSessionUseCase
@@ -68,6 +70,24 @@ class WorkoutExecutionViewModel @Inject constructor(
         WorkoutExecutionState.Loading
     )
     val uiState: StateFlow<WorkoutExecutionState> = _uiState.asStateFlow()
+
+    private val _recordedSets = mutableListOf<RecordedSet>()
+    internal val recordedSets: List<RecordedSet> get() = _recordedSets
+
+    // Поднимается синхронно до запуска записи: второй тап по последнему подходу,
+    // пока корутина пишет сессию, ничего не делает.
+    private var isFinishing = false
+
+    // Последний подход уже в списке, но сессия не записалась: повторное нажатие
+    // пробует записать снова, не добавляя подход второй раз.
+    private var finishPending = false
+
+    private val _finishError = MutableStateFlow(false)
+    val finishError: StateFlow<Boolean> = _finishError.asStateFlow()
+
+    fun dismissFinishError() {
+        _finishError.value = false
+    }
 
     private var timerJob: Job? = null
     private var idleReminderJob: Job? = null
@@ -126,6 +146,9 @@ class WorkoutExecutionViewModel @Inject constructor(
                 sessionStartedAt = System.currentTimeMillis()
                 lastInteractionAt = sessionStartedAt
                 excludedIdleMillis = 0L
+                _recordedSets.clear()
+                finishPending = false
+                isFinishing = false
 
                 // Начинаем с первого упражнения в состоянии Rest
                 val firstExercise = exercises[0]
@@ -271,9 +294,27 @@ class WorkoutExecutionViewModel @Inject constructor(
     }
 
     fun onExerciseFinished() {
+        if (isFinishing) return
         registerInteraction()
         val currentState = _uiState.value
         if (currentState is WorkoutExecutionState.Active) {
+            // Подход снимается до перехода: на последнем подходе moveToNextExercise
+            // сразу пишет сессию, и снимать будет уже поздно.
+            val set = RecordedSet(
+                catalogId = currentState.exercise.catalogId,
+                exerciseName = currentState.exercise.name,
+                weight = currentState.weight,
+                extraWeight = currentState.extraWeight,
+                reps = currentState.reps,
+                unit = currentState.exercise.unit
+            )
+            // Повтор после сбоя записи: последний подход уже в списке — заменяем
+            // его текущими значениями (плитку могли поправить), а не дублируем.
+            if (finishPending && _recordedSets.isNotEmpty()) {
+                _recordedSets[_recordedSets.lastIndex] = set
+            } else {
+                _recordedSets += set
+            }
             if (currentState.currentSet < currentState.totalSets) {
                 // Переход к следующему подходу того же упражнения
                 _uiState.value = WorkoutExecutionState.Rest(
@@ -307,17 +348,30 @@ class WorkoutExecutionViewModel @Inject constructor(
             scheduleIdleReminderIfActive()
         } else {
             val workoutId = workout?.id ?: return
+            isFinishing = true
+            finishPending = true
             viewModelScope.launch {
                 val finishedAt = System.currentTimeMillis()
                 val rawDurationMillis = finishedAt - sessionStartedAt
                 val durationMillis = (rawDurationMillis - excludedIdleMillis).coerceAtLeast(0L)
-                finishWorkoutSessionUseCase(
-                    workoutId = workoutId,
-                    startedAt = sessionStartedAt,
-                    finishedAt = finishedAt,
-                    durationMillis = durationMillis,
-                    sets = emptyList() // запись подходов — Task 5
-                )
+                try {
+                    finishWorkoutSessionUseCase(
+                        workoutId = workoutId,
+                        startedAt = sessionStartedAt,
+                        finishedAt = finishedAt,
+                        durationMillis = durationMillis,
+                        sets = _recordedSets.toList()
+                    )
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Подходы остаются в памяти, экран — на последнем подходе:
+                    // повторное «Закончить подход» попробует записать ещё раз.
+                    isFinishing = false
+                    _finishError.value = true
+                    return@launch
+                }
+                finishPending = false
                 // Экран должен показать Finished сразу после записи сессии, не дожидаясь
                 // перерисовки виджета: updateLastUseAt() внутри дёргает updateAll() (биндер,
                 // чтение DataStore, композиция Glance), и если поставить его раньше присваивания
@@ -337,6 +391,8 @@ class WorkoutExecutionViewModel @Inject constructor(
 
         if (index != -1) {
             registerInteraction()
+            // Ушли с последнего подхода — следующий закрытый подход записывается заново.
+            finishPending = false
             timerJob?.cancel()
             wakeLockHelper.release()
             stopNotification()
@@ -390,29 +446,28 @@ class WorkoutExecutionViewModel @Inject constructor(
 
     fun updateExerciseWeightAndReps(exerciseId: Int, weight: Double, reps: Int) {
         registerInteraction()
+        val index = exercises.indexOfFirst { it.id == exerciseId }
+        if (index == -1) return
+        val updatedExercise = exercises[index].copy(weight = weight, reps = reps)
+        exercises = exercises.toMutableList().apply { set(index, updatedExercise) }
+
+        // Сначала экран, потом база: «Закончить подход» сразу после правки
+        // должен записать новые значения, а не ждать окончания записи.
+        // Плитки в Active берут числа из state.weight и state.reps, а не из
+        // state.exercise, поэтому одного обновления упражнения им мало.
+        _uiState.update { state ->
+            when {
+                state is WorkoutExecutionState.Active && state.exercise.id == exerciseId ->
+                    state.copy(exercise = updatedExercise, weight = weight, reps = reps)
+
+                state is WorkoutExecutionState.Rest && state.exercise.id == exerciseId ->
+                    state.copy(exercise = updatedExercise)
+
+                else -> state
+            }
+        }
         viewModelScope.launch {
             workoutRepository.updateExerciseWeightAndReps(exerciseId, weight, reps)
-
-            val index = exercises.indexOfFirst { it.id == exerciseId }
-            if (index == -1) return@launch
-            val updatedExercise = exercises[index].copy(weight = weight, reps = reps)
-            exercises = exercises.toMutableList().apply {
-                set(index, updatedExercise)
-            }
-
-            // Плитки в Active берут числа из state.weight и state.reps, а не из
-            // state.exercise, поэтому одного обновления упражнения им мало.
-            _uiState.update { state ->
-                when {
-                    state is WorkoutExecutionState.Active && state.exercise.id == exerciseId ->
-                        state.copy(exercise = updatedExercise, weight = weight, reps = reps)
-
-                    state is WorkoutExecutionState.Rest && state.exercise.id == exerciseId ->
-                        state.copy(exercise = updatedExercise)
-
-                    else -> state
-                }
-            }
         }
     }
 
@@ -478,7 +533,8 @@ sealed class WorkoutExecutionState {
         val currentSet: Int,
         val totalSets: Int = exercise.sets,
         val weight: Double = exercise.weight,
-        val reps: Int = exercise.reps
+        val reps: Int = exercise.reps,
+        val extraWeight: Double = exercise.extraWeight
     ) : WorkoutExecutionState()
     
     data class Finished(val durationMillis: Long) : WorkoutExecutionState()

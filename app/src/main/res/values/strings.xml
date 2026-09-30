@@ -66,6 +66,7 @@
     <string name="execution_no_notes">Нет заметок</string>
     <string name="execution_to_home">На главную</string>
     <string name="execution_loading_title">Загрузка тренировки</string>
+    <string name="execution_finish_error">Не удалось сохранить тренировку</string>
     <string name="execution_loading_subtitle">Секунду…</string>
     <string name="execution_note_dialog_title">Заметка к упражнению</string>
     <string name="execution_note_placeholder" tools:ignore="TypographyEllipsis">Введите заметку...</string>
