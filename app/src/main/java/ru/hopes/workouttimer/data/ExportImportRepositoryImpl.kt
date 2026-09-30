@@ -6,7 +6,6 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -14,6 +13,7 @@ import kotlinx.serialization.json.Json
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.data.dao.WorkoutDao
 import ru.hopes.workouttimer.data.entity.ExerciseEntity
+import ru.hopes.workouttimer.data.entity.WorkoutEntity
 import ru.hopes.workouttimer.data.mapper.toDomain
 import ru.hopes.workouttimer.data.mapper.toExport
 import ru.hopes.workouttimer.domain.model.export.ExportData
@@ -89,19 +89,17 @@ class ExportImportRepositoryImpl @Inject constructor(
                     )
                 }
 
-                val existingNames = dao.getAllWorkouts()
-                    .map { list -> list.map { it.name }.toSet() }
-                    .first()
-                    .toMutableSet()
-
-                var importedCount = 0
+                val existingNames = dao.getAllWorkoutNames().toMutableSet()
                 var skippedCount = 0
 
-                exportData.workouts.forEach { exportWorkout ->
+                // Тренировка без единого названного упражнения открылась бы экраном ошибки — пропускаем целиком.
+                val prepared = exportData.workouts.filter { w -> w.exercises.any { it.name.isNotBlank() } }.map { exportWorkout ->
                     val uniqueName = getUniqueName(exportWorkout.name, existingNames)
                     existingNames.add(uniqueName)
-
-                    val exerciseEntities = exportWorkout.exercises.map { ex ->
+                    // Пустые названия редактор не пропускает, импорт — тоже; считаем их пропущенными.
+                    val (blank, named) = exportWorkout.exercises.partition { it.name.isBlank() }
+                    skippedCount += blank.size
+                    WorkoutEntity(name = uniqueName, lastUseAt = exportWorkout.lastUseAt) to named.map { ex ->
                         ExerciseEntity(
                             workoutId = 0,
                             name = ex.name,
@@ -111,19 +109,12 @@ class ExportImportRepositoryImpl @Inject constructor(
                             restTimeMillis = ex.restTimeMillis,
                             orderInWorkout = ex.order,
                             note = ex.note,
-                            catalogId = 0L // проставит транзакция DAO (Task 3/4)
+                            catalogId = 0L // проставит транзакция DAO
                         )
                     }
-
-                    dao.insertWorkoutWithExercises(
-                        ru.hopes.workouttimer.data.entity.WorkoutEntity(
-                            name = uniqueName,
-                            lastUseAt = exportWorkout.lastUseAt
-                        ),
-                        exerciseEntities
-                    )
-                    importedCount++
                 }
+
+                val importedCount = dao.importWorkouts(prepared)
 
                 if (importedCount > 0) {
                     // Вызов внутри try/catch (e: Exception) ниже: исключение отсюда вернуло бы

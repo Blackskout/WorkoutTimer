@@ -136,6 +136,20 @@ interface WorkoutDao {
         return workoutId
     }
 
+    @Query("SELECT name FROM workouts")
+    suspend fun getAllWorkoutNames(): List<String>
+
+    // Весь файл — одна транзакция: сбой посреди файла не оставляет половину тренировок.
+    @Transaction
+    suspend fun importWorkouts(workouts: List<Pair<WorkoutEntity, List<ExerciseEntity>>>): Int {
+        for ((workout, exercises) in workouts) {
+            val workoutId = insertWorkout(workout)
+            insertExercises(resolveCatalog(workoutId, exercises))
+        }
+        cleanupCatalog()
+        return workouts.size
+    }
+
     @Transaction
     suspend fun updateWorkoutResolvingCatalog(workoutId: Int, name: String, exercises: List<ExerciseEntity>) {
         updateWorkout(workoutId, name)

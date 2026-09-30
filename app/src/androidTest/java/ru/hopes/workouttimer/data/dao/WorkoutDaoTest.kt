@@ -107,4 +107,32 @@ class WorkoutDaoTest {
         )
         assertEquals(listOf(8, 7, 6), dao.getSessionSets(sessionId).map { it.reps })
     }
+
+    @Test
+    fun импорт_сводит_одинаковые_ключи_из_одного_файла_в_одну_запись() = runBlocking {
+        val count = dao.importWorkouts(
+            listOf(
+                WorkoutEntity(name = "А", lastUseAt = 0) to listOf(exercise("Присед")),
+                WorkoutEntity(name = "Б", lastUseAt = 0) to listOf(exercise("ПРИСЕД "))
+            )
+        )
+        assertEquals(2, count)
+        assertEquals(listOf("Присед"), dao.getCatalog().map { it.name })
+    }
+
+    @Test
+    fun сбой_посреди_импорта_откатывает_весь_файл() = runBlocking {
+        val broken = exercise("Жим").copy(id = 1) // одинаковый первичный ключ со следующим
+        val result = runCatching {
+            dao.importWorkouts(
+                listOf(
+                    WorkoutEntity(name = "А", lastUseAt = 0) to listOf(broken),
+                    WorkoutEntity(name = "Б", lastUseAt = 0) to listOf(broken)
+                )
+            )
+        }
+        assert(result.isFailure)
+        assertEquals(emptyList<String>(), dao.getAllWorkoutNames())
+        assertEquals(0, dao.getCatalog().size)
+    }
 }
