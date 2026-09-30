@@ -125,6 +125,10 @@
     <string name="music_like">Лайк</string>
     <string name="music_unlike">Убрать лайк</string>
     <string name="music_seek">Перемотка</string>
+    <string name="music_access_title">Управление музыкой</string>
+    <string name="music_access_message">Чтобы ставить трек на паузу и переключать его прямо с экрана тренировки, Android требует включить приложению «Доступ к уведомлениям» — другого способа нет.\n\nWorkout Timer не читает ваши уведомления: он видит только играющий трек. У приложения нет доступа в интернет, поэтому ничего не покидает телефон.</string>
+    <string name="music_access_confirm">Открыть настройки</string>
+    <string name="music_access_dismiss">Не сейчас</string>
     <string name="music_settings_not_found">Не нашёл экран доступа к уведомлениям</string>
 
     <!-- Уведомления -->

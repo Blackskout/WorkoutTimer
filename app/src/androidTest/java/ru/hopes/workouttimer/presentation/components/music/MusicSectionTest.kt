@@ -109,4 +109,54 @@ class MusicSectionTest {
             assertEquals(0, repository.playCount)
         }
     }
+
+    @Test
+    fun тап_по_просьбе_доступа_сначала_объясняет_а_не_открывает_настройки() {
+        val repository = FakeMusicControlRepository(MusicState.PermissionRequired)
+        val viewModel = MusicViewModel(repository)
+        composeRule.setContent {
+            WorkoutTimerTheme {
+                MusicSection(isResting = false, viewModel = viewModel)
+            }
+        }
+
+        composeRule.onNodeWithText("Разрешить управление музыкой").performClick()
+
+        composeRule.onNodeWithText("Открыть настройки").assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(0, repository.openSettingsCount) }
+    }
+
+    @Test
+    fun открыть_настройки_в_пояснении_ведёт_в_настройки_один_раз() {
+        val repository = FakeMusicControlRepository(MusicState.PermissionRequired)
+        val viewModel = MusicViewModel(repository)
+        composeRule.setContent {
+            WorkoutTimerTheme {
+                MusicSection(isResting = false, viewModel = viewModel)
+            }
+        }
+        composeRule.onNodeWithText("Разрешить управление музыкой").performClick()
+
+        composeRule.onNodeWithText("Открыть настройки").performClick()
+
+        composeRule.onNodeWithText("Открыть настройки").assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(1, repository.openSettingsCount) }
+    }
+
+    @Test
+    fun не_сейчас_закрывает_пояснение_без_перехода_в_настройки() {
+        val repository = FakeMusicControlRepository(MusicState.PermissionRequired)
+        val viewModel = MusicViewModel(repository)
+        composeRule.setContent {
+            WorkoutTimerTheme {
+                MusicSection(isResting = false, viewModel = viewModel)
+            }
+        }
+        composeRule.onNodeWithText("Разрешить управление музыкой").performClick()
+
+        composeRule.onNodeWithText("Не сейчас").performClick()
+
+        composeRule.onNodeWithText("Открыть настройки").assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(0, repository.openSettingsCount) }
+    }
 }
