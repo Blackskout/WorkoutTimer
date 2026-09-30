@@ -3,6 +3,7 @@ package ru.hopes.workouttimer.presentation.screen.exportImport
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.annotation.StringRes
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.domain.repository.ExportImportRepository
 import ru.hopes.workouttimer.domain.repository.ImportResult
 import ru.hopes.workouttimer.domain.usecase.ExportAllWorkoutsUseCase
@@ -51,7 +53,7 @@ class ExportImportViewModel @Inject constructor(
                 
                 _uiState.value = ExportImportUiState.ExportSuccess
             } catch (e: Exception) {
-                _uiState.value = ExportImportUiState.Error(e.message ?: "Ошибка экспорта")
+                _uiState.value = ExportImportUiState.Error(e.message, R.string.export_error_export)
             }
         }
     }
@@ -64,7 +66,7 @@ class ExportImportViewModel @Inject constructor(
                 val result = importUseCase(uri)
                 _uiState.value = ExportImportUiState.ImportSuccess(result)
             } catch (e: Exception) {
-                _uiState.value = ExportImportUiState.Error(e.message ?: "Ошибка импорта")
+                _uiState.value = ExportImportUiState.Error(e.message, R.string.export_error_import)
             }
         }
     }
@@ -83,5 +85,6 @@ sealed class ExportImportUiState {
     object Loading : ExportImportUiState()
     object ExportSuccess : ExportImportUiState()
     data class ImportSuccess(val result: ImportResult) : ExportImportUiState()
-    data class Error(val message: String) : ExportImportUiState()
+    /** [detail] — текст исключения, если он есть; иначе экран показывает [fallback]. */
+    data class Error(val detail: String?, @StringRes val fallback: Int) : ExportImportUiState()
 }

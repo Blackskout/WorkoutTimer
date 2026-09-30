@@ -1,8 +1,153 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Workout Timer</string>
-    <string name="h_ago">%1$d ч. назад</string>
+
+    <!-- Общие -->
+    <string name="common_cancel">Отмена</string>
+    <string name="common_delete">Удалить</string>
+    <string name="common_undo">Отменить</string>
+    <string name="common_save">Сохранить</string>
+    <string name="common_done">Готово</string>
+    <string name="common_unit_kg">кг</string>
+    <string name="common_unit_reps">повт</string>
+    <string name="common_back">Назад</string>
+    <string name="common_exit">Выйти</string>
+    <string name="common_note">Заметка</string>
+    <string name="common_never_done">ещё не делали</string>
     <string name="d_ago">%1$d дн. назад</string>
-    <string name="just_now">Только что</string>
+
+    <!-- Список тренировок -->
+    <string name="list_title">Тренировки</string>
+    <string name="list_fab_new">Новая</string>
+    <string name="list_search">Поиск</string>
+    <string name="list_export_import">Экспорт и импорт</string>
+    <string name="list_search_placeholder">Название тренировки или упражнения</string>
+    <string name="list_skipped_snackbar">%1$s пропущена</string>
+    <string name="list_delete_title">Удалить тренировку?</string>
+    <string name="list_delete_message">«%1$s» и её история будут удалены. Это действие нельзя отменить.</string>
+    <string name="list_action_start">Начать</string>
+    <string name="list_action_skip">Пропустить</string>
+    <string name="list_action_skip_subtitle">в конец очереди</string>
+    <string name="list_action_edit">Редактировать</string>
+    <string name="list_action_history">История</string>
+    <string name="list_actions">Действия</string>
+    <string name="list_search_empty_title">Ничего не найдено</string>
+    <string name="list_search_empty_subtitle">Попробуйте другой запрос</string>
+    <string name="list_empty_title">Нет тренировок</string>
+    <string name="list_empty_subtitle">Создайте первую — она сразу встанет первой в очереди</string>
+    <string name="list_empty_action">Создать тренировку</string>
+    <string name="list_queue_header">Дальше по очереди</string>
+    <string name="list_today">сегодня</string>
+    <string name="list_yesterday">вчера</string>
+    <string name="list_next">Следующая</string>
+    <string name="list_start_button">НАЧАТЬ</string>
+    <string name="list_meta">%1$d упр</string>
+    <string name="list_meta_with_duration">%1$d упр · %2$s</string>
+    <string name="list_error_delete">Не удалось удалить тренировку</string>
+    <string name="list_error_skip">Не удалось пропустить тренировку</string>
+    <string name="list_error_undo_skip">Не удалось отменить пропуск</string>
+
+    <!-- Выполнение тренировки -->
+    <string name="execution_workout_fallback">Тренировка</string>
+    <string name="execution_load_error_title">Не удалось загрузить</string>
+    <string name="execution_load_error_subtitle">Тренировка не найдена или не содержит упражнений</string>
+    <string name="execution_retry">Повторить</string>
+    <string name="execution_finish_set">Закончить подход</string>
+    <string name="execution_skip_rest">Пропустить отдых</string>
+    <string name="execution_exercises">Упражнения</string>
+    <string name="execution_exit_title">Выйти из тренировки?</string>
+    <string name="execution_exit_message">Прогресс не будет сохранён.</string>
+    <string name="execution_finish_title">Завершить тренировку?</string>
+    <string name="execution_finish_message">Это последний подход. Тренировка будет сохранена в историю.</string>
+    <string name="execution_finish_confirm">Завершить</string>
+    <string name="execution_set_of">Подход %1$d из %2$d</string>
+    <string name="execution_rest_next_set">Отдых · далее подход %1$d</string>
+    <string name="execution_rest_weight_reps">%1$s кг · %2$d повторений</string>
+    <string name="execution_edit_note">Редактировать заметку</string>
+    <string name="execution_no_notes">Нет заметок</string>
+    <string name="execution_to_home">На главную</string>
+    <string name="execution_loading_title">Загрузка тренировки</string>
+    <string name="execution_loading_subtitle">Секунду…</string>
+    <string name="execution_note_dialog_title">Заметка к упражнению</string>
+    <string name="execution_note_placeholder" tools:ignore="TypographyEllipsis">Введите заметку...</string>
+
+    <!-- Создание и редактирование тренировки -->
+    <string name="create_fab_exercise">Упражнение</string>
+    <string name="create_title_new">Новая тренировка</string>
+    <string name="create_title_edit">Редактирование</string>
+    <string name="create_workout_name">Название тренировки</string>
+    <string name="create_exercises_header">Упражнения · %1$d</string>
+    <string name="create_reorder">Переставить</string>
+    <string name="create_empty_title">Упражнений пока нет</string>
+    <string name="create_empty_subtitle">Добавьте первое кнопкой внизу</string>
+    <string name="create_exit_title">Выйти без сохранения?</string>
+    <string name="create_exit_message">Изменения, включая порядок упражнений, будут потеряны.</string>
+    <string name="create_untitled">Без названия</string>
+    <string name="create_exercise_summary">%1$s кг · %2$d×%3$d · отдых %4$s</string>
+    <string name="create_exercise_name">Название упражнения</string>
+    <string name="create_unit_sets">подх</string>
+    <string name="create_unit_rest">отдых</string>
+    <string name="create_delete_exercise">Удалить упражнение</string>
+
+    <!-- Экспорт и импорт -->
+    <string name="export_action_title">Экспортировать тренировки</string>
+    <string name="export_action_description">Сохраняет все тренировки и упражнения в JSON-файл.</string>
+    <string name="import_action_title">Импортировать тренировки</string>
+    <string name="import_action_description">Добавляет тренировки из файла. Дубликаты переименовываются автоматически.</string>
+    <string name="export_busy" tools:ignore="TypographyEllipsis">Обработка...</string>
+    <string name="export_done">Экспорт завершен</string>
+    <string name="export_imported_count">Импортировано тренировок: %1$d</string>
+    <string name="export_error_export">Ошибка экспорта</string>
+    <string name="export_error_import">Ошибка импорта</string>
+    <string name="export_error_import_detail">Ошибка импорта: %1$s</string>
+    <string name="export_error_read">Не удалось прочитать файл</string>
+    <string name="export_error_empty">Файл не содержит тренировок</string>
+    <string name="export_share_title">Поделиться тренировками</string>
+    <!-- Имя импортируемой тренировки, если такое уже есть. Пишется в БД. -->
+    <string name="export_copy_name">%1$s (копия)</string>
+    <string name="export_copy_name_numbered">%1$s (копия %2$d)</string>
+
+    <!-- История -->
+    <string name="history_empty_title">История пуста</string>
+    <string name="history_empty_subtitle">Завершите тренировку — она появится здесь</string>
+    <string name="rest_ring_total">из %1$s</string>
+
+    <!-- Музыка -->
+    <string name="music_service_label">Управление музыкой</string>
+    <string name="music_grant_access">Разрешить управление музыкой</string>
+    <string name="music_launch">Включить музыку</string>
+    <string name="music_open_player">Открыть плеер</string>
+    <string name="music_open_yandex">Открыть Яндекс Музыку</string>
+    <string name="music_artwork">Обложка трека</string>
+    <string name="music_previous">Предыдущий трек</string>
+    <string name="music_next">Следующий трек</string>
+    <string name="music_pause">Пауза</string>
+    <string name="music_play">Играть</string>
+    <string name="music_like">Лайк</string>
+    <string name="music_unlike">Убрать лайк</string>
+    <string name="music_seek">Перемотка</string>
+    <string name="music_settings_not_found">Не нашёл экран доступа к уведомлениям</string>
+
+    <!-- Уведомления -->
+    <string name="notification_channel_timer">Таймер отдыха</string>
+    <string name="notification_channel_timer_description">Отображение обратного отсчета таймера во время отдыха между подходами</string>
+    <string name="notification_channel_rest_finished">Завершение отдыха</string>
+    <string name="notification_channel_rest_finished_description">Уведомление о завершении отдыха между подходами</string>
+    <string name="notification_channel_idle">Напоминание о тренировке</string>
+    <string name="notification_channel_idle_description">Напоминание вернуться в приложение, если подход давно не завершён</string>
+    <string name="notification_rest_title">Отдых: %1$s</string>
+    <string name="notification_set_content">%1$s — Подход %2$d из %3$d</string>
+    <string name="notification_rest_finished_title">Отдых завершён!</string>
+    <string name="notification_idle_title">Вы всё ещё тренируетесь?</string>
+    <string name="notification_idle_content">%1$s — Подход %2$d из %3$d. Не забудьте закончить подход.</string>
+
+    <!-- Виджет -->
     <string name="widget_empty">Нет тренировок</string>
     <string name="widget_description">Быстрый старт тренировки</string>
+    <string name="widget_subtitle">%1$d упр.</string>
+    <string name="widget_subtitle_with_duration">%1$d упр. · %2$s</string>
+    <string name="widget_subtitle_never_done">%1$d упр. · ещё не делали</string>
+
+    <!-- Длительность -->
+    <string name="duration_minutes">%1$d мин</string>
+    <string name="duration_hours_minutes">%1$d ч %2$d мин</string>
 </resources>

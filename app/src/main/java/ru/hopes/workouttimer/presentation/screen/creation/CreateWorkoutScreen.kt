@@ -43,11 +43,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.presentation.ui.components.AppBottomSheet
 import ru.hopes.workouttimer.presentation.ui.components.EmptyState
 import ru.hopes.workouttimer.presentation.ui.components.PrimaryButton
@@ -124,7 +126,7 @@ fun CreateWorkoutScreen(
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Text(
-                    "Упражнение",
+                    stringResource(R.string.create_fab_exercise),
                     modifier = Modifier.padding(start = 8.dp),
                     fontWeight = FontWeight.Bold
                 )
@@ -147,12 +149,14 @@ fun CreateWorkoutScreen(
                 }) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Назад",
+                        contentDescription = stringResource(R.string.common_back),
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Text(
-                    text = if (workoutId == null) "Новая тренировка" else "Редактирование",
+                    text = stringResource(
+                            if (workoutId == null) R.string.create_title_new else R.string.create_title_edit
+                        ),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
@@ -163,7 +167,7 @@ fun CreateWorkoutScreen(
                 ) {
                     Icon(
                         Icons.Default.Check,
-                        contentDescription = "Сохранить",
+                        contentDescription = stringResource(R.string.common_save),
                         tint = if (state.isSaveEnabled) {
                             MaterialTheme.colorScheme.primary
                         } else {
@@ -190,14 +194,14 @@ fun CreateWorkoutScreen(
                             viewModel.processCommand(CreateWorkoutCommand.ChangeWorkoutName(it))
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Название тренировки") },
+                        label = { Text(stringResource(R.string.create_workout_name)) },
                         singleLine = true,
                         shape = MaterialTheme.shapes.small
                     )
                 }
                 item(key = "section") {
                     SectionHeader(
-                        text = "Упражнения · ${state.exercises.size}",
+                        text = stringResource(R.string.create_exercises_header, state.exercises.size),
                         modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
                     )
                 }
@@ -209,7 +213,7 @@ fun CreateWorkoutScreen(
                             dragHandle = {
                                 Icon(
                                     Icons.Default.DragHandle,
-                                    contentDescription = "Переставить",
+                                    contentDescription = stringResource(R.string.create_reorder),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier
                                         .size(22.dp)
@@ -224,8 +228,8 @@ fun CreateWorkoutScreen(
                         Box(modifier = Modifier.height(220.dp)) {
                             EmptyState(
                                 icon = Icons.Default.FitnessCenter,
-                                title = "Упражнений пока нет",
-                                subtitle = "Добавьте первое кнопкой внизу"
+                                title = stringResource(R.string.create_empty_title),
+                                subtitle = stringResource(R.string.create_empty_subtitle)
                             )
                         }
                     }
@@ -256,16 +260,16 @@ fun CreateWorkoutScreen(
     if (showExitDialog) {
         AlertDialog(
             onDismissRequest = { showExitDialog = false },
-            title = { Text("Выйти без сохранения?") },
-            text = { Text("Изменения, включая порядок упражнений, будут потеряны.") },
+            title = { Text(stringResource(R.string.create_exit_title)) },
+            text = { Text(stringResource(R.string.create_exit_message)) },
             confirmButton = {
                 TextButton(onClick = {
                     showExitDialog = false
                     viewModel.processCommand(CreateWorkoutCommand.Back)
-                }) { Text("Выйти") }
+                }) { Text(stringResource(R.string.common_exit)) }
             },
             dismissButton = {
-                TextButton(onClick = { showExitDialog = false }) { Text("Отмена") }
+                TextButton(onClick = { showExitDialog = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -295,7 +299,7 @@ private fun ExerciseRow(
         dragHandle()
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = item.name.ifBlank { "Без названия" },
+                text = item.name.ifBlank { stringResource(R.string.create_untitled) },
                 style = MaterialTheme.typography.titleMedium,
                 color = if (item.name.isBlank()) {
                     MaterialTheme.colorScheme.onSurfaceVariant
@@ -306,7 +310,13 @@ private fun ExerciseRow(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "${item.weight.toCorrectNum()} кг · ${item.sets}×${item.reps} · отдых ${formatRest(item.restTimeSeconds)}",
+                text = stringResource(
+                    R.string.create_exercise_summary,
+                    item.weight.toCorrectNum(),
+                    item.sets,
+                    item.reps,
+                    formatRest(item.restTimeSeconds)
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -360,7 +370,7 @@ private fun ExerciseEditSheetContent(
             value = item.name,
             onValueChange = { onChange(item.copy(name = it)) },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Название упражнения") },
+            label = { Text(stringResource(R.string.create_exercise_name)) },
             singleLine = true,
             shape = MaterialTheme.shapes.small
         )
@@ -373,7 +383,7 @@ private fun ExerciseEditSheetContent(
                     weightIndex = it
                     onChange(item.copy(weight = WeightValues[it]))
                 },
-                label = "кг",
+                label = stringResource(R.string.common_unit_kg),
                 format = { it.toCorrectNum() }
             )
             WheelPicker(
@@ -383,7 +393,7 @@ private fun ExerciseEditSheetContent(
                     setsIndex = it
                     onChange(item.copy(sets = SetsValues[it]))
                 },
-                label = "подх",
+                label = stringResource(R.string.create_unit_sets),
                 format = { it.toString() }
             )
             WheelPicker(
@@ -393,7 +403,7 @@ private fun ExerciseEditSheetContent(
                     repsIndex = it
                     onChange(item.copy(reps = RepsValues[it]))
                 },
-                label = "повт",
+                label = stringResource(R.string.common_unit_reps),
                 format = { it.toString() }
             )
             WheelPicker(
@@ -403,7 +413,7 @@ private fun ExerciseEditSheetContent(
                     restIndex = it
                     onChange(item.copy(restTimeSeconds = RestValues[it]))
                 },
-                label = "отдых",
+                label = stringResource(R.string.create_unit_rest),
                 format = { formatRest(it) }
             )
         }
@@ -412,13 +422,13 @@ private fun ExerciseEditSheetContent(
             value = item.note,
             onValueChange = { onChange(item.copy(note = it)) },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Заметка") },
+            label = { Text(stringResource(R.string.common_note)) },
             minLines = 2,
             shape = MaterialTheme.shapes.small
         )
 
         PrimaryButton(
-            text = "Готово",
+            text = stringResource(R.string.common_done),
             onClick = onDone,
             modifier = Modifier.padding(top = 14.dp)
         )
@@ -428,7 +438,7 @@ private fun ExerciseEditSheetContent(
                 .fillMaxWidth()
                 .padding(top = 4.dp)
         ) {
-            Text("Удалить упражнение", color = MaterialTheme.colorScheme.error)
+            Text(stringResource(R.string.create_delete_exercise), color = MaterialTheme.colorScheme.error)
         }
     }
 }

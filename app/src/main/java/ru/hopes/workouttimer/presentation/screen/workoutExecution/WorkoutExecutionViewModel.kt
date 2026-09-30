@@ -136,9 +136,7 @@ class WorkoutExecutionViewModel @Inject constructor(
                 )
                 scheduleIdleReminderIfActive()
             } else {
-                _uiState.value = WorkoutExecutionState.Error(
-                    message = "Тренировка не найдена или не содержит упражнений"
-                )
+                _uiState.value = WorkoutExecutionState.Error
             }
         }
     }
@@ -464,7 +462,7 @@ class WorkoutExecutionViewModel @Inject constructor(
 sealed class WorkoutExecutionState {
     data object Loading : WorkoutExecutionState()
     
-    data class Error(val message: String) : WorkoutExecutionState()
+    data object Error : WorkoutExecutionState()
     
     data class Rest(
         val exercise: Exercise,

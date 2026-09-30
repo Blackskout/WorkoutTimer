@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.update
+import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.data.mapper.toMusicState
 import ru.hopes.workouttimer.domain.model.MusicState
 import ru.hopes.workouttimer.domain.repository.MusicControlRepository
@@ -187,7 +188,7 @@ class MusicControlRepositoryImpl(
             Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
         }
         if (!startSafely(intent)) {
-            Toast.makeText(context, "Не нашёл экран доступа к уведомлениям", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.music_settings_not_found, Toast.LENGTH_SHORT).show()
         }
     }
 

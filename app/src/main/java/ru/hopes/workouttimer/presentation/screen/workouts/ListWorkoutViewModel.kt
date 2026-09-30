@@ -1,5 +1,6 @@
 package ru.hopes.workouttimer.presentation.screen.workouts
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.data.dao.WorkoutWithExercises
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
 import ru.hopes.workouttimer.domain.usecase.DeleteWorkoutUseCase
@@ -76,7 +78,7 @@ class ListWorkoutViewModel @Inject constructor(
      * а не в падение. Непойманное исключение из `viewModelScope.launch` уходит
      * в дефолтный обработчик потока, то есть роняет приложение целиком.
      */
-    private fun launchGuarded(message: String, block: suspend () -> Unit) {
+    private fun launchGuarded(@StringRes message: Int, block: suspend () -> Unit) {
         viewModelScope.launch {
             try {
                 block()
@@ -90,7 +92,7 @@ class ListWorkoutViewModel @Inject constructor(
     }
 
     fun deleteWorkout(workout: WorkoutEntity) {
-        launchGuarded("Не удалось удалить тренировку") {
+        launchGuarded(R.string.list_error_delete) {
             deleteWorkoutUseCase(workout)
         }
     }
@@ -100,7 +102,7 @@ class ListWorkoutViewModel @Inject constructor(
      * Прежнее время кладётся в состояние, чтобы снекбар мог предложить отмену.
      */
     fun skipWorkout(workout: WorkoutEntity) {
-        launchGuarded("Не удалось пропустить тренировку") {
+        launchGuarded(R.string.list_error_skip) {
             val previous = skipWorkoutUseCase(workout.id) ?: return@launchGuarded
             _state.update {
                 it.copy(
@@ -116,7 +118,7 @@ class ListWorkoutViewModel @Inject constructor(
 
     fun undoSkip() {
         val skipped = _state.value.skippedWorkout ?: return
-        launchGuarded("Не удалось отменить пропуск") {
+        launchGuarded(R.string.list_error_undo_skip) {
             undoSkipWorkoutUseCase(skipped.id, skipped.previousLastUseAt)
             _state.update { it.copy(skippedWorkout = null) }
         }
@@ -144,7 +146,7 @@ data class ListWorkoutState(
     val lastSessionDurations: Map<Int, Long> = emptyMap(),
     val skippedWorkout: SkippedWorkout? = null,
     /** Сбой операции с БД; показывается снекбаром и гасится `dismissError()`. */
-    val errorMessage: String? = null
+    @StringRes val errorMessage: Int? = null
 ) {
     /** Первая в очереди — та, которую не делали дольше всех. */
     val nextWorkout: WorkoutWithExercises? get() = workouts.firstOrNull()

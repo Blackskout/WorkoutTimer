@@ -74,18 +74,18 @@ class DateFormatterTest {
     }
 
     @Test
-    fun `formatDurationToString shows only minutes under an hour`() {
-        assertEquals("42 мин", DateFormatter.formatDurationToString(42 * 60_000L))
+    fun `hoursMinutesOf gives only minutes under an hour`() {
+        assertEquals(HoursMinutes(0, 42), DateFormatter.hoursMinutesOf(42 * 60_000L))
     }
 
     @Test
-    fun `formatDurationToString shows hours and minutes over an hour`() {
-        assertEquals("1 ч 15 мин", DateFormatter.formatDurationToString(75 * 60_000L))
+    fun `hoursMinutesOf splits hours and minutes over an hour`() {
+        assertEquals(HoursMinutes(1, 15), DateFormatter.hoursMinutesOf(75 * 60_000L))
     }
 
     @Test
-    fun `formatDurationToString rounds down partial minutes`() {
-        assertEquals("0 мин", DateFormatter.formatDurationToString(59_000L))
+    fun `hoursMinutesOf rounds down partial minutes`() {
+        assertEquals(HoursMinutes(0, 0), DateFormatter.hoursMinutesOf(59_000L))
     }
 
     @Test
