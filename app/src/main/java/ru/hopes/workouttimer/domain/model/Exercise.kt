@@ -8,5 +8,8 @@ data class Exercise(
     val reps: Int,
     val timeMillis: Long = 120_000L,
     val order: Int,
-    val note: String = ""
+    val note: String = "",
+    val catalogId: Long = 0L,
+    val unit: ExerciseUnit = ExerciseUnit.KG,
+    val extraWeight: Double = 0.0
 )
