@@ -11,9 +11,8 @@ import jakarta.inject.Singleton
 import ru.hopes.workouttimer.data.ExportImportRepositoryImpl
 import ru.hopes.workouttimer.data.MusicControlRepositoryImpl
 import ru.hopes.workouttimer.data.WorkoutRepositoryImpl
+import ru.hopes.workouttimer.data.dao.ALL_MIGRATIONS
 import ru.hopes.workouttimer.data.dao.AppDatabase
-import ru.hopes.workouttimer.data.dao.MIGRATION_5_6
-import ru.hopes.workouttimer.data.dao.MIGRATION_6_7
 import ru.hopes.workouttimer.data.dao.WorkoutDao
 import ru.hopes.workouttimer.domain.repository.ExportImportRepository
 import ru.hopes.workouttimer.domain.repository.MusicControlRepository
@@ -33,8 +32,12 @@ object AppModule {
             AppDatabase::class.java,
             "workout_db"
         )
-            .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
-            .fallbackToDestructiveMigration(dropAllTables = true)
+            .addMigrations(*ALL_MIGRATIONS.toTypedArray())
+            // Стирать базу можно только с довыпускных версий 2 и 4: миграций с
+            // них нет и не будет. С 5-й и выше недостающая миграция, как и откат
+            // на старую сборку, роняет приложение, а не молча удаляет историю
+            // тренировок.
+            .fallbackToDestructiveMigrationFrom(dropAllTables = true, 2, 4)
             .build()
     }
 
