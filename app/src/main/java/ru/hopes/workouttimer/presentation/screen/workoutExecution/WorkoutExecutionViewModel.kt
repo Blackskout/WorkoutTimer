@@ -20,7 +20,7 @@ import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.repository.WorkoutRepository
-import ru.hopes.workouttimer.domain.usecase.AddWorkoutSessionUseCase
+import ru.hopes.workouttimer.domain.usecase.FinishWorkoutSessionUseCase
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
 import ru.hopes.workouttimer.presentation.service.TimerNotificationService
 import ru.hopes.workouttimer.presentation.utils.SoundPlayer
@@ -36,7 +36,7 @@ class WorkoutExecutionViewModel @Inject constructor(
     private val vibrationManager: VibrationManager,
     private val wakeLockHelper: WakeLockHelper,
     private val workoutRepository: WorkoutRepository,
-    private val addWorkoutSessionUseCase: AddWorkoutSessionUseCase
+    private val finishWorkoutSessionUseCase: FinishWorkoutSessionUseCase
 ) : ViewModel() {
 
     private var workout: Workout? = null
@@ -311,11 +311,12 @@ class WorkoutExecutionViewModel @Inject constructor(
                 val finishedAt = System.currentTimeMillis()
                 val rawDurationMillis = finishedAt - sessionStartedAt
                 val durationMillis = (rawDurationMillis - excludedIdleMillis).coerceAtLeast(0L)
-                addWorkoutSessionUseCase(
+                finishWorkoutSessionUseCase(
                     workoutId = workoutId,
                     startedAt = sessionStartedAt,
                     finishedAt = finishedAt,
-                    durationMillis = durationMillis
+                    durationMillis = durationMillis,
+                    sets = emptyList() // запись подходов — Task 5
                 )
                 // Экран должен показать Finished сразу после записи сессии, не дожидаясь
                 // перерисовки виджета: updateLastUseAt() внутри дёргает updateAll() (биндер,

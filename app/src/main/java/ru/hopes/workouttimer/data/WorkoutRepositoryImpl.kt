@@ -5,12 +5,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import ru.hopes.workouttimer.data.dao.SessionSetDraft
 import ru.hopes.workouttimer.data.dao.WorkoutDao
 import ru.hopes.workouttimer.data.dao.WorkoutWithExercises
 import ru.hopes.workouttimer.data.entity.ExerciseEntity
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
 import ru.hopes.workouttimer.data.entity.WorkoutSessionEntity
 import ru.hopes.workouttimer.data.mapper.toDomain
+import ru.hopes.workouttimer.domain.model.RecordedSet
 import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.model.WorkoutSession
 import ru.hopes.workouttimer.domain.repository.WidgetUpdater
@@ -39,37 +41,28 @@ class WorkoutRepositoryImpl @Inject constructor(
     }
 
     override suspend fun updateWorkout(workout: Workout) {
-        withContext(Dispatchers.IO) {
-            // Обновляем тренировку
-            dao.updateWorkout(
-                id = workout.id,
-                name = workout.name
+        val exerciseEntities = workout.exercises.map { ex ->
+            ExerciseEntity(
+                workoutId = workout.id.toLong(),
+                name = ex.name,
+                weight = ex.weight,
+                sets = ex.sets,
+                reps = ex.reps,
+                restTimeMillis = ex.timeMillis,
+                orderInWorkout = ex.order,
+                note = ex.note,
+                catalogId = 0L // проставит транзакция DAO
             )
-
-            // Удаляем старые упражнения и добавляем новые
-            dao.deleteExercisesByWorkoutId(workout.id.toLong())
-
-            val exerciseEntities = workout.exercises.mapIndexed { idx, ex ->
-                ExerciseEntity(
-                    workoutId = workout.id.toLong(),
-                    name = ex.name,
-                    weight = ex.weight,
-                    sets = ex.sets,
-                    reps = ex.reps,
-                    restTimeMillis = ex.timeMillis,
-                    orderInWorkout = ex.order,
-                    note = ex.note,
-                    catalogId = 0L // проставит транзакция DAO (Task 3/4)
-                )
-            }
-            dao.insertExercises(exerciseEntities)
+        }
+        withContext(Dispatchers.IO) {
+            dao.updateWorkoutResolvingCatalog(workout.id, workout.name, exerciseEntities)
         }
         widgetUpdater.requestUpdate()
     }
 
     override suspend fun deleteWorkout(workout: WorkoutEntity) {
         withContext(Dispatchers.IO) {
-            dao.deleteWorkout(workout)
+            dao.deleteWorkoutWithExercises(workout)
         }
         widgetUpdater.requestUpdate()
     }
@@ -80,10 +73,9 @@ class WorkoutRepositoryImpl @Inject constructor(
 
     override suspend fun addWorkout(workout: Workout) {
         val workoutEntity = WorkoutEntity(name = workout.name, lastUseAt = workout.lastUseAt)
-        val id = dao.insertWorkout(workoutEntity)
-        val exerciseEntities = workout.exercises.mapIndexed { idx, ex ->
+        val exerciseEntities = workout.exercises.map { ex ->
             ExerciseEntity(
-                workoutId = id,
+                workoutId = 0L, // проставит транзакция DAO
                 name = ex.name,
                 weight = ex.weight,
                 sets = ex.sets,
@@ -91,10 +83,10 @@ class WorkoutRepositoryImpl @Inject constructor(
                 restTimeMillis = ex.timeMillis,
                 orderInWorkout = ex.order,
                 note = ex.note,
-                catalogId = 0L // проставит транзакция DAO (Task 3/4)
+                catalogId = 0L // проставит транзакция DAO
             )
         }
-        dao.insertExercises(exerciseEntities)
+        dao.insertWorkoutResolvingCatalog(workoutEntity, exerciseEntities)
         widgetUpdater.requestUpdate()
     }
 
@@ -126,14 +118,30 @@ class WorkoutRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun addWorkoutSession(workoutId: Int, startedAt: Long, finishedAt: Long, durationMillis: Long) {
-        dao.insertSession(
+    override suspend fun finishWorkoutSession(
+        workoutId: Int,
+        startedAt: Long,
+        finishedAt: Long,
+        durationMillis: Long,
+        sets: List<RecordedSet>
+    ) {
+        dao.finishSession(
             WorkoutSessionEntity(
                 workoutId = workoutId.toLong(),
                 startedAt = startedAt,
                 finishedAt = finishedAt,
                 durationMillis = durationMillis
-            )
+            ),
+            sets.map {
+                SessionSetDraft(
+                    catalogId = it.catalogId,
+                    exerciseName = it.exerciseName,
+                    weight = it.weight,
+                    extraWeight = it.extraWeight,
+                    reps = it.reps,
+                    unit = it.unit.name
+                )
+            }
         )
     }
 

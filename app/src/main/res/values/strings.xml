@@ -71,6 +71,7 @@
     <string name="execution_note_placeholder" tools:ignore="TypographyEllipsis">Введите заметку...</string>
 
     <!-- Создание и редактирование тренировки -->
+    <string name="create_save_error">Не удалось сохранить тренировку</string>
     <string name="create_fab_exercise">Упражнение</string>
     <string name="create_title_new">Новая тренировка</string>
     <string name="create_title_edit">Редактирование</string>

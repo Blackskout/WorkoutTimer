@@ -23,7 +23,7 @@ import org.junit.Test
 import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.repository.WorkoutRepository
-import ru.hopes.workouttimer.domain.usecase.AddWorkoutSessionUseCase
+import ru.hopes.workouttimer.domain.usecase.FinishWorkoutSessionUseCase
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
 import ru.hopes.workouttimer.presentation.utils.SoundPlayer
 import ru.hopes.workouttimer.presentation.utils.VibrationManager
@@ -47,7 +47,7 @@ class WorkoutExecutionViewModelTest {
     private fun buildViewModel(
         getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
         workoutRepository: WorkoutRepository,
-        addWorkoutSessionUseCase: AddWorkoutSessionUseCase
+        finishWorkoutSessionUseCase: FinishWorkoutSessionUseCase
     ): WorkoutExecutionViewModel {
         return WorkoutExecutionViewModel(
             context = mockk<Context>(relaxed = true),
@@ -56,7 +56,7 @@ class WorkoutExecutionViewModelTest {
             vibrationManager = mockk<VibrationManager>(relaxed = true),
             wakeLockHelper = mockk<WakeLockHelper>(relaxed = true),
             workoutRepository = workoutRepository,
-            addWorkoutSessionUseCase = addWorkoutSessionUseCase
+            finishWorkoutSessionUseCase = finishWorkoutSessionUseCase
         )
     }
 
@@ -68,18 +68,19 @@ class WorkoutExecutionViewModelTest {
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>()
         coEvery { workoutRepository.updateLastUseAt(1) } returns Unit
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
         val durationSlot = slot<Long>()
         coEvery {
-            addWorkoutSessionUseCase(
+            finishWorkoutSessionUseCase(
                 workoutId = 1,
                 startedAt = any(),
                 finishedAt = any(),
-                durationMillis = capture(durationSlot)
+                durationMillis = capture(durationSlot),
+                sets = any()
             )
         } just Runs
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
         viewModel.onExerciseFinished()
 
@@ -87,7 +88,7 @@ class WorkoutExecutionViewModelTest {
         assertTrue(state is WorkoutExecutionState.Finished)
         assertEquals(durationSlot.captured, (state as WorkoutExecutionState.Finished).durationMillis)
         coVerify(exactly = 1) {
-            addWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any())
+            finishWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any(), sets = any())
         }
     }
 
@@ -103,17 +104,17 @@ class WorkoutExecutionViewModelTest {
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>()
         coEvery { workoutRepository.updateLastUseAt(1) } returns Unit
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
         coEvery {
-            addWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any())
+            finishWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any(), sets = any())
         } just Runs
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
         viewModel.onExerciseFinished()
 
         coVerifyOrder {
-            addWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any())
+            finishWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any(), sets = any())
             workoutRepository.updateLastUseAt(1)
         }
     }
@@ -126,18 +127,19 @@ class WorkoutExecutionViewModelTest {
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>()
         coEvery { workoutRepository.updateLastUseAt(1) } returns Unit
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
         val durationSlot = slot<Long>()
         coEvery {
-            addWorkoutSessionUseCase(
+            finishWorkoutSessionUseCase(
                 workoutId = 1,
                 startedAt = any(),
                 finishedAt = any(),
-                durationMillis = capture(durationSlot)
+                durationMillis = capture(durationSlot),
+                sets = any()
             )
         } just Runs
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
 
         // Bank a large excluded gap using timestamps far in the "future" relative to real
@@ -169,13 +171,13 @@ class WorkoutExecutionViewModelTest {
         val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
 
         coVerify(exactly = 0) {
-            addWorkoutSessionUseCase(workoutId = any(), startedAt = any(), finishedAt = any(), durationMillis = any())
+            finishWorkoutSessionUseCase(workoutId = any(), startedAt = any(), finishedAt = any(), durationMillis = any(), sets = any())
         }
     }
 
@@ -186,9 +188,9 @@ class WorkoutExecutionViewModelTest {
         val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
 
         viewModel.registerInteraction(now = 1L) // ненулевая база: 0L совпал бы с "ещё не было взаимодействий"
@@ -204,9 +206,9 @@ class WorkoutExecutionViewModelTest {
         val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
 
         viewModel.registerInteraction(now = 1L)
@@ -222,9 +224,9 @@ class WorkoutExecutionViewModelTest {
         val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
 
         viewModel.registerInteraction(now = 1L)
@@ -241,9 +243,9 @@ class WorkoutExecutionViewModelTest {
         val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
         viewModel.registerInteraction(now = 1L)
         viewModel.registerInteraction(now = 1L + 45 * 60 * 1000L)
@@ -261,9 +263,9 @@ class WorkoutExecutionViewModelTest {
         val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
         val farFuture = System.currentTimeMillis() + 1_000_000L
         viewModel.registerInteraction(now = farFuture)
@@ -280,9 +282,9 @@ class WorkoutExecutionViewModelTest {
         val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
         val farFuture = System.currentTimeMillis() + 1_000_000L
         viewModel.registerInteraction(now = farFuture)
@@ -299,9 +301,9 @@ class WorkoutExecutionViewModelTest {
         val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
         val farFuture = System.currentTimeMillis() + 1_000_000L
         viewModel.registerInteraction(now = farFuture)
@@ -319,9 +321,9 @@ class WorkoutExecutionViewModelTest {
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
         coEvery { workoutRepository.updateExerciseNote(1, "note") } returns Unit
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
         val farFuture = System.currentTimeMillis() + 1_000_000L
         viewModel.registerInteraction(now = farFuture)
@@ -338,9 +340,9 @@ class WorkoutExecutionViewModelTest {
         val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
         viewModel.onExerciseFinished() // sets=2, currentSet 1<2 -> переход в Rest, регистрирует взаимодействие
         val afterRealInteraction = viewModel.lastInteractionAt
@@ -357,9 +359,9 @@ class WorkoutExecutionViewModelTest {
         val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
 
         assertTrue(viewModel.isIdleReminderJobActive)
@@ -372,9 +374,9 @@ class WorkoutExecutionViewModelTest {
         val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
         viewModel.onExerciseFinished() // sets=2, currentSet 1<2 -> переход в Rest
 
@@ -388,9 +390,9 @@ class WorkoutExecutionViewModelTest {
         val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
         viewModel.onExerciseFinished() // -> Rest
         viewModel.skipRest() // -> Active
@@ -406,12 +408,12 @@ class WorkoutExecutionViewModelTest {
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>()
         coEvery { workoutRepository.updateLastUseAt(1) } returns Unit
-        val addWorkoutSessionUseCase = mockk<AddWorkoutSessionUseCase>()
+        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
         coEvery {
-            addWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any())
+            finishWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any(), sets = any())
         } just Runs
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, addWorkoutSessionUseCase)
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
         viewModel.loadWorkout(1)
         viewModel.onExerciseFinished() // единственное упражнение, единственный подход -> Finished
 
@@ -427,7 +429,7 @@ class WorkoutExecutionViewModelTest {
         val viewModel = buildViewModel(
             getWorkoutByIdUseCase,
             mockk<WorkoutRepository>(relaxed = true),
-            mockk<AddWorkoutSessionUseCase>()
+            mockk<FinishWorkoutSessionUseCase>()
         )
 
         viewModel.loadWorkout(1) // подход 1 из 2
@@ -445,7 +447,7 @@ class WorkoutExecutionViewModelTest {
         val viewModel = buildViewModel(
             getWorkoutByIdUseCase,
             mockk<WorkoutRepository>(relaxed = true),
-            mockk<AddWorkoutSessionUseCase>()
+            mockk<FinishWorkoutSessionUseCase>()
         )
 
         viewModel.loadWorkout(1) // единственный подход первого из двух упражнений
@@ -463,7 +465,7 @@ class WorkoutExecutionViewModelTest {
         val viewModel = buildViewModel(
             getWorkoutByIdUseCase,
             mockk<WorkoutRepository>(relaxed = true),
-            mockk<AddWorkoutSessionUseCase>()
+            mockk<FinishWorkoutSessionUseCase>()
         )
 
         viewModel.loadWorkout(1)
@@ -481,7 +483,7 @@ class WorkoutExecutionViewModelTest {
         val viewModel = buildViewModel(
             getWorkoutByIdUseCase,
             mockk<WorkoutRepository>(relaxed = true),
-            mockk<AddWorkoutSessionUseCase>()
+            mockk<FinishWorkoutSessionUseCase>()
         )
 
         viewModel.loadWorkout(1)
@@ -498,7 +500,7 @@ class WorkoutExecutionViewModelTest {
         val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
         coEvery { getWorkoutByIdUseCase(1) } returns workout
         val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, mockk<AddWorkoutSessionUseCase>())
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, mockk<FinishWorkoutSessionUseCase>())
 
         viewModel.loadWorkout(1)
         viewModel.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, reps = 8)
@@ -519,7 +521,7 @@ class WorkoutExecutionViewModelTest {
         val viewModel = buildViewModel(
             getWorkoutByIdUseCase,
             mockk<WorkoutRepository>(relaxed = true),
-            mockk<AddWorkoutSessionUseCase>()
+            mockk<FinishWorkoutSessionUseCase>()
         )
 
         viewModel.loadWorkout(1)
@@ -541,7 +543,7 @@ class WorkoutExecutionViewModelTest {
         val viewModel = buildViewModel(
             getWorkoutByIdUseCase,
             mockk<WorkoutRepository>(relaxed = true),
-            mockk<AddWorkoutSessionUseCase>()
+            mockk<FinishWorkoutSessionUseCase>()
         )
 
         viewModel.loadWorkout(1)
@@ -563,7 +565,7 @@ class WorkoutExecutionViewModelTest {
         val viewModel = buildViewModel(
             getWorkoutByIdUseCase,
             mockk<WorkoutRepository>(relaxed = true),
-            mockk<AddWorkoutSessionUseCase>()
+            mockk<FinishWorkoutSessionUseCase>()
         )
 
         viewModel.loadWorkout(1)

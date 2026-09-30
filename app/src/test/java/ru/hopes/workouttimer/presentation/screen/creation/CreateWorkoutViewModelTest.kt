@@ -12,6 +12,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import ru.hopes.workouttimer.domain.model.Workout
@@ -176,5 +178,30 @@ class CreateWorkoutViewModelTest {
         assertEquals(7, saved.captured.id)
         assertEquals(12345L, saved.captured.lastUseAt)
         assertEquals("Ноги (изменено)", saved.captured.name)
+    }
+
+    @Test
+    fun `сбой сохранения оставляет редактор открытым и сообщает об ошибке`() = runTest(dispatcher) {
+        val add = mockk<AddWorkoutUseCase>()
+        coEvery { add(any()) } throws IllegalStateException("db")
+        val vm = viewModel(add = add)
+
+        vm.processCommand(CreateWorkoutCommand.ChangeWorkoutName("Ноги"))
+        vm.processCommand(CreateWorkoutCommand.AddExercise())
+        val exerciseId = vm.state.value.exercises.first().id
+        vm.processCommand(
+            CreateWorkoutCommand.UpdateExercise(
+                exerciseId,
+                vm.state.value.exercises.first().copy(name = "Присед")
+            )
+        )
+        vm.processCommand(CreateWorkoutCommand.Save)
+        testScheduler.advanceUntilIdle()
+
+        assertFalse(vm.state.value.isFinished)
+        assertTrue(vm.state.value.saveFailed)
+
+        vm.processCommand(CreateWorkoutCommand.DismissSaveError)
+        assertFalse(vm.state.value.saveFailed)
     }
 }

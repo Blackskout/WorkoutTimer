@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import ru.hopes.workouttimer.data.dao.WorkoutWithExercises
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
+import ru.hopes.workouttimer.domain.model.RecordedSet
 import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.model.WorkoutSession
 import ru.hopes.workouttimer.domain.repository.WorkoutRepository
@@ -47,11 +48,12 @@ class FakeWorkoutRepository : WorkoutRepository {
 
     override suspend fun updateExerciseWeightAndReps(exerciseId: Int, weight: Double, reps: Int) = Unit
 
-    override suspend fun addWorkoutSession(
+    override suspend fun finishWorkoutSession(
         workoutId: Int,
         startedAt: Long,
         finishedAt: Long,
-        durationMillis: Long
+        durationMillis: Long,
+        sets: List<RecordedSet>
     ) = Unit
 
     override fun getSessionsForWorkout(workoutId: Int): Flow<List<WorkoutSession>> =
