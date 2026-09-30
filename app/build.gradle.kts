@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
+    alias(libs.plugins.androidx.room)
 }
 
 android {
@@ -58,6 +59,21 @@ android {
     }
 }
 
+room {
+    schemaDirectory("$projectDir/schemas")
+}
+
+// Тесты миграций идут на JVM: MigrationTestHelper из room-testing-jvm с
+// bundled SQLite. Ему нужен JVM-вариант рантайма Room, а Gradle по умолчанию
+// кладёт в unit-тесты Android-вариант, несовместимый с ним по конструкторам.
+// Подмена касается только classpath запуска unit-тестов, не приложения.
+configurations.matching { it.name.endsWith("UnitTestRuntimeClasspath") }.configureEach {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("androidx.room:room-runtime-android"))
+            .using(module("androidx.room:room-runtime-jvm:${libs.versions.roomRuntime.get()}"))
+    }
+}
+
 tasks.withType<KotlinJvmCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
@@ -92,6 +108,8 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.androidx.room.testing.jvm)
+    testImplementation(libs.androidx.sqlite.bundled.jvm)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
