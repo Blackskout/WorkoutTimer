@@ -114,7 +114,7 @@ const val UNTITLED_EXERCISE_NAME = "Без названия"
 
 // (?U)\s — Юникод-пробелы, включая неразрывный из вставленного текста.
 // Голый \s видит только ASCII, а \p{javaWhitespace} пропускает U+00A0.
-private val WHITESPACE_RUN = Regex("(?U)\\s+")
+private val WHITESPACE_RUN = Regex("[\\s\\p{Z}]+")
 
 /** Название, как его хранит справочник: без лишних пробелов, пустое — «Без названия». */
 fun normalizedExerciseName(raw: String): String {
