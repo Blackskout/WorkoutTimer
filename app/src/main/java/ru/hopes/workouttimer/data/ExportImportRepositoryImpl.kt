@@ -90,28 +90,39 @@ class ExportImportRepositoryImpl @Inject constructor(
                 }
 
                 val existingNames = dao.getAllWorkoutNames().toMutableSet()
-                var skippedCount = 0
 
                 // Тренировка без единого названного упражнения открылась бы экраном ошибки — пропускаем целиком.
-                val prepared = exportData.workouts.filter { w -> w.exercises.any { it.name.isNotBlank() } }.map { exportWorkout ->
+                val kept = exportData.workouts.filter { w -> w.exercises.any { it.name.isNotBlank() } }
+                // Пустые названия редактор не пропускает, импорт — тоже; считаем их пропущенными,
+                // в том числе у отброшенных целиком тренировок, иначе они не попадут ни в какой счётчик.
+                val skippedCount = exportData.workouts.sumOf { w -> w.exercises.count { it.name.isBlank() } }
+
+                val prepared = kept.map { exportWorkout ->
                     val uniqueName = getUniqueName(exportWorkout.name, existingNames)
                     existingNames.add(uniqueName)
-                    // Пустые названия редактор не пропускает, импорт — тоже; считаем их пропущенными.
-                    val (blank, named) = exportWorkout.exercises.partition { it.name.isBlank() }
-                    skippedCount += blank.size
-                    WorkoutEntity(name = uniqueName, lastUseAt = exportWorkout.lastUseAt) to named.map { ex ->
-                        ExerciseEntity(
-                            workoutId = 0,
-                            name = ex.name,
-                            weight = ex.weight,
-                            sets = ex.sets,
-                            reps = ex.reps,
-                            restTimeMillis = ex.restTimeMillis,
-                            orderInWorkout = ex.order,
-                            note = ex.note,
-                            catalogId = 0L // проставит транзакция DAO
-                        )
-                    }
+                    WorkoutEntity(name = uniqueName, lastUseAt = exportWorkout.lastUseAt) to
+                        exportWorkout.exercises.filter { it.name.isNotBlank() }.map { ex ->
+                            ExerciseEntity(
+                                workoutId = 0,
+                                name = ex.name,
+                                weight = ex.weight,
+                                sets = ex.sets,
+                                reps = ex.reps,
+                                restTimeMillis = ex.restTimeMillis,
+                                orderInWorkout = ex.order,
+                                note = ex.note,
+                                catalogId = 0L // проставит транзакция DAO
+                            )
+                        }
+                }
+
+                if (prepared.isEmpty()) {
+                    return@withContext ImportResult(
+                        success = false,
+                        importedCount = 0,
+                        skippedCount = skippedCount,
+                        error = ImportError.NoWorkouts
+                    )
                 }
 
                 val importedCount = dao.importWorkouts(prepared)

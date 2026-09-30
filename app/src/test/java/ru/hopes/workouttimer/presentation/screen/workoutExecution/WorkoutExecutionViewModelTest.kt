@@ -636,7 +636,7 @@ class WorkoutExecutionViewModelTest {
     }
 
     @Test
-    fun `leaving without finishing records nothing`() = runTest {
+    fun `leaving without finishing writes no session`() = runTest {
         val getWorkout = mockk<GetWorkoutByIdUseCase>()
         coEvery { getWorkout(1) } returns workoutOf(ex(1, "Присед", sets = 3))
         val finish = mockk<FinishWorkoutSessionUseCase>(relaxed = true)
@@ -706,7 +706,63 @@ class WorkoutExecutionViewModelTest {
         vm.dismissFinishError()
         vm.onExerciseFinished()   // повтор
 
+        assertEquals(2, attempts.size)
         assertEquals(1, attempts.last().size)
         assertTrue(vm.uiState.value is WorkoutExecutionState.Finished)
+    }
+
+    @Test
+    fun `failed finish then jumping back and finishing again keeps every tapped set`() = runTest {
+        val a = ex(1, "Присед", sets = 1)
+        val b = ex(2, "Жим", sets = 1)
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } returns workoutOf(a, b)
+        val finish = mockk<FinishWorkoutSessionUseCase>()
+        val attempts = mutableListOf<List<RecordedSet>>()
+        coEvery { finish(any(), any(), any(), any(), capture(attempts)) } throws
+            IllegalStateException("disk full") andThen Unit
+        val vm = buildViewModel(getWorkout, mockk(relaxed = true), finish)
+
+        vm.loadWorkout(1)
+        vm.onExerciseFinished()            // A → отдых перед B
+        vm.skipRest()
+        vm.onExerciseFinished()            // B, последний подход — запись падает
+        assertTrue(vm.finishError.value)
+
+        vm.dismissFinishError()
+        vm.moveToSelectedExercise(a)       // ушли с последнего подхода
+        vm.onExerciseFinished()            // A ещё раз
+        vm.skipRest()
+        vm.onExerciseFinished()            // B — запись проходит
+
+        val setA = RecordedSet(10L, "Присед", 50.0, 0.0, 8, ExerciseUnit.KG)
+        val setB = RecordedSet(20L, "Жим", 50.0, 0.0, 8, ExerciseUnit.KG)
+        assertEquals(2, attempts.size)
+        assertEquals(listOf(setA, setB), attempts.first())
+        // Неудавшийся подход B остаётся в истории: он был сделан, а не потерян.
+        assertEquals(listOf(setA, setB, setA, setB), attempts.last())
+        assertTrue(vm.uiState.value is WorkoutExecutionState.Finished)
+    }
+
+    @Test
+    fun `failed finish then weight edit is recorded by the retry without growing the list`() = runTest {
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } returns workoutOf(ex(1, "Присед", sets = 1))
+        val finish = mockk<FinishWorkoutSessionUseCase>()
+        val attempts = mutableListOf<List<RecordedSet>>()
+        coEvery { finish(any(), any(), any(), any(), capture(attempts)) } throws
+            IllegalStateException("disk full") andThen Unit
+        val vm = buildViewModel(getWorkout, mockk(relaxed = true), finish)
+
+        vm.loadWorkout(1)
+        vm.onExerciseFinished()
+        vm.dismissFinishError()
+        vm.updateExerciseWeightAndReps(exerciseId = 1, weight = 70.0, reps = 5)
+        vm.onExerciseFinished()   // повтор
+
+        assertEquals(1, attempts.last().size)
+        assertEquals(70.0, attempts.last().single().weight, 0.0)
+        assertEquals(5, attempts.last().single().reps)
+        assertEquals(1, vm.recordedSets.size)
     }
 }

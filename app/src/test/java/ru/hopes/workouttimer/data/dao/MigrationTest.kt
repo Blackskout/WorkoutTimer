@@ -137,6 +137,12 @@ class MigrationTest {
             // упражнения носят название своей записи справочника
             assertEquals(listOf("Жим лёжа", "Жим лёжа", "Жим лёжа"), textColumn(db, "SELECT name FROM exercises WHERE id IN (3, 4, 5) ORDER BY id"))
             assertEquals(listOf("0"), textColumn(db, "SELECT COUNT(*) FROM exercises WHERE catalogId = 0"))
+            // слияние в справочнике не схлопывает строки тренировки: ни одно упражнение не потеряно,
+            // а два с одним ключом в тренировке 1 (id 4 и 5) остаются отдельными строками
+            assertEquals(listOf("5"), textColumn(db, "SELECT COUNT(*) FROM exercises"))
+            assertEquals(listOf("2"), textColumn(db, "SELECT COUNT(*) FROM exercises WHERE workoutId = 1 AND id IN (4, 5)"))
+            // новая колонка extraWeight у старых строк — 0
+            assertEquals(listOf("0"), textColumn(db, "SELECT COUNT(*) FROM exercises WHERE extraWeight != 0"))
             // сессии не тронуты, FK чистые
             assertEquals(listOf("1"), textColumn(db, "SELECT COUNT(*) FROM workout_sessions"))
             assertEquals(emptyList<String>(), textColumn(db, "PRAGMA foreign_key_check"))

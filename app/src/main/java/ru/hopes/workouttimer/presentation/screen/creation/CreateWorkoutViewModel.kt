@@ -1,5 +1,6 @@
 package ru.hopes.workouttimer.presentation.screen.creation
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,6 +28,10 @@ class CreateWorkoutViewModel @Inject constructor(
 
     private var editingWorkoutId: Int? = null
     private var editingLastUseAt: Long? = null
+
+    private companion object {
+        const val TAG = "CreateWorkoutVM"
+    }
 
     /** Слепок состояния после загрузки — с ним сравнивается текущее при выходе. */
     private var savedSnapshot: CreateWorkoutState = CreateWorkoutState()
@@ -129,6 +134,7 @@ class CreateWorkoutViewModel @Inject constructor(
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
+                            Log.e(TAG, "Не удалось сохранить тренировку", e)
                             _state.update { it.copy(saveFailed = true) }
                             return@launch
                         }

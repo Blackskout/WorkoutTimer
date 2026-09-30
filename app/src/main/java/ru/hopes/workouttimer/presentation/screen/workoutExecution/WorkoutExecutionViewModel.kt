@@ -2,6 +2,7 @@ package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -367,8 +368,11 @@ class WorkoutExecutionViewModel @Inject constructor(
                 } catch (e: Exception) {
                     // Подходы остаются в памяти, экран — на последнем подходе:
                     // повторное «Закончить подход» попробует записать ещё раз.
+                    Log.e(TAG, "Не удалось записать завершённую тренировку", e)
                     isFinishing = false
                     _finishError.value = true
+                    // Экран остался Active — заново взводим напоминание о простое.
+                    scheduleIdleReminderIfActive()
                     return@launch
                 }
                 finishPending = false
@@ -510,6 +514,7 @@ class WorkoutExecutionViewModel @Inject constructor(
     }
 
     companion object {
+        private const val TAG = "WorkoutExecutionVM"
         internal const val IDLE_EXCLUSION_THRESHOLD_MILLIS = 10 * 60 * 1000L
         internal const val IDLE_REMINDER_DELAY_MILLIS = 5 * 60 * 1000L
     }

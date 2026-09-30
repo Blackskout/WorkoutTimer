@@ -71,16 +71,6 @@ interface WorkoutDao {
     @Query("UPDATE exercises SET weight = :weight, reps = :reps WHERE id = :id")
     suspend fun updateExerciseWeightAndReps(id: Int, weight: Double, reps: Int)
 
-    @Transaction
-    suspend fun insertWorkoutWithExercises(
-        workout: WorkoutEntity,
-        exercises: List<ExerciseEntity>
-    ) {
-        val workoutId = insertWorkout(workout)
-        val exercisesWithId = exercises.map { it.copy(workoutId = workoutId) }
-        insertExercises(exercisesWithId)
-    }
-
     @Insert
     suspend fun insertSession(session: WorkoutSessionEntity): Long
 
