@@ -1,19 +1,27 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Правила бэкапа для Android 12+. Для Android 11 и ниже — backup_rules.xml,
+    держать оба файла одинаковыми.
+
+    В бэкап идёт только база с тренировками и историей. Раз указан хотя бы один
+    include, всё остальное система пропускает. Так и нужно: состояние виджета
+    (files/datastore/GlanceAppWidgetManager…) привязано к id виджетов старого
+    телефона, на новом оно бесполезно, а виджеты там ставятся заново.
+
+    -wal и -shm обязательны: свежие записи Room могут лежать в WAL, пока SQLite
+    не перенёс их в основной файл.
+
+    Появятся сохраняемые настройки (DataStore, SharedPreferences) — добавить их сюда.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <include domain="database" path="workout_db" />
+        <include domain="database" path="workout_db-wal" />
+        <include domain="database" path="workout_db-shm" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <include domain="database" path="workout_db" />
+        <include domain="database" path="workout_db-wal" />
+        <include domain="database" path="workout_db-shm" />
     </device-transfer>
-    -->
 </data-extraction-rules>
