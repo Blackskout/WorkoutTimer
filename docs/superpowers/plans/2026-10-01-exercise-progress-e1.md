@@ -112,9 +112,9 @@ import java.util.Locale
  */
 const val UNTITLED_EXERCISE_NAME = "Без названия"
 
-// \p{javaWhitespace}, а не \s: голый \s в Kotlin видит только ASCII и
-// пропустил бы неразрывный пробел из вставленного текста.
-private val WHITESPACE_RUN = Regex("\\p{javaWhitespace}+")
+// (?U)\s — Юникод-пробелы, включая неразрывный из вставленного текста.
+// Голый \s видит только ASCII, а \p{javaWhitespace} пропускает U+00A0.
+private val WHITESPACE_RUN = Regex("(?U)\\s+")
 
 /** Название, как его хранит справочник: без лишних пробелов, пустое — «Без названия». */
 fun normalizedExerciseName(raw: String): String {
@@ -348,7 +348,8 @@ Expected: BUILD SUCCESSFUL, появился `app/schemas/ru.hopes.workouttimer.
                     "(1, 1, 'Присед', 60.0, 4, 8, 120000, 0, ''), " +
                     "(2, 2, '  присед ', 50.0, 4, 8, 120000, 0, ''), " +
                     "(3, 2, 'Жим лёжа', 40.0, 3, 10, 90000, 1, ''), " +
-                    "(4, 1, 'ЖИМ ЛЕЖА', 45.0, 3, 10, 90000, 1, '')"
+                    "(4, 1, 'ЖИМ ЛЕЖА', 45.0, 3, 10, 90000, 1, ''), " +
+                    "(5, 1, 'Жим\u00A0лёжа', 45.0, 3, 10, 90000, 2, '')"
             )
             db.execSQL("INSERT INTO workout_sessions (id, workoutId, startedAt, finishedAt, durationMillis) VALUES (1, 1, 10, 20, 10)")
         }
@@ -358,7 +359,9 @@ Expected: BUILD SUCCESSFUL, появился `app/schemas/ru.hopes.workouttimer.
             assertEquals(listOf("KG", "KG"), textColumn(db, "SELECT unit FROM exercise_catalog"))
             // одинаковый ключ — одна запись справочника
             assertEquals(listOf("1"), textColumn(db, "SELECT COUNT(DISTINCT catalogId) FROM exercises WHERE id IN (1, 2)"))
-            assertEquals(listOf("1"), textColumn(db, "SELECT COUNT(DISTINCT catalogId) FROM exercises WHERE id IN (3, 4)"))
+            assertEquals(listOf("1"), textColumn(db, "SELECT COUNT(DISTINCT catalogId) FROM exercises WHERE id IN (3, 4, 5)"))
+            // упражнения носят название своей записи справочника
+            assertEquals(listOf("Жим лёжа", "Жим лёжа", "Жим лёжа"), textColumn(db, "SELECT name FROM exercises WHERE id IN (3, 4, 5) ORDER BY id"))
             assertEquals(listOf("0"), textColumn(db, "SELECT COUNT(*) FROM exercises WHERE catalogId = 0"))
             // сессии не тронуты, FK чистые
             assertEquals(listOf("1"), textColumn(db, "SELECT COUNT(*) FROM workout_sessions"))
@@ -461,10 +464,11 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
             }
         }
 
-        val catalogIdByKey = mutableMapOf<String, Long>()
+        // Упражнению пишется название его записи справочника — так же, как при сохранении.
+        val catalogByKey = mutableMapOf<String, Pair<Long, String>>()
         for ((exerciseId, name) in exercises) {
             val key = exerciseNameKey(name)
-            val catalogId = catalogIdByKey.getOrPut(key) {
+            val (catalogId, catalogName) = catalogByKey.getOrPut(key) {
                 connection.prepare(
                     "INSERT INTO `exercise_catalog` (`name`, `nameKey`, `unit`) VALUES (?, ?, 'KG')"
                 ).use { stmt ->
@@ -472,16 +476,17 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
                     stmt.bindText(2, key)
                     stmt.step()
                 }
-                connection.prepare("SELECT last_insert_rowid()").use { stmt ->
+                val id = connection.prepare("SELECT last_insert_rowid()").use { stmt ->
                     stmt.step()
                     stmt.getLong(0)
                 }
+                id to name
             }
             connection.prepare(
                 "UPDATE `exercises` SET `catalogId` = ?, `name` = ? WHERE `id` = ?"
             ).use { stmt ->
                 stmt.bindLong(1, catalogId)
-                stmt.bindText(2, name)
+                stmt.bindText(2, catalogName)
                 stmt.bindLong(3, exerciseId)
                 stmt.step()
             }
@@ -522,7 +527,7 @@ git commit -m "feat: миграция 7→8 — справочник упраж�
 - Create: `app/src/main/java/ru/hopes/workouttimer/domain/usecase/FinishWorkoutSessionUseCase.kt`
 - Modify: `app/src/androidTest/java/ru/hopes/workouttimer/presentation/screen/creation/FakeWorkoutRepository.kt`
 - Modify: `app/src/test/java/ru/hopes/workouttimer/data/WorkoutRepositoryImplTest.kt`
-- Modify: `app/src/test/java/ru/hopes/workouttimer/domain/usecase/SkipWorkoutUseCaseTest.kt` (если реализует `WorkoutRepository` — заменить метод)
+- Modify: `app/src/test/java/ru/hopes/workouttimer/domain/usecase/SkipWorkoutUseCaseTest.kt:39` — `coVerify { repo.addWorkoutSession(any(), any(), any(), any()) }` заменить на `repo.finishWorkoutSession(any(), any(), any(), any(), any())`
 - Modify: `app/src/main/java/ru/hopes/workouttimer/presentation/screen/creation/CreateWorkoutViewModel.kt`, `CreateWorkoutScreen.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/java/ru/hopes/workouttimer/presentation/screen/creation/CreateWorkoutViewModelTest.kt` (Step 4b)
 - Test: `app/src/androidTest/java/ru/hopes/workouttimer/data/dao/WorkoutDaoTest.kt`
 
@@ -556,6 +561,7 @@ package ru.hopes.workouttimer.data.dao
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -598,9 +604,7 @@ class WorkoutDaoTest {
             WorkoutEntity(name = "Ноги", lastUseAt = 0),
             listOf(exercise("Присед"), exercise("  присед ", order = 1))
         )
-        val exercises = dao.getAllWorkoutsWithExercises().let { flow ->
-            kotlinx.coroutines.flow.first(flow).single { it.workout.id.toLong() == id }.exercises
-        }
+        val exercises = dao.getAllWorkoutsWithExercises().first().single { it.workout.id.toLong() == id }.exercises
         assertEquals(1, dao.getCatalog().size)
         assertEquals(listOf("Присед", "Присед"), exercises.sortedBy { it.orderInWorkout }.map { it.name })
         assertEquals(1, exercises.map { it.catalogId }.distinct().size)
@@ -630,7 +634,7 @@ class WorkoutDaoTest {
         val sessionId = dao.finishSession(session(id), listOf(SessionSetDraft(catalogId, "Присед", 60.0, 0.0, 8, "KG")))
         val workout = dao.getWorkoutById(id.toInt())!!
         dao.deleteWorkoutWithExercises(workout)
-        assertEquals(0, kotlinx.coroutines.flow.first(dao.getAllWorkoutsWithExercises()).size)
+        assertEquals(0, dao.getAllWorkoutsWithExercises().first().size)
         assertEquals(1, dao.getSessionSets(sessionId).size)
         assertEquals(listOf("Присед"), dao.getCatalog().map { it.name })
     }
@@ -663,8 +667,6 @@ class WorkoutDaoTest {
     }
 }
 ```
-
-(Если `kotlinx.coroutines.flow.first(flow)` не компилируется как вызов функции — импортировать `kotlinx.coroutines.flow.first` и писать `dao.getAllWorkoutsWithExercises().first()`.)
 
 Run (по правилам эмулятора из Global Constraints): `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=ru.hopes.workouttimer.data.dao.WorkoutDaoTest`
 Expected: FAIL — компиляция: `Unresolved reference 'insertWorkoutResolvingCatalog'`.
@@ -854,7 +856,7 @@ class FinishWorkoutSessionUseCase @Inject constructor(
 }
 ```
 
-Удалить `AddWorkoutSessionUseCase.kt`. В `FakeWorkoutRepository.kt` и других реализациях `WorkoutRepository` в тестах заменить метод. `WorkoutExecutionViewModel` пока правится минимально, чтобы собралось: конструктор принимает `FinishWorkoutSessionUseCase`, вызов с `sets = emptyList()` (полностью — в Task 5); в `WorkoutExecutionViewModelTest` заменить тип мока и вызовы `addWorkoutSessionUseCase(...)` на `finishWorkoutSessionUseCase(..., sets = any())`.
+Удалить `AddWorkoutSessionUseCase.kt`. В `FakeWorkoutRepository.kt` и других реализациях `WorkoutRepository` в тестах заменить метод. `WorkoutExecutionViewModel` пока правится минимально, чтобы собралось: параметр конструктора `addWorkoutSessionUseCase: AddWorkoutSessionUseCase` становится **`finishWorkoutSessionUseCase: FinishWorkoutSessionUseCase`** (это имя использует Task 5), вызов — с `sets = emptyList()` (полностью — в Task 5). В `WorkoutExecutionViewModelTest` (около 25 тестов): `buildViewModel(..., addWorkoutSessionUseCase: AddWorkoutSessionUseCase)` → `finishWorkoutSessionUseCase: FinishWorkoutSessionUseCase`; каждый `mockk<AddWorkoutSessionUseCase>()` → `mockk<FinishWorkoutSessionUseCase>()`; в каждом `coEvery`/`coVerify` вызова use case с именованными аргументами добавить `sets = any()`. Все прежние тесты должны остаться зелёными.
 
 - [ ] **Step 4: Обновить `WorkoutRepositoryImplTest`**
 
@@ -886,25 +888,34 @@ class FinishWorkoutSessionUseCase @Inject constructor(
 
 Транзакция сохранения теперь может бросить (например, UNIQUE справочника при гонке). Сейчас `CreateWorkoutCommand.Save` (`CreateWorkoutViewModel.kt:97-129`) без перехвата — исключение из `viewModelScope.launch` уронит приложение.
 
-Тест в `CreateWorkoutViewModelTest` (JVM):
+Тест в `CreateWorkoutViewModelTest` (JVM; файл использует `StandardTestDispatcher` и фабрику `viewModel(add = …)`, `:25-29`). Добавить импорты `org.junit.Assert.assertFalse`, `org.junit.Assert.assertTrue`:
 
 ```kotlin
     @Test
-    fun `failed save keeps the editor open and reports an error`() = runTest {
-        // собрать ViewModel так же, как в соседних тестах этого файла,
-        // с addWorkoutUseCase, который бросает исключение
-        coEvery { addWorkoutUseCase(any()) } throws IllegalStateException("db")
-        viewModel.onCommand(CreateWorkoutCommand.ChangeName("Ноги"))
-        viewModel.onCommand(CreateWorkoutCommand.AddExercise)
-        // дать упражнению имя тем же способом, что соседние тесты (команда правки упражнения)
-        viewModel.onCommand(CreateWorkoutCommand.Save)
+    fun `сбой сохранения оставляет редактор открытым и сообщает об ошибке`() = runTest(dispatcher) {
+        val add = mockk<AddWorkoutUseCase>()
+        coEvery { add(any()) } throws IllegalStateException("db")
+        val vm = viewModel(add = add)
 
-        assertFalse(viewModel.state.value.isFinished)
-        assertTrue(viewModel.state.value.saveFailed)
+        vm.processCommand(CreateWorkoutCommand.ChangeWorkoutName("Ноги"))
+        vm.processCommand(CreateWorkoutCommand.AddExercise())
+        val exerciseId = vm.state.value.exercises.first().id
+        vm.processCommand(
+            CreateWorkoutCommand.UpdateExercise(
+                exerciseId,
+                vm.state.value.exercises.first().copy(name = "Присед")
+            )
+        )
+        vm.processCommand(CreateWorkoutCommand.Save)
+        testScheduler.advanceUntilIdle()
+
+        assertFalse(vm.state.value.isFinished)
+        assertTrue(vm.state.value.saveFailed)
+
+        vm.processCommand(CreateWorkoutCommand.DismissSaveError)
+        assertFalse(vm.state.value.saveFailed)
     }
 ```
-
-(Имена команд `ChangeName`/`AddExercise`/правки упражнения взять из `CreateWorkoutCommand` и соседних тестов — если отличаются, использовать существующие.)
 
 Реализация: в `CreateWorkoutState` поле `val saveFailed: Boolean = false`; в `Save` обернуть вызов use case:
 
@@ -920,7 +931,7 @@ class FinishWorkoutSessionUseCase @Inject constructor(
                         _state.update { it.copy(isFinished = true) }
 ```
 
-команда `CreateWorkoutCommand.DismissSaveError` сбрасывает флаг. В `CreateWorkoutScreen.kt` — `SnackbarHostState`, `snackbarHost` у `Scaffold` (`:113`), `LaunchedEffect(state.saveFailed)` показывает `R.string.create_save_error` («Не удалось сохранить тренировку») и шлёт `DismissSaveError`. Строку добавить в секцию «Создание и редактирование тренировки» `strings.xml`.
+новая команда `data object DismissSaveError : CreateWorkoutCommand` в `processCommand` сбрасывает флаг (`CancellationException` — `kotlinx.coroutines.CancellationException`). В `CreateWorkoutScreen.kt` — `SnackbarHostState`, `snackbarHost` у `Scaffold` (`:113`), `LaunchedEffect(state.saveFailed)` показывает `R.string.create_save_error` («Не удалось сохранить тренировку») и шлёт `DismissSaveError`. Строку добавить в секцию «Создание и редактирование тренировки» `strings.xml`.
 
 - [ ] **Step 5: Запустить**
 
@@ -1014,8 +1025,10 @@ Run (эмулятор, класс `WorkoutDaoTest`). Expected: FAIL — `Unresol
                 val existingNames = dao.getAllWorkoutNames().toMutableSet()
                 var skippedCount = 0
 
-                val prepared = exportData.workouts.map { exportWorkout ->
+                // Тренировка без единого названного упражнения открылась бы экраном ошибки — пропускаем целиком.
+                val prepared = exportData.workouts.filter { w -> w.exercises.any { it.name.isNotBlank() } }.map { exportWorkout ->
                     val uniqueName = getUniqueName(exportWorkout.name, existingNames)
+                    // (тренировки, отброшенные фильтром выше, в skippedCount не входят — их упражнения пустые)
                     existingNames.add(uniqueName)
                     // Пустые названия редактор не пропускает, импорт — тоже; считаем их пропущенными.
                     val (blank, named) = exportWorkout.exercises.partition { it.name.isBlank() }
@@ -1248,15 +1261,20 @@ Expected: FAIL — `recordedSets`/`finishError` не существуют.
         if (currentState is WorkoutExecutionState.Active) {
             // Подход снимается до перехода: на последнем подходе moveToNextExercise
             // сразу пишет сессию, и снимать будет уже поздно.
-            if (!finishPending) {
-                _recordedSets += RecordedSet(
-                    catalogId = currentState.exercise.catalogId,
-                    exerciseName = currentState.exercise.name,
-                    weight = currentState.weight,
-                    extraWeight = currentState.extraWeight,
-                    reps = currentState.reps,
-                    unit = currentState.exercise.unit
-                )
+            val set = RecordedSet(
+                catalogId = currentState.exercise.catalogId,
+                exerciseName = currentState.exercise.name,
+                weight = currentState.weight,
+                extraWeight = currentState.extraWeight,
+                reps = currentState.reps,
+                unit = currentState.exercise.unit
+            )
+            // Повтор после сбоя записи: последний подход уже в списке — заменяем
+            // его текущими значениями (плитку могли поправить), а не дублируем.
+            if (finishPending && _recordedSets.isNotEmpty()) {
+                _recordedSets[_recordedSets.lastIndex] = set
+            } else {
+                _recordedSets += set
             }
             if (currentState.currentSet < currentState.totalSets) {
                 // … прежний код перехода к отдыху без изменений
@@ -1422,7 +1440,9 @@ $ADB -s emulator-5554 install "$SCRATCH/wt-master/app/build/outputs/apk/debug/ap
 ]}
 ```
 
-Поля сверены с `ExportData`/`ExportWorkout`/`ExportExercise` на 01.10.2026. `adb push "$SCRATCH/e1-import.json" /sdcard/Download/`, в приложении: список → «Экспорт и импорт» → «Импортировать тренировки» → выбрать файл (навигация по системному пикеру — через `uiautomator dump` и тапы). Затем удалить тренировку «Удаляемая» (меню → Удалить) и один раз пройти «Ноги А» до конца, чтобы в v7 была сессия.
+Поля сверены с `ExportData`/`ExportWorkout`/`ExportExercise` на 01.10.2026. `adb push "$SCRATCH/e1-import.json" /sdcard/Download/`, в приложении: список → «Экспорт и импорт» → «Импортировать тренировки» → выбрать файл. В системном пикере идти через корень памяти устройства → `Download` (раздел «Загрузки» может не видеть файл до медиасканирования); навигация — `uiautomator dump` и тапы.
+
+Запасной путь, если пикер не даётся: запустить сборку v7 один раз, `force-stop`, скопировать базу на хост (как в Step 3), вставить строки хостовым `sqlite3` (тренировки и упражнения из JSON выше, «Призрак» — с `workoutId` несуществующей тренировки), затем `adb push` в `/data/local/tmp/` и `adb shell run-as ru.hopes.workouttimer cp /data/local/tmp/workout_db databases/` (то же для `-wal`/`-shm`, либо удалить их после `PRAGMA wal_checkpoint(TRUNCATE)` на хосте). Затем удалить тренировку «Удаляемая» (меню → Удалить) и один раз пройти «Ноги А» до конца, чтобы в v7 была сессия.
 
 - [ ] **Step 3: Обновление до E1**
 
@@ -1432,11 +1452,20 @@ $ADB -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
 $ADB -s emulator-5554 shell am start -n ru.hopes.workouttimer/.presentation.MainActivity
 ```
 
-Проверить (скриншотами и данными):
+Проверить (скриншотами и данными). На эмуляторе (`google_apis_playstore`) `sqlite3` нет — база копируется на хост и читается хостовым `sqlite3` (есть в `~/Library/Android/sdk/platform-tools/`):
+
+```bash
+$ADB -s emulator-5554 shell am force-stop ru.hopes.workouttimer   # иначе копия может быть несогласованной
+for f in workout_db workout_db-wal workout_db-shm; do
+  $ADB -s emulator-5554 exec-out run-as ru.hopes.workouttimer cat databases/$f > "$SCRATCH/$f"
+done
+~/Library/Android/sdk/platform-tools/sqlite3 "$SCRATCH/workout_db" "SELECT name FROM exercise_catalog ORDER BY name; SELECT COUNT(*) FROM exercises WHERE catalogId = 0; PRAGMA foreign_key_check;"
+```
+
 - приложение открылось, обе тренировки и история «Ноги А» на месте;
-- `adb shell run-as ru.hopes.workouttimer ls databases` — база есть; при наличии на эмуляторе `sqlite3` (`adb shell run-as … sqlite3 databases/workout_db`) — `SELECT name FROM exercise_catalog ORDER BY name` даёт ровно `Без названия`, `Жим лёжа`, `Присед` (без «Призрака»), `PRAGMA foreign_keys` → 1;
-- если `sqlite3` нет — скопировать базу на хост (`adb exec-out run-as ru.hopes.workouttimer cat databases/workout_db > "$SCRATCH/e1.db"`, то же для `-wal`, `-shm`) и проверить хостовым `sqlite3`;
-- пройти «Ноги Б» до конца, снова скопировать базу — в `session_sets` появились подходы с `catalogId` из справочника.
+- справочник — ровно `Без названия`, `Жим лёжа`, `Присед` (без «Призрака»); упражнений с `catalogId = 0` — 0; `foreign_key_check` пуст;
+- `PRAGMA foreign_keys` в копии не проверяется (настройка живёт в соединении приложения) — что FK объявлены, видно по `foreignKeys` таблицы `session_sets` в `8.json`, а что работают — по `WorkoutDaoTest`;
+- пройти «Ноги Б» до конца, снова `force-stop` и копия — в `session_sets` появились подходы с `catalogId` из справочника.
 
 Удалить временный worktree: `git worktree remove "$SCRATCH/wt-master"`.
 
