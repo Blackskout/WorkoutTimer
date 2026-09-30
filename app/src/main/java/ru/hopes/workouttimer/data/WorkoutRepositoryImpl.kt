@@ -58,7 +58,8 @@ class WorkoutRepositoryImpl @Inject constructor(
                     reps = ex.reps,
                     restTimeMillis = ex.timeMillis,
                     orderInWorkout = ex.order,
-                    note = ex.note
+                    note = ex.note,
+                    catalogId = 0L // проставит транзакция DAO (Task 3/4)
                 )
             }
             dao.insertExercises(exerciseEntities)
@@ -89,7 +90,8 @@ class WorkoutRepositoryImpl @Inject constructor(
                 reps = ex.reps,
                 restTimeMillis = ex.timeMillis,
                 orderInWorkout = ex.order,
-                note = ex.note
+                note = ex.note,
+                catalogId = 0L // проставит транзакция DAO (Task 3/4)
             )
         }
         dao.insertExercises(exerciseEntities)
