@@ -65,13 +65,13 @@ class ExerciseNameTest {
 
     @Test
     fun `normalized name trims edges and collapses inner whitespace including nbsp`() {
-        assertEquals("Жим лёжа", normalizedExerciseName("  Жим    лёжа\t"))
+        assertEquals("Жим лёжа", normalizedExerciseName("  Жим \u00A0  лёжа\t"))
     }
 
     @Test
     fun `blank name becomes untitled`() {
         assertEquals(UNTITLED_EXERCISE_NAME, normalizedExerciseName(""))
-        assertEquals(UNTITLED_EXERCISE_NAME, normalizedExerciseName("   "))
+        assertEquals(UNTITLED_EXERCISE_NAME, normalizedExerciseName(" \u00A0 "))
     }
 
     @Test
