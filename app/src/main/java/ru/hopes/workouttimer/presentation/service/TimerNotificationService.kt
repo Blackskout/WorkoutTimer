@@ -11,6 +11,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.presentation.MainActivity
+import java.util.Locale
 
 class TimerNotificationService : Service() {
 
@@ -223,7 +224,7 @@ class TimerNotificationService : Service() {
         val totalSeconds = millis / 1000
         val minutes = totalSeconds / 60
         val seconds = totalSeconds % 60
-        return String.format("%02d:%02d", minutes, seconds)
+        return String.format(Locale.US, "%02d:%02d", minutes, seconds)
     }
 
     private val notificationManager: NotificationManager

@@ -6,6 +6,7 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Build
+import android.util.Log
 import androidx.annotation.RawRes
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -44,14 +45,14 @@ class SoundPlayer @Inject constructor (@ApplicationContext private val context: 
                 start()
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w(TAG, "Не удалось проиграть звук", e)
             releaseMediaPlayer()
         }
     }
 
     private fun requestAudioFocus() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                 .setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_NOTIFICATION)
@@ -60,7 +61,8 @@ class SoundPlayer @Inject constructor (@ApplicationContext private val context: 
                 )
                 .setAcceptsDelayedFocusGain(false)
                 .build()
-            audioManager.requestAudioFocus(audioFocusRequest!!)
+            audioFocusRequest = request
+            audioManager.requestAudioFocus(request)
         } else {
             @Suppress("DEPRECATION")
             audioManager.requestAudioFocus(
@@ -91,5 +93,9 @@ class SoundPlayer @Inject constructor (@ApplicationContext private val context: 
 
     fun release() {
         releaseMediaPlayer()
+    }
+
+    private companion object {
+        const val TAG = "SoundPlayer"
     }
 }
