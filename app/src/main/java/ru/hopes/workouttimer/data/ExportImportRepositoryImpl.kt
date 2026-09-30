@@ -51,7 +51,7 @@ class ExportImportRepositoryImpl @Inject constructor(
     }
 
     override suspend fun shareJson(workoutsJson: String) {
-        val uri = exportToJson(workoutsJson) ?: throw Exception("Не удалось создать файл для экспорта")
+        val uri = exportToJson(workoutsJson)
 
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "application/json"

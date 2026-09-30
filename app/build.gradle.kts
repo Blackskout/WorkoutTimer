@@ -67,23 +67,20 @@ tasks.withType<KotlinJvmCompile>().configureEach {
 
 dependencies {
 
-    //noinspection GradleDependency
     implementation(libs.androidx.core.splashscreen)
     implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.kotlin.stdlib)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
     implementation(libs.androidx.compose.runtime)
-    ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.room.runtime)
-    ksp (libs.androidx.room.compiler)
+    ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
     implementation(libs.hilt.android)
-    ksp (libs.hilt.compiler)
+    ksp(libs.hilt.compiler)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
