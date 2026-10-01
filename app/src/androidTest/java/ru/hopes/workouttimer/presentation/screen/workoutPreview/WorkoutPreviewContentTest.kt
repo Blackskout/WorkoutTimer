@@ -5,6 +5,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -70,6 +71,15 @@ class WorkoutPreviewContentTest {
         bottom = bottom,
         addedExerciseIds = addedIds
     )
+
+    @Test
+    fun ошибка_загрузки_не_показывает_прежнюю_тренировку() {
+        show(WorkoutPreviewState(isLoaded = true, loadFailed = true, workout = back))
+
+        composeRule.onNodeWithText("Не удалось загрузить тренировку").assertIsDisplayed()
+        composeRule.onNodeWithText("Жим лёжа", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Спина", useUnmergedTree = true).assertDoesNotExist()
+    }
 
     @Test
     fun строка_показывает_план_и_прошлый_раз() {
