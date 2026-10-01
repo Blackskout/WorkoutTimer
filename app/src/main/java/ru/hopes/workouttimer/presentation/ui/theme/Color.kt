@@ -5,7 +5,10 @@ import androidx.compose.ui.graphics.Color
 val Background = Color(0xFF0B0B0F)
 val SurfaceDark = Color(0xFF16161C)
 val SurfaceElevated = Color(0xFF1E1E26)
+/** Рамки карточек и сетка графика: декоративно, нарочно едва видно. */
 val OutlineDark = Color(0xFF26262E)
+/** Дорожки прогресса и рамки полей: несут смысл, поэтому заметнее (≈2:1 к фону). */
+val OutlineStrong = Color(0xFF4A4A56)
 
 val TextPrimary = Color(0xFFF2F2F5)
 val TextSecondary = Color(0xFF8A8A96)

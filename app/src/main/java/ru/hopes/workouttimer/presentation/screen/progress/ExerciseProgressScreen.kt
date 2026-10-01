@@ -343,7 +343,7 @@ private fun SessionRow(session: ProgressSession, isSelected: Boolean, format: Se
             .background(MaterialTheme.colorScheme.surface)
             .border(
                 1.dp,
-                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                 shape
             )
             .semantics(mergeDescendants = true) { selected = isSelected }

@@ -55,4 +55,15 @@ class WorkoutSessionTest {
         val summary = runningWorkoutOf(present(WorkoutExecutionState.Active(push, 1), listOf(SessionExercise(push), added)))
         assertEquals(setOf(42), summary!!.addedExerciseIds)
     }
+
+    @Test
+    fun `сводка несёт сделанные подходы своих упражнений, без нулей и добавленных`() {
+        val pull = push.copy(id = 2, name = "Pull")
+        val added = SessionExercise(push.copy(id = 42), addedToday = true, doneSets = 2)
+        val exercises = listOf(SessionExercise(push, doneSets = 1), SessionExercise(pull), added)
+
+        val summary = runningWorkoutOf(present(WorkoutExecutionState.Active(push, 2), exercises))
+
+        assertEquals(mapOf(1 to 1), summary!!.doneSets)
+    }
 }

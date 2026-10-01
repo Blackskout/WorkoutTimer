@@ -43,6 +43,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -180,6 +181,8 @@ internal fun WorkoutPreviewContent(
                     PreviewExerciseRow(
                         exercise = exercise,
                         lastTime = state.lastTime[exercise.catalogId],
+                        // Только начатые: «0 из 4» на каждой строке было бы шумом.
+                        todayDone = state.todayDone?.get(exercise.id),
                         format = format,
                         canAdd = state.canAddToday,
                         added = exercise.id in state.addedExerciseIds,
@@ -206,6 +209,8 @@ private fun summaryLine(count: Int, durationMillis: Long?): String =
 private fun PreviewExerciseRow(
     exercise: Exercise,
     lastTime: LastTime?,
+    /** Идёт эта тренировка и упражнение начато — сделано подходов сегодня; иначе null. */
+    todayDone: Int?,
     format: SetFormat,
     canAdd: Boolean,
     added: Boolean,
@@ -218,7 +223,7 @@ private fun PreviewExerciseRow(
             .fillMaxWidth()
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, shape),
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Вся строка, кроме кнопки добавления, — тап на прогресс упражнения. Метка нажатия,
@@ -246,6 +251,19 @@ private fun PreviewExerciseRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 2.dp)
             )
+            if (todayDone != null) {
+                Text(
+                    text = if (todayDone >= exercise.sets) {
+                        stringResource(R.string.preview_today_done)
+                    } else {
+                        stringResource(R.string.preview_today_progress, todayDone, exercise.sets)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
             Text(
                 text = lastTimeLine(lastTime, format),
                 style = MaterialTheme.typography.bodySmall,

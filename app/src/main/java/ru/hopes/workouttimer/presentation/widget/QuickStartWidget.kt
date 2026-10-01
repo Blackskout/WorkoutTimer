@@ -83,7 +83,8 @@ private fun WidgetContent(workouts: List<WidgetWorkout>) {
         Text(
             text = context.getString(R.string.app_name),
             style = TextStyle(
-                color = GlanceTheme.colors.onSurface,
+                // Фирменный салатовый — как акцент приложения.
+                color = GlanceTheme.colors.primary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             ),

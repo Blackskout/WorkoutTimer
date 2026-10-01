@@ -72,7 +72,7 @@ internal fun ProgressChart(
     val lineColor = MaterialTheme.colorScheme.primary
     // Кольцо цвета подложки: точка читается поверх линии и соседних точек.
     val ringColor = MaterialTheme.colorScheme.surface
-    val gridColor = MaterialTheme.colorScheme.outline
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
     val crosshairColor = MaterialTheme.colorScheme.onSurfaceVariant
     // Текст — цветом текста, никогда цветом линии.
     val labelStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)

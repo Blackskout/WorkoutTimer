@@ -81,6 +81,21 @@ class WorkoutPreviewViewModelTest {
     }
 
     @Test
+    fun `идёт эта тренировка — сделанное сегодня по упражнениям`() {
+        running.value = RunningWorkout(2, "Спина", isLoading = false, addedExerciseIds = emptySet(), doneSets = mapOf(5 to 2))
+
+        assertEquals(mapOf(5 to 2), viewModel().state.value.todayDone)
+    }
+
+    @Test
+    fun `без сессии или при другой тренировке сегодняшнего прогресса нет`() {
+        assertNull(viewModel().state.value.todayDone)
+
+        running.value = RunningWorkout(1, "Ноги", isLoading = false, addedExerciseIds = emptySet(), doneSets = mapOf(5 to 2))
+        assertNull(viewModel().state.value.todayDone)
+    }
+
+    @Test
     fun `идёт другая тренировка — подсказка и добавление`() {
         running.value = RunningWorkout(1, "Ноги", isLoading = false, addedExerciseIds = emptySet())
 

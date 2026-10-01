@@ -65,7 +65,12 @@ data class RunningWorkout(
     val workoutName: String,
     val isLoading: Boolean,
     /** exercise.id исходных строк, добавленных «+ в сегодняшнюю». */
-    val addedExerciseIds: Set<Int>
+    val addedExerciseIds: Set<Int>,
+    /**
+     * Сделано подходов по своим упражнениям тренировки (exercise.id → число), только ненулевые.
+     * Меняется при закрытии подхода, а не на тиках — подписчикам сводки это по-прежнему дёшево.
+     */
+    val doneSets: Map<Int, Int> = emptyMap()
 )
 
 internal fun runningWorkoutOf(session: WorkoutSession): RunningWorkout? {
@@ -75,7 +80,11 @@ internal fun runningWorkoutOf(session: WorkoutSession): RunningWorkout? {
         workoutId = present.workoutId,
         workoutName = present.workoutName,
         isLoading = present.phase is WorkoutExecutionState.Loading,
-        addedExerciseIds = present.exercises.filter { it.addedToday }.map { it.exercise.id }.toSet()
+        addedExerciseIds = present.exercises.filter { it.addedToday }.map { it.exercise.id }.toSet(),
+        // Добавленные — строки другой тренировки: их id в превью этой тренировки не встретятся.
+        doneSets = present.exercises
+            .filter { !it.addedToday && it.doneSets > 0 }
+            .associate { it.exercise.id to it.doneSets }
     )
 }
 

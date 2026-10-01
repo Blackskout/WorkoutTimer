@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -304,10 +305,14 @@ fun NavGraph(
             title = { Text(stringResource(R.string.execution_exit_title)) },
             text = { Text(stringResource(R.string.execution_exit_message)) },
             confirmButton = {
-                TextButton(onClick = {
-                    showExitDialog = false
-                    miniBar.abandon()
-                }) { Text(stringResource(R.string.common_exit)) }
+                TextButton(
+                    onClick = {
+                        showExitDialog = false
+                        miniBar.abandon()
+                    },
+                    // Выход теряет несохранённое — кнопка в цвете ошибки, «Отмена» нейтральна.
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text(stringResource(R.string.common_exit)) }
             },
             dismissButton = {
                 TextButton(onClick = { showExitDialog = false }) { Text(stringResource(R.string.common_cancel)) }

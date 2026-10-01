@@ -55,7 +55,8 @@ class WorkoutPreviewViewModel @Inject constructor(
                 lastTime = lastTimeByCatalog(lastSets),
                 lastDurationMillis = durations[workoutId],
                 bottom = previewBottomOf(workoutId, workout, running),
-                addedExerciseIds = running?.addedExerciseIds.orEmpty()
+                addedExerciseIds = running?.addedExerciseIds.orEmpty(),
+                todayDone = running?.takeIf { !it.isLoading && it.workoutId == workoutId }?.doneSets
             )
         }
             .onEach { _state.value = it }
@@ -80,7 +81,9 @@ data class WorkoutPreviewState(
     val lastDurationMillis: Long? = null,
     val bottom: PreviewBottom = PreviewBottom.None,
     /** exercise.id строк этой тренировки, уже добавленных в идущую. */
-    val addedExerciseIds: Set<Int> = emptySet()
+    val addedExerciseIds: Set<Int> = emptySet(),
+    /** Идёт эта тренировка: сделано подходов сегодня по exercise.id; иначе null. */
+    val todayDone: Map<Int, Int>? = null
 ) {
     /** «+ В сегодняшнюю» — только когда идёт другая тренировка. */
     val canAddToday: Boolean get() = bottom is PreviewBottom.RunningOther

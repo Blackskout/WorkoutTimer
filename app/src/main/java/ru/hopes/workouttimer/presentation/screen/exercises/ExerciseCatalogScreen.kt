@@ -232,7 +232,7 @@ private fun CatalogRow(
             .fillMaxWidth()
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
             .clickable(
                 role = Role.Button,
                 onClickLabel = stringResource(R.string.catalog_open_progress),

@@ -72,7 +72,7 @@ fun MiniWorkoutBarContent(
     onExit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val outline = MaterialTheme.colorScheme.outline
+    val outline = MaterialTheme.colorScheme.outlineVariant
     val status = state.status
     val statusText = when (status) {
         is MiniBarStatus.Resting -> {
@@ -92,7 +92,7 @@ fun MiniWorkoutBarContent(
             .fillMaxWidth()
             .height(BarHeight)
             .drawBehind {
-                // Верхняя граница цвета outline — как рамка карточек темы.
+                // Верхняя граница цвета outlineVariant — как рамка карточек темы.
                 drawLine(outline, Offset.Zero, Offset(size.width, 0f), strokeWidth = TopBorder.toPx())
             },
         verticalAlignment = Alignment.CenterVertically

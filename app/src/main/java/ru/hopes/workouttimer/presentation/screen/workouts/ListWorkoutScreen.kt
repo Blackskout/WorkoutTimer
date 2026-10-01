@@ -360,6 +360,7 @@ internal fun QueueContent(
                 item = item,
                 position = if (state.isSearching) null else index + 2,
                 durationMillis = state.lastSessionDurations[item.workout.id],
+                isRunning = item.workout.id == state.runningWorkoutId,
                 onClick = { onOpen(item.workout) },
                 onMenu = { onMenuClick(item.workout) }
             )
@@ -447,6 +448,8 @@ private fun WorkoutRow(
     item: WorkoutWithExercises,
     position: Int?,
     durationMillis: Long?,
+    /** Эта тренировка сейчас идёт: акцентная рамка и «идёт» вместо давности. */
+    isRunning: Boolean,
     onClick: () -> Unit,
     onMenu: () -> Unit
 ) {
@@ -456,7 +459,11 @@ private fun WorkoutRow(
             .fillMaxWidth()
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .border(
+                1.dp,
+                if (isRunning) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                shape
+            )
             .combinedClickable(onClick = onClick, onLongClick = onMenu)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -492,9 +499,10 @@ private fun WorkoutRow(
             )
         }
         Text(
-            text = daysAgoText(item.workout.lastUseAt),
+            text = if (isRunning) stringResource(R.string.list_running) else daysAgoText(item.workout.lastUseAt),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (isRunning) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (isRunning) FontWeight.Medium else null
         )
         IconButton(onClick = onMenu) {
             Icon(

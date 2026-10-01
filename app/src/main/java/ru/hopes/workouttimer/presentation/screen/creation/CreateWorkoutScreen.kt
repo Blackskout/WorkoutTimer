@@ -27,6 +27,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -292,10 +293,14 @@ fun CreateWorkoutScreen(
             title = { Text(stringResource(R.string.create_exit_title)) },
             text = { Text(stringResource(R.string.create_exit_message)) },
             confirmButton = {
-                TextButton(onClick = {
-                    showExitDialog = false
-                    viewModel.processCommand(CreateWorkoutCommand.Back)
-                }) { Text(stringResource(R.string.common_exit)) }
+                TextButton(
+                    onClick = {
+                        showExitDialog = false
+                        viewModel.processCommand(CreateWorkoutCommand.Back)
+                    },
+                    // Выход теряет несохранённое — кнопка в цвете ошибки, «Отмена» нейтральна.
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text(stringResource(R.string.common_exit)) }
             },
             dismissButton = {
                 TextButton(onClick = { showExitDialog = false }) { Text(stringResource(R.string.common_cancel)) }
@@ -320,7 +325,7 @@ private fun ExerciseRow(
             .fillMaxWidth()
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
             .clickable(onClick = onClick)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
