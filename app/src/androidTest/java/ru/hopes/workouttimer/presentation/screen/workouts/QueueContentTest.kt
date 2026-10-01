@@ -78,4 +78,14 @@ class QueueContentTest {
 
         composeRule.runOnIdle { assertEquals(listOf(2), opened) }
     }
+
+    @Test
+    fun тап_по_карточке_следующей_открывает_просмотр() {
+        show(runningWorkoutId = null)
+
+        // Клик по названию, а не по центру карточки: центр близко к кнопке «НАЧАТЬ».
+        composeRule.onNodeWithText("Ноги", useUnmergedTree = true).performClick()
+
+        composeRule.runOnIdle { assertEquals(listOf(1), opened) }
+    }
 }

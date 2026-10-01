@@ -47,6 +47,7 @@ import ru.hopes.workouttimer.presentation.screen.exportImport.ExportImportScreen
 import ru.hopes.workouttimer.presentation.screen.progress.ExerciseProgressScreen
 import ru.hopes.workouttimer.presentation.screen.workoutExecution.WorkoutExecutionScreen
 import ru.hopes.workouttimer.presentation.screen.workoutHistory.WorkoutHistoryScreen
+import ru.hopes.workouttimer.presentation.screen.workoutPreview.WorkoutPreviewScreen
 import ru.hopes.workouttimer.presentation.screen.workouts.ListWorkoutScreen
 import ru.hopes.workouttimer.presentation.session.MiniWorkoutBar
 import ru.hopes.workouttimer.presentation.session.MiniWorkoutBarViewModel
@@ -123,15 +124,9 @@ fun NavGraph(
                     onAddWorkoutClick = {
                         navController.navigate(Screen.CreateWorkout.route)
                     },
-                    // До экрана просмотра: без сессии тап по строке запускает тренировку, как
-                    // раньше; при идущей — возвращает в неё, а не начинает вторую.
+                    // Тап по тренировке открывает просмотр: старт — явной кнопкой.
                     onOpen = { workout ->
-                        val runningId = miniBar.prepareReturn()
-                        if (runningId != null) {
-                            navController.returnToSession(runningId)
-                        } else {
-                            navController.navigate(Screen.Execution.createRoute(workout.id))
-                        }
+                        navController.navigate(Screen.WorkoutPreview.createRoute(workout.id))
                     },
                     onStart = { workout ->
                         navController.navigate(Screen.Execution.createRoute(workout.id))
@@ -221,6 +216,32 @@ fun NavGraph(
                         navController.popBackStack()
                     },
                     onExerciseClick = { catalogId ->
+                        navController.navigate(Screen.ExerciseProgress.createRoute(catalogId))
+                    }
+                )
+            }
+
+            // Просмотр тренировки: состав, «прошлый раз», «Начать» / «Вернуться» / «+ в сегодняшнюю»
+            composable(
+                route = Screen.WorkoutPreview.route,
+                arguments = listOf(
+                    navArgument("workout_id") { type = NavType.IntType }
+                )
+            ) { entry ->
+                val workoutId = Screen.WorkoutPreview.getWorkoutId(entry.arguments)
+                WorkoutPreviewScreen(
+                    workoutId = workoutId,
+                    onNavigateBack = { navController.popBackStack() },
+                    // Просмотр заменяется выполнением: «Назад» (сворачивание) ведёт на список,
+                    // как после старта из списка.
+                    onStart = {
+                        navController.navigate(Screen.Execution.createRoute(workoutId)) {
+                            popUpTo(Screen.WorkoutPreview.route) { inclusive = true }
+                        }
+                    },
+                    // Просмотр остаётся под выполнением: «Назад» вернёт сюда.
+                    onReturn = returnToSession,
+                    onOpenProgress = { catalogId ->
                         navController.navigate(Screen.ExerciseProgress.createRoute(catalogId))
                     }
                 )

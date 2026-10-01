@@ -2,6 +2,7 @@ package ru.hopes.workouttimer.presentation.screen.workouts
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -335,7 +336,8 @@ internal fun QueueContent(
                         onAction = {
                             if (state.runningWorkoutId == null) onStart(next.workout) else onReturn()
                         },
-                        onMenu = { onMenuClick(next.workout) }
+                        onMenu = { onMenuClick(next.workout) },
+                        onOpen = { onOpen(next.workout) }
                     )
                 }
             }
@@ -371,13 +373,15 @@ private fun NextWorkoutCard(
     durationMillis: Long?,
     action: HeroAction?,
     onAction: () -> Unit,
-    onMenu: () -> Unit
+    onMenu: () -> Unit,
+    onOpen: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
             .background(Brush.linearGradient(listOf(Accent, AccentDark)))
+            .clickable(onClick = onOpen)
             .padding(16.dp)
     ) {
         IconButton(
