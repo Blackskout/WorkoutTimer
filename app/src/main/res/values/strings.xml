@@ -92,6 +92,9 @@
     <string name="execution_loading_subtitle">Секунду…</string>
     <string name="execution_note_dialog_title">Заметка к упражнению</string>
     <string name="execution_note_placeholder" tools:ignore="TypographyEllipsis">Введите заметку...</string>
+    <string name="execution_minimize">Свернуть тренировку</string>
+    <string name="execution_more">Ещё</string>
+    <string name="execution_exit_without_saving">Выйти без сохранения</string>
 
     <!-- Плашка свёрнутой тренировки -->
     <string name="minibar_rest">Отдых %1$s</string>

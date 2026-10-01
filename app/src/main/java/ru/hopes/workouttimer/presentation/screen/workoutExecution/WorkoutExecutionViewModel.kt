@@ -72,16 +72,14 @@ class WorkoutExecutionViewModel @Inject constructor(
 
     fun dismissFinishError() = manager.dismissFinishError()
 
+    /** «Выйти без сохранения» из меню ⋮: экран сначала уходит, потом сессия сбрасывается. */
+    fun abandon() = manager.abandon()
+
     override fun onCleared() {
         super.onCleared()
-        val id = ownedSessionId ?: return
-        // Сворачивания ещё нет: уход с экрана идущей тренировки — это выход без сохранения.
-        val current = manager.session.value as? WorkoutSession.Present
-        if (current?.sessionId == id && manager.isRunning) {
-            manager.abandon()
-        } else {
-            manager.close(id)
-        }
+        // close() сам ничего не делает, если тренировка идёт (экран свернули) или сессия
+        // уже другая; закрывает только Loading, Error и Finished этой сессии.
+        ownedSessionId?.let { manager.close(it) }
     }
 }
 

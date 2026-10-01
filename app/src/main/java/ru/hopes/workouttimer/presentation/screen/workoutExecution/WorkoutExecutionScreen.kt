@@ -22,7 +22,10 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -70,9 +73,10 @@ import ru.hopes.workouttimer.presentation.utils.toCorrectNum
 
 @Composable
 fun WorkoutExecutionScreen(
-    viewModel: WorkoutExecutionViewModel = hiltViewModel(),
-    onExerciseCompleted: () -> Unit,
-    workoutId: Int
+    workoutId: Int,
+    onMinimize: () -> Unit,
+    onLeave: () -> Unit,
+    viewModel: WorkoutExecutionViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val chrome by viewModel.chrome.collectAsState()
@@ -85,18 +89,23 @@ fun WorkoutExecutionScreen(
     var showExitDialog by remember { mutableStateOf(false) }
     var showFinishDialog by remember { mutableStateOf(false) }
     var showExercisePicker by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }
 
-    // Уходить без подтверждения нечего терять только в Loading/Error/Finished:
-    // в Finished сессия уже сохранена, в остальных двух её ещё нет.
-    val hasUnsavedProgress =
-        uiState is WorkoutExecutionState.Active || uiState is WorkoutExecutionState.Rest
+    // Идёт тренировка — «Назад» и стрелка сворачивают её без диалога. В Loading, Error и
+    // Finished сворачивать нечего: уход закрывает сессию (onCleared → close).
+    val isLive = uiState is WorkoutExecutionState.Active || uiState is WorkoutExecutionState.Rest
 
-    // start() идемпотентен: при пересоздании активности идущая сессия не сбрасывается.
+    // start() идемпотентен: при пересоздании активности и при возврате в свёрнутую
+    // тренировку сессия не сбрасывается.
     LaunchedEffect(workoutId) {
         viewModel.start(workoutId)
     }
 
-    BackHandler(enabled = hasUnsavedProgress) { showExitDialog = true }
+    // Пока пишется завершение, «Назад» поглощается и ничего не делает: свернуть посреди
+    // записи значило бы получить Finished, которого никто не увидит.
+    BackHandler(enabled = isLive) {
+        if (!chrome.isFinishing) onMinimize()
+    }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val finishError by viewModel.finishError.collectAsState()
@@ -113,7 +122,7 @@ fun WorkoutExecutionScreen(
         FinishedContent(
             workoutName = chrome.workoutName,
             durationMillis = finishedState.durationMillis,
-            onDone = onExerciseCompleted
+            onDone = onLeave
         )
         return
     }
@@ -141,11 +150,16 @@ fun WorkoutExecutionScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = {
-                    if (hasUnsavedProgress) showExitDialog = true else onExerciseCompleted()
+                    when {
+                        !isLive -> onLeave()
+                        !chrome.isFinishing -> onMinimize()
+                    }
                 }) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.common_back),
+                        contentDescription = stringResource(
+                            if (isLive) R.string.execution_minimize else R.string.common_back
+                        ),
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -165,7 +179,29 @@ fun WorkoutExecutionScreen(
                         )
                     }
                 }
-                Box(modifier = Modifier.size(48.dp))
+                // «Назад» больше не выходит — выход без сохранения переехал в меню.
+                if (isLive && !chrome.isFinishing) {
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = stringResource(R.string.execution_more),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.execution_exit_without_saving)) },
+                                onClick = {
+                                    menuExpanded = false
+                                    showExitDialog = true
+                                }
+                            )
+                        }
+                    }
+                } else {
+                    Box(modifier = Modifier.size(48.dp))
+                }
             }
 
             if (currentExercise != null && chrome.totalExercises > 0) {
@@ -327,7 +363,10 @@ fun WorkoutExecutionScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showExitDialog = false
-                    onExerciseCompleted()
+                    // Сначала уходим, потом сбрасываем: уходящий экран держит последний кадр
+                    // (ViewModel не отдаёт None), и onCleared застанет уже None — close() пустой.
+                    onMinimize()
+                    viewModel.abandon()
                 }) { Text(stringResource(R.string.common_exit)) }
             },
             dismissButton = {

@@ -81,17 +81,24 @@ class WorkoutExecutionViewModelTest {
     }
 
     @Test
-    fun `leaving a running session abandons it`() {
+    fun `leaving a running session only asks to close it, which keeps it running`() {
         every { manager.start(1) } returns 7L
         every { manager.isRunning } returns true
         val vm = viewModel()
         vm.start(1)
         session.value = present(7L, WorkoutExecutionState.Active(push, 1))
 
-        store.clear()
+        store.clear() // экран свернули
+
+        verify { manager.close(7L) } // менеджер сам ничего не сделает: тренировка в процессе
+        verify(exactly = 0) { manager.abandon() }
+    }
+
+    @Test
+    fun `exit without saving abandons the session`() {
+        viewModel().abandon()
 
         verify { manager.abandon() }
-        verify(exactly = 0) { manager.close(any()) }
     }
 
     @Test
