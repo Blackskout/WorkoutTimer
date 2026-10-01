@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import ru.hopes.workouttimer.data.dao.ExerciseWithCatalog
 import ru.hopes.workouttimer.data.dao.WorkoutWithExercises
 import ru.hopes.workouttimer.data.entity.ExerciseEntity
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
@@ -23,17 +24,20 @@ class GetWidgetWorkoutsUseCaseTest {
     ) = WorkoutWithExercises(
         workout = WorkoutEntity(id = id, name = name, lastUseAt = lastUseAt),
         exercises = (1..exerciseCount).map { index ->
-            ExerciseEntity(
-                id = index,
-                workoutId = id.toLong(),
-                name = "Упражнение $index",
-                weight = 10.0,
-                sets = 3,
-                reps = 12,
-                restTimeMillis = 120_000L,
-                orderInWorkout = index,
-                note = "",
-                catalogId = index.toLong() + 1
+            ExerciseWithCatalog(
+                exercise = ExerciseEntity(
+                    id = index,
+                    workoutId = id.toLong(),
+                    name = "Упражнение $index",
+                    weight = 10.0,
+                    sets = 3,
+                    reps = 12,
+                    restTimeMillis = 120_000L,
+                    orderInWorkout = index,
+                    note = "",
+                    catalogId = index.toLong() + 1
+                ),
+                catalog = null
             )
         }
     )

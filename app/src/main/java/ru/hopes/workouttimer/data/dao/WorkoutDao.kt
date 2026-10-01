@@ -13,6 +13,8 @@ import ru.hopes.workouttimer.data.entity.WorkoutEntity
 import ru.hopes.workouttimer.data.entity.WorkoutSessionEntity
 import ru.hopes.workouttimer.domain.model.ExerciseUnit
 import ru.hopes.workouttimer.domain.model.exerciseNameKey
+import ru.hopes.workouttimer.domain.model.exerciseUnitOf
+import ru.hopes.workouttimer.domain.model.fitLoadToUnit
 import ru.hopes.workouttimer.domain.model.normalizedExerciseName
 
 @Dao
@@ -102,26 +104,39 @@ interface WorkoutDao {
     )
     suspend fun cleanupCatalog()
 
-    /** Ищет запись по ключу названия, создаёт с единицей «кг», если её нет. */
-    suspend fun findOrCreateCatalog(rawName: String): ExerciseCatalogEntity {
+    /** Ищет запись по ключу названия; если её нет — создаёт с единицей [unitIfNew]. */
+    suspend fun findOrCreateCatalog(rawName: String, unitIfNew: ExerciseUnit): ExerciseCatalogEntity {
         val name = normalizedExerciseName(rawName)
         val key = exerciseNameKey(name)
         findCatalogByKey(key)?.let { return it }
-        val entry = ExerciseCatalogEntity(name = name, nameKey = key, unit = ExerciseUnit.KG.name)
+        val entry = ExerciseCatalogEntity(name = name, nameKey = key, unit = unitIfNew.name)
         return entry.copy(id = insertCatalog(entry))
     }
 
     // В упражнение пишется название из справочника: «присед » сохраняется как «Присед».
-    private suspend fun resolveCatalog(workoutId: Long, exercises: List<ExerciseEntity>): List<ExerciseEntity> =
-        exercises.map { ex ->
-            val entry = findOrCreateCatalog(ex.name)
-            ex.copy(workoutId = workoutId, catalogId = entry.id, name = entry.name)
+    // Нагрузка приводится к единице найденной записи — она главнее того, что пришло
+    // из редактора или файла: у плиты целый номер 1..30, у кг и без веса нет добавки.
+    private suspend fun resolveCatalog(workoutId: Long, drafts: List<ExerciseDraft>): List<ExerciseEntity> =
+        drafts.map { draft ->
+            val entry = findOrCreateCatalog(draft.exercise.name, draft.unitIfNew)
+            val load = fitLoadToUnit(draft.exercise.weight, draft.exercise.extraWeight, exerciseUnitOf(entry.unit))
+            draft.exercise.copy(
+                workoutId = workoutId,
+                catalogId = entry.id,
+                name = entry.name,
+                weight = load.weight,
+                extraWeight = load.extraWeight
+            )
         }
+
+    // Редактор создаёт новые записи в кг: единицу меняют только на экране «Упражнения».
+    private fun editorDrafts(exercises: List<ExerciseEntity>): List<ExerciseDraft> =
+        exercises.map { ExerciseDraft(it, ExerciseUnit.KG) }
 
     @Transaction
     suspend fun insertWorkoutResolvingCatalog(workout: WorkoutEntity, exercises: List<ExerciseEntity>): Long {
         val workoutId = insertWorkout(workout)
-        insertExercises(resolveCatalog(workoutId, exercises))
+        insertExercises(resolveCatalog(workoutId, editorDrafts(exercises)))
         cleanupCatalog()
         return workoutId
     }
@@ -134,7 +149,7 @@ interface WorkoutDao {
     suspend fun importWorkouts(workouts: List<Pair<WorkoutEntity, List<ExerciseEntity>>>): Int {
         for ((workout, exercises) in workouts) {
             val workoutId = insertWorkout(workout)
-            insertExercises(resolveCatalog(workoutId, exercises))
+            insertExercises(resolveCatalog(workoutId, editorDrafts(exercises)))
         }
         cleanupCatalog()
         return workouts.size
@@ -144,7 +159,7 @@ interface WorkoutDao {
     suspend fun updateWorkoutResolvingCatalog(workoutId: Int, name: String, exercises: List<ExerciseEntity>) {
         updateWorkout(workoutId, name)
         deleteExercisesByWorkoutId(workoutId.toLong())
-        insertExercises(resolveCatalog(workoutId.toLong(), exercises))
+        insertExercises(resolveCatalog(workoutId.toLong(), editorDrafts(exercises)))
         cleanupCatalog()
     }
 
@@ -163,7 +178,7 @@ interface WorkoutDao {
         val sessionId = insertSession(session)
         for (draft in sets) {
             val catalogId = draft.catalogId.takeIf { it > 0 && findCatalogById(it) != null }
-                ?: findOrCreateCatalog(draft.exerciseName).id
+                ?: findOrCreateCatalog(draft.exerciseName, exerciseUnitOf(draft.unit)).id
             insertSessionSet(
                 SessionSetEntity(
                     sessionId = sessionId,

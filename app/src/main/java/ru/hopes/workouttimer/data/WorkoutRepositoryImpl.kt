@@ -51,7 +51,8 @@ class WorkoutRepositoryImpl @Inject constructor(
                 restTimeMillis = ex.timeMillis,
                 orderInWorkout = ex.order,
                 note = ex.note,
-                catalogId = 0L // проставит транзакция DAO
+                catalogId = 0L, // проставит транзакция DAO
+                extraWeight = ex.extraWeight
             )
         }
         withContext(Dispatchers.IO) {
@@ -83,7 +84,8 @@ class WorkoutRepositoryImpl @Inject constructor(
                 restTimeMillis = ex.timeMillis,
                 orderInWorkout = ex.order,
                 note = ex.note,
-                catalogId = 0L // проставит транзакция DAO
+                catalogId = 0L, // проставит транзакция DAO
+                extraWeight = ex.extraWeight
             )
         }
         dao.insertWorkoutResolvingCatalog(workoutEntity, exerciseEntities)

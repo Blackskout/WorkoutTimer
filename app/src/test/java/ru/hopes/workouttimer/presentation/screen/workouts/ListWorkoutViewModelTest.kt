@@ -22,6 +22,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import ru.hopes.workouttimer.data.dao.ExerciseWithCatalog
 import ru.hopes.workouttimer.data.dao.WorkoutWithExercises
 import ru.hopes.workouttimer.data.entity.ExerciseEntity
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
@@ -46,17 +47,20 @@ class ListWorkoutViewModelTest {
     private fun workoutWith(id: Int, name: String, lastUseAt: Long) = WorkoutWithExercises(
         workout = WorkoutEntity(id = id, name = name, lastUseAt = lastUseAt),
         exercises = listOf(
-            ExerciseEntity(
-                id = id,
-                workoutId = id.toLong(),
-                name = "Упражнение",
-                weight = 10.0,
-                sets = 3,
-                reps = 12,
-                restTimeMillis = 120_000L,
-                orderInWorkout = 1,
-                note = "",
-                catalogId = 1L
+            ExerciseWithCatalog(
+                exercise = ExerciseEntity(
+                    id = id,
+                    workoutId = id.toLong(),
+                    name = "Упражнение",
+                    weight = 10.0,
+                    sets = 3,
+                    reps = 12,
+                    restTimeMillis = 120_000L,
+                    orderInWorkout = 1,
+                    note = "",
+                    catalogId = 1L
+                ),
+                catalog = null
             )
         )
     )

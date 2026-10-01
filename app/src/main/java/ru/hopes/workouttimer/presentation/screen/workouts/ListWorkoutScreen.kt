@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.hopes.workouttimer.R
+import ru.hopes.workouttimer.data.dao.ExerciseWithCatalog
 import ru.hopes.workouttimer.data.dao.WorkoutWithExercises
 import ru.hopes.workouttimer.data.entity.ExerciseEntity
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
@@ -502,16 +503,19 @@ private fun previewWorkout(
 ): WorkoutWithExercises = WorkoutWithExercises(
     workout = WorkoutEntity(id = id, name = name, lastUseAt = lastUseAt),
     exercises = List(exerciseCount) { index ->
-        ExerciseEntity(
-            id = index,
-            workoutId = id.toLong(),
-            name = "Упражнение ${index + 1}",
-            weight = 20.0,
-            sets = 3,
-            reps = 10,
-            restTimeMillis = 60_000,
-            orderInWorkout = index,
-            catalogId = index.toLong() + 1
+        ExerciseWithCatalog(
+            exercise = ExerciseEntity(
+                id = index,
+                workoutId = id.toLong(),
+                name = "Упражнение ${index + 1}",
+                weight = 20.0,
+                sets = 3,
+                reps = 10,
+                restTimeMillis = 60_000,
+                orderInWorkout = index,
+                catalogId = index.toLong() + 1
+            ),
+            catalog = null
         )
     }
 )

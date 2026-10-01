@@ -14,8 +14,10 @@ import org.junit.Test
 import ru.hopes.workouttimer.data.dao.LastSessionDuration
 import ru.hopes.workouttimer.data.dao.SessionSetDraft
 import ru.hopes.workouttimer.data.dao.WorkoutDao
+import ru.hopes.workouttimer.data.entity.ExerciseEntity
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
 import ru.hopes.workouttimer.data.entity.WorkoutSessionEntity
+import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.domain.model.ExerciseUnit
 import ru.hopes.workouttimer.domain.model.RecordedSet
 import ru.hopes.workouttimer.domain.model.Workout
@@ -200,5 +202,33 @@ class WorkoutRepositoryImplTest {
         repo.updateExerciseWeightAndReps(exerciseId = 3, weight = 82.5, reps = 6)
 
         coVerify(exactly = 1) { dao.updateExerciseWeightAndReps(id = 3, weight = 82.5, reps = 6) }
+    }
+
+    private val plateExercise = Exercise(
+        name = "Тяга блока", weight = 5.0, sets = 3, reps = 12, order = 1, extraWeight = 2.5
+    )
+
+    @Test
+    fun `addWorkout передаёт в DAO добавку к плите`() = runTest {
+        val dao = mockk<WorkoutDao>(relaxed = true)
+        val saved = slot<List<ExerciseEntity>>()
+        coEvery { dao.insertWorkoutResolvingCatalog(any(), capture(saved)) } returns 1L
+        val repo = WorkoutRepositoryImpl(dao, RecordingWidgetUpdater())
+
+        repo.addWorkout(Workout(name = "Спина", exercises = listOf(plateExercise), lastUseAt = 0L))
+
+        assertEquals(2.5, saved.captured.single().extraWeight, 0.0)
+    }
+
+    @Test
+    fun `updateWorkout передаёт в DAO добавку к плите`() = runTest {
+        val dao = mockk<WorkoutDao>(relaxed = true)
+        val saved = slot<List<ExerciseEntity>>()
+        coEvery { dao.updateWorkoutResolvingCatalog(any(), any(), capture(saved)) } returns Unit
+        val repo = WorkoutRepositoryImpl(dao, RecordingWidgetUpdater())
+
+        repo.updateWorkout(Workout(id = 3, name = "Спина", exercises = listOf(plateExercise), lastUseAt = 0L))
+
+        assertEquals(2.5, saved.captured.single().extraWeight, 0.0)
     }
 }

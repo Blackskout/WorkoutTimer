@@ -13,6 +13,8 @@ import org.junit.runner.RunWith
 import ru.hopes.workouttimer.data.entity.ExerciseEntity
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
 import ru.hopes.workouttimer.data.entity.WorkoutSessionEntity
+import ru.hopes.workouttimer.data.mapper.toDomain
+import ru.hopes.workouttimer.domain.model.ExerciseUnit
 
 @RunWith(AndroidJUnit4::class)
 class WorkoutDaoTest {
@@ -46,7 +48,8 @@ class WorkoutDaoTest {
             WorkoutEntity(name = "Ноги", lastUseAt = 0),
             listOf(exercise("Присед"), exercise("  присед ", order = 1))
         )
-        val exercises = dao.getAllWorkoutsWithExercises().first().single { it.workout.id.toLong() == id }.exercises
+        val exercises = dao.getAllWorkoutsWithExercises().first()
+            .single { it.workout.id.toLong() == id }.exercises.map { it.exercise }
         assertEquals(1, dao.getCatalog().size)
         assertEquals(listOf("Присед", "Присед"), exercises.sortedBy { it.orderInWorkout }.map { it.name })
         assertEquals(1, exercises.map { it.catalogId }.distinct().size)
@@ -134,5 +137,60 @@ class WorkoutDaoTest {
         assert(result.isFailure)
         assertEquals(emptyList<String>(), dao.getAllWorkoutNames())
         assertEquals(0, dao.getCatalog().size)
+    }
+
+    private suspend fun savedTemplate(): ExerciseEntity =
+        dao.getAllWorkoutsWithExercises().first().single().exercises.single().exercise
+
+    @Test
+    fun единица_упражнения_читается_из_справочника() = runBlocking {
+        dao.findOrCreateCatalog("Тяга блока", ExerciseUnit.PLATE)
+        dao.insertWorkoutResolvingCatalog(WorkoutEntity(name = "Спина", lastUseAt = 0), listOf(exercise("тяга блока")))
+
+        val row = dao.getAllWorkoutsWithExercises().first().single()
+        assertEquals("PLATE", row.exercises.single().catalog?.unit)
+        assertEquals(ExerciseUnit.PLATE, row.toDomain().exercises.single().unit)
+    }
+
+    @Test
+    fun сохранение_в_запись_плиты_приводит_шаблон_к_сетке_плиты() = runBlocking {
+        dao.findOrCreateCatalog("Тяга блока", ExerciseUnit.PLATE)
+        dao.insertWorkoutResolvingCatalog(
+            WorkoutEntity(name = "Спина", lastUseAt = 0),
+            listOf(exercise("Тяга блока").copy(weight = 60.0, extraWeight = 2.3))
+        )
+
+        val saved = savedTemplate()
+        assertEquals(30.0, saved.weight, 0.0)
+        assertEquals(2.5, saved.extraWeight, 0.0)
+    }
+
+    @Test
+    fun сохранение_в_запись_кг_обнуляет_добавку() = runBlocking {
+        dao.insertWorkoutResolvingCatalog(
+            WorkoutEntity(name = "Ноги", lastUseAt = 0),
+            listOf(exercise("Присед").copy(extraWeight = 2.5))
+        )
+
+        val saved = savedTemplate()
+        assertEquals(50.0, saved.weight, 0.0)
+        assertEquals(0.0, saved.extraWeight, 0.0)
+    }
+
+    @Test
+    fun добавка_к_плите_переживает_пересохранение_тренировки() = runBlocking {
+        dao.findOrCreateCatalog("Тяга блока", ExerciseUnit.PLATE)
+        val id = dao.insertWorkoutResolvingCatalog(
+            WorkoutEntity(name = "Спина", lastUseAt = 0),
+            listOf(exercise("Тяга блока").copy(weight = 5.0, extraWeight = 2.0))
+        )
+        dao.updateWorkoutResolvingCatalog(
+            id.toInt(), "Спина",
+            listOf(exercise("Тяга блока").copy(weight = 6.0, extraWeight = 2.0))
+        )
+
+        val saved = savedTemplate()
+        assertEquals(6.0, saved.weight, 0.0)
+        assertEquals(2.0, saved.extraWeight, 0.0)
     }
 }
