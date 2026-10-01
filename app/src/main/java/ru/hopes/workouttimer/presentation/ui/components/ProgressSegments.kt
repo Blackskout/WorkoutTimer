@@ -17,21 +17,22 @@ import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
 
 @Composable
 fun ProgressSegments(
-    total: Int,
+    /** Сделан ли сегмент: по факту, а не по позиции — по шторке можно прыгать. */
+    done: List<Boolean>,
     currentIndex: Int,
     modifier: Modifier = Modifier
 ) {
-    if (total <= 0) return
+    if (done.isEmpty()) return
     val accent = MaterialTheme.colorScheme.primary
     val track = MaterialTheme.colorScheme.outline
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        repeat(total) { index ->
+        done.forEachIndexed { index, isDone ->
             val color = when {
-                index < currentIndex -> accent.copy(alpha = 0.5f)
                 index == currentIndex -> accent
+                isDone -> accent.copy(alpha = 0.5f)
                 else -> track
             }
             Row(
@@ -50,8 +51,8 @@ fun ProgressSegments(
 private fun ProgressSegmentsPreview() {
     WorkoutTimerTheme {
         ProgressSegments(
-            total = 6,
-            currentIndex = 1,
+            done = listOf(true, false, true, false, false, false),
+            currentIndex = 3,
             modifier = Modifier.padding(18.dp)
         )
     }

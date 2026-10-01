@@ -206,7 +206,7 @@ fun WorkoutExecutionScreen(
 
             if (currentExercise != null && chrome.totalExercises > 0) {
                 ProgressSegments(
-                    total = chrome.totalExercises,
+                    done = chrome.exercises.map { it.isDone },
                     currentIndex = chrome.exerciseIndex,
                     modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 8.dp)
                 )
@@ -291,7 +291,6 @@ fun WorkoutExecutionScreen(
             )
             chrome.exercises.forEachIndexed { index, row ->
                 val isCurrent = index == chrome.exerciseIndex
-                val isDone = index < chrome.exerciseIndex
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -308,23 +307,35 @@ fun WorkoutExecutionScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
-                    Text(
-                        text = row.exercise.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = when {
-                            isCurrent -> MaterialTheme.colorScheme.primary
-                            isDone -> MaterialTheme.colorScheme.onSurfaceVariant
-                            else -> MaterialTheme.colorScheme.onSurface
-                        },
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    // Добавленные «+ в сегодняшнюю» стоят в конце списка с пометкой.
-                    if (row.addedToday) {
+                    // Название с пометкой занимает всё место, счётчик — у правого края.
+                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = stringResource(R.string.execution_added_today),
-                            style = MaterialTheme.typography.labelSmall,
+                            text = row.exercise.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = when {
+                                isCurrent -> MaterialTheme.colorScheme.primary
+                                row.isDone -> MaterialTheme.colorScheme.onSurfaceVariant
+                                else -> MaterialTheme.colorScheme.onSurface
+                            },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        // Добавленные «+ в сегодняшнюю» стоят в конце списка с пометкой.
+                        if (row.addedToday) {
+                            Text(
+                                text = stringResource(R.string.execution_added_today),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
+                    }
+                    // Начатое, но не доделанное: видно, сколько подходов уже есть.
+                    if (row.doneSets > 0 && !row.isDone) {
+                        Text(
+                            text = "${row.doneSets}/${row.exercise.sets}",
+                            style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(start = 8.dp)
                         )

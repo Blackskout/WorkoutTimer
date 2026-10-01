@@ -6,8 +6,15 @@ import ru.hopes.workouttimer.domain.model.Exercise
 data class SessionExercise(
     val exercise: Exercise,
     /** Копия из другой тренировки («+ в сегодняшнюю»): правки не пишутся в БД. */
-    val addedToday: Boolean = false
-)
+    val addedToday: Boolean = false,
+    /** Сколько подходов сделано: наибольший закрытый номер подхода, повтор его не растит. */
+    val doneSets: Int = 0
+) {
+    val isDone: Boolean get() = doneSets >= exercise.sets
+
+    /** С какого подхода продолжать: начатое — со следующего, сделанное — повтор с первого. */
+    val nextSet: Int get() = if (isDone) 1 else doneSets + 1
+}
 
 /**
  * Один снимок на всю сессию: список, индекс и фаза меняются вместе, поэтому экран
