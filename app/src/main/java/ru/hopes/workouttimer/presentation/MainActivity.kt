@@ -12,12 +12,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import ru.hopes.workouttimer.presentation.navigation.NavGraph
+import ru.hopes.workouttimer.presentation.utils.ActiveWorkoutTracker
 import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
 
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var activeWorkoutTracker: ActiveWorkoutTracker
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -46,6 +51,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        // Тренировка идёт — тап по виджету просто возвращает в неё: разбор диплинка
+        // перестроил бы стек и сбросил экран выполнения вместе с таймером.
+        if (activeWorkoutTracker.isActive) return
         setIntent(intent)
         newIntent.value = intent
     }

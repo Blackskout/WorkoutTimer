@@ -145,8 +145,11 @@ private fun WorkoutRow(workout: WidgetWorkout) {
 }
 
 /**
- * Флаги обязательны: без NEW_TASK|CLEAR_TASK NavController обрезает стек до
- * одного экрана выполнения, и «Назад» закрывает приложение вместо возврата к списку.
+ * Только NEW_TASK, без CLEAR_TASK: CLEAR_TASK сносил задачу до того, как приложение успевало
+ * что-то решить, и идущая тренировка терялась. Теперь живая задача просто выходит вперёд и
+ * получает интент в MainActivity.onNewIntent (singleTop), а та его игнорирует, если тренировка
+ * идёт. На холодном старте NavController сам видит NEW_TASK без CLEAR_TASK, перезапускает
+ * задачу с синтетическим стеком «список → выполнение», и «Назад» ведёт к списку, как раньше.
  */
 private fun startWorkoutIntent(context: Context, workoutId: Int): Intent =
     Intent(
@@ -155,5 +158,5 @@ private fun startWorkoutIntent(context: Context, workoutId: Int): Intent =
         context,
         MainActivity::class.java
     ).apply {
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK
     }

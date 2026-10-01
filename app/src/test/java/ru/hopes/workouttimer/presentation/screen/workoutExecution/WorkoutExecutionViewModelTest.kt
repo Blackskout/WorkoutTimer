@@ -1,6 +1,10 @@
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
 import android.content.Context
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -28,6 +32,7 @@ import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.repository.WorkoutRepository
 import ru.hopes.workouttimer.domain.usecase.FinishWorkoutSessionUseCase
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
+import ru.hopes.workouttimer.presentation.utils.ActiveWorkoutTracker
 import ru.hopes.workouttimer.presentation.utils.SoundPlayer
 import ru.hopes.workouttimer.presentation.utils.VibrationManager
 import ru.hopes.workouttimer.presentation.utils.WakeLockHelper
@@ -50,7 +55,8 @@ class WorkoutExecutionViewModelTest {
     private fun buildViewModel(
         getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
         workoutRepository: WorkoutRepository,
-        finishWorkoutSessionUseCase: FinishWorkoutSessionUseCase
+        finishWorkoutSessionUseCase: FinishWorkoutSessionUseCase,
+        activeWorkoutTracker: ActiveWorkoutTracker = ActiveWorkoutTracker()
     ): WorkoutExecutionViewModel {
         return WorkoutExecutionViewModel(
             context = mockk<Context>(relaxed = true),
@@ -59,8 +65,72 @@ class WorkoutExecutionViewModelTest {
             vibrationManager = mockk<VibrationManager>(relaxed = true),
             wakeLockHelper = mockk<WakeLockHelper>(relaxed = true),
             workoutRepository = workoutRepository,
-            finishWorkoutSessionUseCase = finishWorkoutSessionUseCase
+            finishWorkoutSessionUseCase = finishWorkoutSessionUseCase,
+            activeWorkoutTracker = activeWorkoutTracker
         )
+    }
+
+    private fun singleSetWorkout(): Workout {
+        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
+        return Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
+    }
+
+    @Test
+    fun `a loaded workout is marked active`() = runTest {
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns singleSetWorkout()
+        val tracker = ActiveWorkoutTracker()
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, mockk(relaxed = true), mockk(relaxed = true), tracker)
+
+        assertFalse(tracker.isActive)
+        viewModel.loadWorkout(1)
+
+        assertTrue(tracker.isActive)
+    }
+
+    @Test
+    fun `a workout that failed to load is not marked active`() = runTest {
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns null
+        val tracker = ActiveWorkoutTracker()
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, mockk(relaxed = true), mockk(relaxed = true), tracker)
+
+        viewModel.loadWorkout(1)
+
+        assertFalse(tracker.isActive)
+    }
+
+    @Test
+    fun `finishing the workout clears the active mark`() = runTest {
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns singleSetWorkout()
+        val tracker = ActiveWorkoutTracker()
+        val viewModel = buildViewModel(getWorkoutByIdUseCase, mockk(relaxed = true), mockk(relaxed = true), tracker)
+        viewModel.loadWorkout(1)
+
+        viewModel.onExerciseFinished()
+
+        assertTrue(viewModel.uiState.value is WorkoutExecutionState.Finished)
+        assertFalse(tracker.isActive)
+    }
+
+    @Test
+    fun `leaving the execution screen clears the active mark`() = runTest {
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(1) } returns singleSetWorkout()
+        val tracker = ActiveWorkoutTracker()
+        val store = ViewModelStore()
+        val viewModel = ViewModelProvider.create(
+            store,
+            viewModelFactory {
+                initializer { buildViewModel(getWorkoutByIdUseCase, mockk(relaxed = true), mockk(relaxed = true), tracker) }
+            }
+        )[WorkoutExecutionViewModel::class]
+        viewModel.loadWorkout(1)
+
+        store.clear()
+
+        assertFalse(tracker.isActive)
     }
 
     @Test
