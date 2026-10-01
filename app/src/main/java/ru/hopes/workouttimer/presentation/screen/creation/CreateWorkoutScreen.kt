@@ -271,7 +271,10 @@ fun CreateWorkoutScreen(
                 item = item,
                 unit = state.unitOf(item),
                 suggestions = state.suggestionsFor(item),
-                onDismiss = { editingId = null },
+                onDismiss = {
+                    viewModel.processCommand(CreateWorkoutCommand.CloseExercise(id))
+                    editingId = null
+                },
                 onChange = { updated ->
                     viewModel.processCommand(CreateWorkoutCommand.UpdateExercise(id, updated))
                 },

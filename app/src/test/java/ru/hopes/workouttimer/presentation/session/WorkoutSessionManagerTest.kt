@@ -5,6 +5,7 @@ import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.Runs
 import io.mockk.just
@@ -1327,6 +1328,35 @@ class WorkoutSessionManagerTest {
         manager.onRestFinished()
 
         verify(exactly = 0) { workoutAlerts.dismiss() }
+    }
+
+    @Test
+    fun `rest finishing in background posts the alert`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        manager.start(1)
+        manager.onExerciseFinished()
+        every { workoutAlerts.isAppInForeground() } returns false
+        clearMocks(context, answers = false)
+
+        manager.onRestFinished()
+
+        // ACTION_STOP таймера и ACTION_SHOW_FINISHED
+        verify(exactly = 2) { context.startService(any()) }
+    }
+
+    @Test
+    fun `rest finishing with the app on screen posts no alert`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        manager.start(1)
+        manager.onExerciseFinished()
+        every { workoutAlerts.isAppInForeground() } returns true
+        clearMocks(context, answers = false)
+
+        manager.onRestFinished()
+
+        // Только ACTION_STOP таймера
+        verify(exactly = 1) { context.startService(any()) }
+        assertNotNull(manager.phase as? WorkoutExecutionState.Active)
     }
 
     @Test
