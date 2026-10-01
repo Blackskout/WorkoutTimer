@@ -59,4 +59,10 @@ class ScreenDeepLinkTest {
         assertEquals(IntentRoute.Ignore, resolveIntent("android.intent.action.MAIN", null, isRunning = true))
         assertEquals(IntentRoute.Ignore, resolveIntent(viewAction, "https://example.com/execution/7", isRunning = false))
     }
+
+    @Test
+    fun `маршрут просмотра тренировки`() {
+        assertEquals("workout/{workout_id}", Screen.WorkoutPreview.route)
+        assertEquals("workout/7", Screen.WorkoutPreview.createRoute(7))
+    }
 }

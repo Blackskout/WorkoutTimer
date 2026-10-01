@@ -337,6 +337,13 @@ internal sealed class Screen(val route: String) {
         }
     }
 
+    // Просмотр тренировки: тап по строке списка. Диплинка нет.
+    data object WorkoutPreview : Screen("workout/{workout_id}") {
+        fun createRoute(workoutId: Int): String = "workout/$workoutId"
+
+        fun getWorkoutId(arguments: Bundle?): Int = arguments?.getInt("workout_id") ?: 0
+    }
+
     data object ExerciseProgress : Screen("exercise_progress/{catalogId}") {
         private const val CATALOG_ID = "catalogId"
 
