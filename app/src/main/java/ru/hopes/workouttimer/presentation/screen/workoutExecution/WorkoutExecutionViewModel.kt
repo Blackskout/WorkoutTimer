@@ -26,6 +26,7 @@ import ru.hopes.workouttimer.domain.repository.WorkoutRepository
 import ru.hopes.workouttimer.domain.usecase.FinishWorkoutSessionUseCase
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
 import ru.hopes.workouttimer.presentation.service.TimerNotificationService
+import ru.hopes.workouttimer.presentation.utils.ActiveWorkoutTracker
 import ru.hopes.workouttimer.presentation.utils.SoundPlayer
 import ru.hopes.workouttimer.presentation.utils.VibrationManager
 import ru.hopes.workouttimer.presentation.utils.WakeLockHelper
@@ -39,7 +40,8 @@ class WorkoutExecutionViewModel @Inject constructor(
     private val vibrationManager: VibrationManager,
     private val wakeLockHelper: WakeLockHelper,
     private val workoutRepository: WorkoutRepository,
-    private val finishWorkoutSessionUseCase: FinishWorkoutSessionUseCase
+    private val finishWorkoutSessionUseCase: FinishWorkoutSessionUseCase,
+    private val activeWorkoutTracker: ActiveWorkoutTracker
 ) : ViewModel() {
 
     private var workout: Workout? = null
@@ -158,6 +160,8 @@ class WorkoutExecutionViewModel @Inject constructor(
                     currentSet = 1,
                     totalSets = firstExercise.sets,
                 )
+                // С этого момента тап по виджету не должен сбрасывать экран (см. MainActivity).
+                activeWorkoutTracker.start(this@WorkoutExecutionViewModel)
                 scheduleIdleReminderIfActive()
             } else {
                 _uiState.value = WorkoutExecutionState.Error
@@ -292,6 +296,7 @@ class WorkoutExecutionViewModel @Inject constructor(
         wakeLockHelper.release()
         stopNotification()
         idleReminderJob?.cancel()
+        activeWorkoutTracker.stop(this)
     }
 
     fun onExerciseFinished() {
@@ -384,6 +389,8 @@ class WorkoutExecutionViewModel @Inject constructor(
                 // виджета подвешен на updateLastUseAt(), а виджет берёт длительность из последней
                 // сессии, так что сессия по-прежнему должна быть записана первой.
                 _uiState.value = WorkoutExecutionState.Finished(durationMillis = durationMillis)
+                // Тренировка записана — виджет снова может начать новую.
+                activeWorkoutTracker.stop(this@WorkoutExecutionViewModel)
                 workoutRepository.updateLastUseAt(workoutId)
                 scheduleIdleReminderIfActive()
             }
