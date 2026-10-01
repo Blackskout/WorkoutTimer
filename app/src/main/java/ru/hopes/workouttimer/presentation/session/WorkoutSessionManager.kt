@@ -26,6 +26,7 @@ import ru.hopes.workouttimer.domain.repository.WorkoutRepository
 import ru.hopes.workouttimer.domain.usecase.FinishWorkoutSessionUseCase
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
 import ru.hopes.workouttimer.presentation.service.TimerNotificationService
+import ru.hopes.workouttimer.presentation.service.WorkoutAlerts
 import ru.hopes.workouttimer.presentation.utils.SoundPlayer
 import ru.hopes.workouttimer.presentation.utils.VibrationManager
 import ru.hopes.workouttimer.presentation.utils.WakeLockHelper
@@ -46,6 +47,7 @@ class WorkoutSessionManager @Inject constructor(
     private val wakeLockHelper: WakeLockHelper,
     private val workoutRepository: WorkoutRepository,
     private val finishWorkoutSessionUseCase: FinishWorkoutSessionUseCase,
+    private val workoutAlerts: WorkoutAlerts,
     @ApplicationScope private val scope: CoroutineScope
 ) {
 
@@ -180,11 +182,12 @@ class WorkoutSessionManager @Inject constructor(
 
     // В БД ничего не пишется. Запись завершения идёт в scope и не отменяется: пользователь
     // уже подтвердил завершение; её корутина сверит sessionId и состояние не тронет.
-    // Уже показанные «Отдых завершён» и «Вы всё ещё тренируетесь?» не снимаются — как раньше.
+    // «Отдых завершён» и «Вы всё ещё тренируетесь?» снимаются: тренировки, к которой они зовут, больше нет.
     private fun endSession() {
         resetSessionScope()
         wakeLockHelper.release()
         stopNotification()
+        workoutAlerts.dismiss()
         soundPlayer.release()
         _recordedSets.clear()
         finishPending = false
@@ -549,6 +552,8 @@ class WorkoutSessionManager @Inject constructor(
             }
         }
         lastInteractionAt = now
+        // Пользователь уже здесь — звать его к тренировке незачем.
+        workoutAlerts.dismiss()
     }
 
     private fun scheduleIdleReminderIfActive() {

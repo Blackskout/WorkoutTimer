@@ -1,6 +1,7 @@
 package ru.hopes.workouttimer.presentation.session
 
 import android.content.Context
+import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -37,6 +38,7 @@ import ru.hopes.workouttimer.domain.repository.WorkoutRepository
 import ru.hopes.workouttimer.domain.usecase.FinishWorkoutSessionUseCase
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
 import ru.hopes.workouttimer.presentation.utils.SoundPlayer
+import ru.hopes.workouttimer.presentation.service.WorkoutAlerts
 import ru.hopes.workouttimer.presentation.utils.VibrationManager
 import ru.hopes.workouttimer.presentation.utils.WakeLockHelper
 
@@ -57,6 +59,7 @@ class WorkoutSessionManagerTest {
     private val soundPlayer = mockk<SoundPlayer>(relaxed = true)
     private val vibrationManager = mockk<VibrationManager>(relaxed = true)
     private val wakeLockHelper = mockk<WakeLockHelper>(relaxed = true)
+    private val workoutAlerts = mockk<WorkoutAlerts>(relaxed = true)
 
     @Before
     fun setUp() {
@@ -83,6 +86,7 @@ class WorkoutSessionManagerTest {
         wakeLockHelper = wakeLockHelper,
         workoutRepository = workoutRepository,
         finishWorkoutSessionUseCase = finishWorkoutSessionUseCase,
+        workoutAlerts = workoutAlerts,
         scope = scope
     )
 
@@ -1305,5 +1309,43 @@ class WorkoutSessionManagerTest {
         assertEquals(2, attempts.size)
         assertEquals(listOf(squat, row, row), attempts.last())
         assertNotNull(manager.phase as? WorkoutExecutionState.Finished)
+    }
+
+    @Test
+    fun `rest finishing keeps its own alert`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        manager.start(1)
+        manager.onExerciseFinished()
+        clearMocks(workoutAlerts)
+
+        manager.onRestFinished()
+
+        verify(exactly = 0) { workoutAlerts.dismiss() }
+    }
+
+    @Test
+    fun `continuing the workout dismisses stale alerts`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        manager.start(1)
+        manager.onExerciseFinished()
+        manager.onRestFinished()
+        clearMocks(workoutAlerts)
+
+        manager.onExerciseFinished()
+
+        verify { workoutAlerts.dismiss() }
+    }
+
+    @Test
+    fun `abandoning the workout dismisses stale alerts`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        manager.start(1)
+        manager.onExerciseFinished()
+        manager.onRestFinished()
+        clearMocks(workoutAlerts)
+
+        manager.abandon()
+
+        verify { workoutAlerts.dismiss() }
     }
 }
