@@ -87,7 +87,7 @@ fun WorkoutPreviewScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Column(modifier = Modifier.padding(paddingValues)) {
-            PreviewHeader(name = state.workout?.name.orEmpty(), onNavigateBack = onNavigateBack)
+            PreviewHeader(name = if (state.loadFailed) "" else state.workout?.name.orEmpty(), onNavigateBack = onNavigateBack)
             WorkoutPreviewContent(
                 state = state,
                 onStart = onStart,
