@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import ru.hopes.workouttimer.data.dao.LoggedSetRow
 import ru.hopes.workouttimer.data.dao.WorkoutDao
@@ -43,6 +44,34 @@ class ExerciseCatalogRepositoryImplTest {
         )
 
         val sets = ExerciseCatalogRepositoryImpl(dao).observeSetsForWorkout(3).first()
+
+        assertEquals(
+            listOf(LoggedSet(SessionSet(5, 9, 1, 5.0, 2.0, 12, ExerciseUnit.PLATE), "Тяга блока", 7_000L)),
+            sets
+        )
+    }
+
+    @Test
+    fun `запись справочника по id отдаётся доменной, отсутствующая — null`() = runTest {
+        val dao = mockk<WorkoutDao>()
+        every { dao.observeCatalogEntry(1L) } returns flowOf(
+            ExerciseCatalogEntity(id = 1, name = "Тяга блока", nameKey = "тяга блока", unit = "PLATE")
+        )
+        every { dao.observeCatalogEntry(2L) } returns flowOf(null)
+        val repo = ExerciseCatalogRepositoryImpl(dao)
+
+        assertEquals(CatalogExercise(1, "Тяга блока", ExerciseUnit.PLATE), repo.observeExercise(1L).first())
+        assertNull(repo.observeExercise(2L).first())
+    }
+
+    @Test
+    fun `подходы упражнения отдаются с названием и временем сессии`() = runTest {
+        val dao = mockk<WorkoutDao>()
+        every { dao.observeSetsForCatalog(1L) } returns flowOf(
+            listOf(LoggedSetRow(5, 9, 1, "Тяга блока", 5.0, 2.0, 12, "PLATE", 7_000L))
+        )
+
+        val sets = ExerciseCatalogRepositoryImpl(dao).observeSetsForExercise(1L).first()
 
         assertEquals(
             listOf(LoggedSet(SessionSet(5, 9, 1, 5.0, 2.0, 12, ExerciseUnit.PLATE), "Тяга блока", 7_000L)),

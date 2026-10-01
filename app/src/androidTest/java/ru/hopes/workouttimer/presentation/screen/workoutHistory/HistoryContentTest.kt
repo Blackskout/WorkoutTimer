@@ -10,6 +10,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,8 +35,25 @@ class HistoryContentTest {
     private fun set(id: Long, weight: Double, reps: Int) =
         SessionSet(id, 1L, 7L, weight, 0.0, reps, ExerciseUnit.KG)
 
-    private fun show(setsBySession: Map<Long, List<SessionExerciseSets>>?) = composeRule.setContent {
-        WorkoutTimerTheme { HistoryContent(sessions = listOf(session), setsBySession = setsBySession) }
+    private fun show(
+        setsBySession: Map<Long, List<SessionExerciseSets>>?,
+        onExerciseClick: (Long) -> Unit = {}
+    ) = composeRule.setContent {
+        WorkoutTimerTheme {
+            HistoryContent(sessions = listOf(session), setsBySession = setsBySession, onExerciseClick = onExerciseClick)
+        }
+    }
+
+    @Test
+    fun тап_по_упражнению_открывает_его_прогресс_и_не_сворачивает_карточку() {
+        var opened: Long? = null
+        show(mapOf(1L to listOf(SessionExerciseSets(7L, "Присед", listOf(set(1, 60.0, 8))))), onExerciseClick = { opened = it })
+        composeRule.onNodeWithText(DateFormatter.formatSessionDateTime(session.finishedAt)).performClick()
+
+        composeRule.onNodeWithText("Присед — 60 кг × 8").performClick()
+
+        assertEquals(7L, opened)
+        composeRule.onNodeWithText("Присед — 60 кг × 8").assertIsDisplayed()
     }
 
     @Test

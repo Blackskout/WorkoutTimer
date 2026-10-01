@@ -2,6 +2,7 @@ package ru.hopes.workouttimer.presentation.screen.exercises
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -71,7 +72,8 @@ import ru.hopes.workouttimer.presentation.utils.unitName
 @Composable
 fun ExerciseCatalogScreen(
     viewModel: ExerciseCatalogViewModel = hiltViewModel(),
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onOpenProgress: (CatalogExercise) -> Unit
 ) {
     val state by viewModel.state.collectAsState()
     var menuFor by remember { mutableStateOf<CatalogExercise?>(null) }
@@ -165,7 +167,7 @@ fun ExerciseCatalogScreen(
                     unfocusedIndicatorColor = Color.Transparent
                 )
             )
-            CatalogContent(state = state, onMenu = { menuFor = it })
+            CatalogContent(state = state, onOpen = onOpenProgress, onMenu = { menuFor = it })
         }
     }
 }
@@ -177,6 +179,7 @@ fun ExerciseCatalogScreen(
 @Composable
 internal fun CatalogContent(
     state: ExerciseCatalogState,
+    onOpen: (CatalogExercise) -> Unit,
     onMenu: (CatalogExercise) -> Unit
 ) {
     // До первого ответа базы пустое состояние не показываем — оно мигнуло бы.
@@ -205,16 +208,22 @@ internal fun CatalogContent(
         verticalArrangement = Arrangement.spacedBy(CardSpacing)
     ) {
         items(state.rows, key = { it.exercise.id }) { summary ->
-            CatalogRow(summary = summary, format = format, onMenu = { onMenu(summary.exercise) })
+            CatalogRow(
+                summary = summary,
+                format = format,
+                onOpen = { onOpen(summary.exercise) },
+                onMenu = { onMenu(summary.exercise) }
+            )
         }
     }
 }
 
-/** Строка справочника. Тап по ней откроет прогресс с E3; пока действия — только в меню. */
+/** Строка справочника: тап открывает прогресс упражнения, ⋮ — меню переименования и единицы. */
 @Composable
 private fun CatalogRow(
     summary: CatalogSummary,
     format: SetFormat,
+    onOpen: () -> Unit,
     onMenu: () -> Unit
 ) {
     val shape = MaterialTheme.shapes.medium
@@ -224,6 +233,11 @@ private fun CatalogRow(
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .clickable(
+                role = Role.Button,
+                onClickLabel = stringResource(R.string.catalog_open_progress),
+                onClick = onOpen
+            )
             .padding(start = 14.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -392,6 +406,7 @@ private fun CatalogContentPreview() {
                     CatalogSummary(CatalogExercise(4, "Фронтальный присед", ExerciseUnit.KG), null, null)
                 )
             ),
+            onOpen = {},
             onMenu = {}
         )
     }

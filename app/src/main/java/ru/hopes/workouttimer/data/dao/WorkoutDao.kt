@@ -250,6 +250,26 @@ interface WorkoutDao {
     )
     fun observeLastSessionSets(): Flow<List<LoggedSetRow>>
 
+    // Поток, а не разовый запрос: после переименования или смены единицы на экране
+    // «Упражнения» прогресс при возврате показывает новое название и единицу.
+    @Query("SELECT * FROM exercise_catalog WHERE id = :id")
+    fun observeCatalogEntry(id: Long): Flow<ExerciseCatalogEntity?>
+
+    // Все подходы записи из всех тренировок, включая удалённые: сессии и подходы
+    // живут дольше тренировки. JOIN только с workout_sessions — не с workouts.
+    @Query(
+        """
+        SELECT s.id, s.sessionId, s.catalogId, c.name AS exerciseName, s.weight, s.extraWeight,
+               s.reps, s.unit, ws.finishedAt
+        FROM session_sets s
+        JOIN workout_sessions ws ON ws.id = s.sessionId
+        JOIN exercise_catalog c ON c.id = s.catalogId
+        WHERE s.catalogId = :catalogId
+        ORDER BY ws.finishedAt, ws.id, s.id
+        """
+    )
+    fun observeSetsForCatalog(catalogId: Long): Flow<List<LoggedSetRow>>
+
     /**
      * Переименование записи и всех её упражнений одной транзакцией: поиск тренировок
      * читает exercises.name. Ключ, занятый этой же записью («присед» → «Присед»),

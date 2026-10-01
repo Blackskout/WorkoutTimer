@@ -140,12 +140,14 @@
     <string name="history_collapse">Скрыть подходы</string>
     <string name="history_state_expanded">Развёрнуто</string>
     <string name="history_state_collapsed">Свёрнуто</string>
+    <string name="history_open_progress">Открыть прогресс</string>
     <string name="rest_ring_total">из %1$s</string>
 
     <!-- Справочник упражнений -->
     <string name="catalog_title">Упражнения</string>
     <string name="catalog_search_placeholder">Название упражнения</string>
     <string name="catalog_actions">Действия с упражнением</string>
+    <string name="catalog_open_progress">Открыть прогресс</string>
     <string name="catalog_last_reps">%1$d повт.</string>
     <string name="catalog_last_set">%1$s · %2$s</string>
     <string name="catalog_empty_title">Упражнений пока нет</string>
@@ -161,6 +163,57 @@
     <string name="catalog_error_load">Не удалось загрузить упражнения</string>
     <string name="catalog_error_rename">Не удалось переименовать упражнение</string>
     <string name="catalog_error_unit">Не удалось сменить единицу</string>
+
+    <!-- Прогресс упражнения. Шаблоны progress_delta_* собирает formatDelta. -->
+    <string name="progress_best_label">Лучший подход</string>
+    <string name="progress_reps">%1$d повт.</string>
+    <string name="progress_delta_line">%1$s %2$s</string>
+    <string name="progress_delta_kg">%1$s кг</string>
+    <string name="progress_delta_reps">%1$s повт</string>
+    <string name="progress_delta_none">без изменений</string>
+    <plurals name="progress_delta_plates">
+        <item quantity="one">%1$s плита</item>
+        <item quantity="few">%1$s плиты</item>
+        <item quantity="many">%1$s плит</item>
+        <item quantity="other">%1$s плиты</item>
+    </plurals>
+    <string name="progress_span_month">за 1 мес</string>
+    <string name="progress_span_quarter">за 3 мес</string>
+    <string name="progress_span_all">за всё время</string>
+    <string name="progress_period_month">1 мес</string>
+    <string name="progress_period_quarter">3 мес</string>
+    <string name="progress_period_all">всё</string>
+    <string name="progress_short_date">%1$d %2$s</string>
+    <!-- Месяцы в родительном падеже: «26 сен», «3 мая». -->
+    <string-array name="progress_months">
+        <item>янв</item>
+        <item>фев</item>
+        <item>мар</item>
+        <item>апр</item>
+        <item>мая</item>
+        <item>июн</item>
+        <item>июл</item>
+        <item>авг</item>
+        <item>сен</item>
+        <item>окт</item>
+        <item>ноя</item>
+        <item>дек</item>
+    </string-array>
+    <string name="progress_point_label">%1$s · %2$s</string>
+    <string name="progress_chart_hint">Нажмите на точку, чтобы увидеть подход</string>
+    <string name="progress_chart_few">График появится, когда за период будет две тренировки</string>
+    <plurals name="progress_chart_description">
+        <item quantity="one">График лучшего подхода: %1$d тренировка</item>
+        <item quantity="few">График лучшего подхода: %1$d тренировки</item>
+        <item quantity="many">График лучшего подхода: %1$d тренировок</item>
+        <item quantity="other">График лучшего подхода: %1$d тренировки</item>
+    </plurals>
+    <string name="progress_other_units">Подходы в других единицах — в списке ниже</string>
+    <string name="progress_sessions_title">Тренировки</string>
+    <string name="progress_empty_title">Сделайте упражнение — здесь появится прогресс</string>
+    <string name="progress_empty_subtitle">Подход записывается, когда вы нажимаете «Закончить подход»</string>
+    <string name="progress_missing_title">Упражнение не найдено</string>
+    <string name="progress_error_load">Не удалось загрузить прогресс</string>
 
     <!-- Музыка -->
     <string name="music_service_label">Управление музыкой</string>

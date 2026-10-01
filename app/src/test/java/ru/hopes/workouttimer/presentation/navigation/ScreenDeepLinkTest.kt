@@ -13,9 +13,15 @@ class ScreenDeepLinkTest {
         assertEquals("workouttimer://execution/7", Screen.Execution.createDeepLink(7))
     }
 
-    // Маршрут из спеки; E3 добавит рядом exercise_progress/{catalogId}.
+    // Маршруты из спеки: экран «Упражнения» (E2) и прогресс упражнения (E3).
     @Test
     fun `exercises screen has its own route`() {
         assertEquals("exercises", Screen.Exercises.route)
+    }
+
+    @Test
+    fun `маршрут прогресса строится из id записи справочника`() {
+        assertEquals("exercise_progress/{catalogId}", Screen.ExerciseProgress.route)
+        assertEquals("exercise_progress/7", Screen.ExerciseProgress.createRoute(7L))
     }
 }
