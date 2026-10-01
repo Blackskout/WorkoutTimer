@@ -2,6 +2,7 @@ package ru.hopes.workouttimer.data.mapper
 
 import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.domain.model.Workout
+import ru.hopes.workouttimer.domain.model.exerciseUnitOf
 import ru.hopes.workouttimer.domain.model.export.ExportExercise
 import ru.hopes.workouttimer.domain.model.export.ExportWorkout
 
@@ -21,7 +22,9 @@ fun Exercise.toExport(): ExportExercise {
         reps = reps,
         restTimeMillis = timeMillis,
         order = order,
-        note = note
+        note = note,
+        unit = unit.name,
+        extraWeight = extraWeight
     )
 }
 
@@ -43,6 +46,8 @@ fun ExportExercise.toDomain(): Exercise {
         reps = reps,
         timeMillis = restTimeMillis,
         order = order,
-        note = note
+        note = note,
+        unit = exerciseUnitOf(unit),
+        extraWeight = extraWeight
     )
 }

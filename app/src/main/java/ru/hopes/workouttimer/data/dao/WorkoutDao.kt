@@ -148,10 +148,10 @@ interface WorkoutDao {
 
     // Весь файл — одна транзакция: сбой посреди файла не оставляет половину тренировок.
     @Transaction
-    suspend fun importWorkouts(workouts: List<Pair<WorkoutEntity, List<ExerciseEntity>>>): Int {
-        for ((workout, exercises) in workouts) {
+    suspend fun importWorkouts(workouts: List<Pair<WorkoutEntity, List<ExerciseDraft>>>): Int {
+        for ((workout, drafts) in workouts) {
             val workoutId = insertWorkout(workout)
-            insertExercises(resolveCatalog(workoutId, editorDrafts(exercises)))
+            insertExercises(resolveCatalog(workoutId, drafts))
         }
         cleanupCatalog()
         return workouts.size

@@ -11,11 +11,13 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import ru.hopes.workouttimer.R
+import ru.hopes.workouttimer.data.dao.ExerciseDraft
 import ru.hopes.workouttimer.data.dao.WorkoutDao
 import ru.hopes.workouttimer.data.entity.ExerciseEntity
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
 import ru.hopes.workouttimer.data.mapper.toDomain
 import ru.hopes.workouttimer.data.mapper.toExport
+import ru.hopes.workouttimer.domain.model.exerciseUnitOf
 import ru.hopes.workouttimer.domain.model.export.ExportData
 import ru.hopes.workouttimer.domain.repository.ExportImportRepository
 import ru.hopes.workouttimer.domain.repository.ImportError
@@ -102,16 +104,22 @@ class ExportImportRepositoryImpl @Inject constructor(
                     existingNames.add(uniqueName)
                     WorkoutEntity(name = uniqueName, lastUseAt = exportWorkout.lastUseAt) to
                         exportWorkout.exercises.filter { it.name.isNotBlank() }.map { ex ->
-                            ExerciseEntity(
-                                workoutId = 0,
-                                name = ex.name,
-                                weight = ex.weight,
-                                sets = ex.sets,
-                                reps = ex.reps,
-                                restTimeMillis = ex.restTimeMillis,
-                                orderInWorkout = ex.order,
-                                note = ex.note,
-                                catalogId = 0L // проставит транзакция DAO
+                            ExerciseDraft(
+                                exercise = ExerciseEntity(
+                                    workoutId = 0,
+                                    name = ex.name,
+                                    weight = ex.weight,
+                                    sets = ex.sets,
+                                    reps = ex.reps,
+                                    restTimeMillis = ex.restTimeMillis,
+                                    orderInWorkout = ex.order,
+                                    note = ex.note,
+                                    catalogId = 0L, // проставит транзакция DAO
+                                    extraWeight = ex.extraWeight
+                                ),
+                                // Единица из файла нужна только новой записи справочника:
+                                // у существующей своя главнее, DAO приведёт шаблон к ней.
+                                unitIfNew = exerciseUnitOf(ex.unit)
                             )
                         }
                 }

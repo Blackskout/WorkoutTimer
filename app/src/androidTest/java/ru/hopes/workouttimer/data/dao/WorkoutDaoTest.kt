@@ -39,6 +39,9 @@ class WorkoutDaoTest {
         restTimeMillis = 60_000, orderInWorkout = order, catalogId = 0L
     )
 
+    private fun draft(name: String, unit: ExerciseUnit = ExerciseUnit.KG, weight: Double = 50.0, extra: Double = 0.0) =
+        ExerciseDraft(exercise(name).copy(weight = weight, extraWeight = extra), unit)
+
     private fun session(workoutId: Long) =
         WorkoutSessionEntity(workoutId = workoutId, startedAt = 1, finishedAt = 2, durationMillis = 1)
 
@@ -115,8 +118,8 @@ class WorkoutDaoTest {
     fun импорт_сводит_одинаковые_ключи_из_одного_файла_в_одну_запись() = runBlocking {
         val count = dao.importWorkouts(
             listOf(
-                WorkoutEntity(name = "А", lastUseAt = 0) to listOf(exercise("Присед")),
-                WorkoutEntity(name = "Б", lastUseAt = 0) to listOf(exercise("ПРИСЕД "))
+                WorkoutEntity(name = "А", lastUseAt = 0) to listOf(draft("Присед")),
+                WorkoutEntity(name = "Б", lastUseAt = 0) to listOf(draft("ПРИСЕД "))
             )
         )
         assertEquals(2, count)
@@ -129,8 +132,8 @@ class WorkoutDaoTest {
         val result = runCatching {
             dao.importWorkouts(
                 listOf(
-                    WorkoutEntity(name = "А", lastUseAt = 0) to listOf(broken),
-                    WorkoutEntity(name = "Б", lastUseAt = 0) to listOf(broken)
+                    WorkoutEntity(name = "А", lastUseAt = 0) to listOf(ExerciseDraft(broken, ExerciseUnit.KG)),
+                    WorkoutEntity(name = "Б", lastUseAt = 0) to listOf(ExerciseDraft(broken, ExerciseUnit.KG))
                 )
             )
         }
@@ -192,5 +195,45 @@ class WorkoutDaoTest {
         val saved = savedTemplate()
         assertEquals(6.0, saved.weight, 0.0)
         assertEquals(2.0, saved.extraWeight, 0.0)
+    }
+
+    @Test
+    fun импорт_создаёт_запись_с_единицей_из_файла() = runBlocking {
+        dao.importWorkouts(
+            listOf(WorkoutEntity(name = "Спина", lastUseAt = 0) to listOf(draft("Тяга блока", ExerciseUnit.PLATE, weight = 5.0, extra = 2.5)))
+        )
+
+        assertEquals(listOf("PLATE"), dao.getCatalog().map { it.unit })
+        val saved = savedTemplate()
+        assertEquals(5.0, saved.weight, 0.0)
+        assertEquals(2.5, saved.extraWeight, 0.0)
+    }
+
+    @Test
+    fun импорт_не_меняет_единицу_существующей_записи_и_приводит_шаблон_к_ней() = runBlocking {
+        dao.findOrCreateCatalog("Присед", ExerciseUnit.KG)
+
+        dao.importWorkouts(
+            listOf(WorkoutEntity(name = "Ноги", lastUseAt = 0) to listOf(draft("присед", ExerciseUnit.PLATE, weight = 5.0, extra = 2.5)))
+        )
+
+        assertEquals(listOf("KG"), dao.getCatalog().map { it.unit })
+        val saved = savedTemplate()
+        assertEquals(5.0, saved.weight, 0.0)
+        assertEquals(0.0, saved.extraWeight, 0.0)
+    }
+
+    @Test
+    fun одинаковые_ключи_с_разными_единицами_в_одном_файле_дают_одну_запись() = runBlocking {
+        dao.importWorkouts(
+            listOf(
+                WorkoutEntity(name = "А", lastUseAt = 0) to listOf(draft("Тяга блока", ExerciseUnit.PLATE, weight = 5.0)),
+                WorkoutEntity(name = "Б", lastUseAt = 0) to listOf(draft("ТЯГА БЛОКА", ExerciseUnit.KG, weight = 60.0))
+            )
+        )
+
+        assertEquals(listOf("PLATE"), dao.getCatalog().map { it.unit })
+        val weights = dao.getAllWorkoutsWithExercises().first().map { it.exercises.single().exercise.weight }
+        assertEquals(listOf(5.0, 30.0), weights.sorted())
     }
 }
