@@ -16,7 +16,7 @@
 - Схема базы **не меняется**: версия 8, `app/schemas/ru.hopes.workouttimer.data.dao.AppDatabase/8.json` не трогается, новых миграций и сущностей нет — только `@Query` к существующим таблицам. Если после правок `git status` показывает изменённый `8.json` — остановиться и разобраться, а не коммитить схему.
 - `fallbackToDestructiveMigrationFrom(dropAllTables = true, 2, 4)` в `AppModule.kt` **не трогать**.
 - Кириллицу в SQL приложения не сравнивать (`LOWER()` в SQLite — только ASCII). Запросы E3 фильтруют только по id.
-- Регулярки — без флага `(?U)` (движок ICU на Android его не знает). Непечатные и типографские символы в исходниках Kotlin — только экранированными: ` `, `−`, никогда не литералом.
+- Регулярки — без флага `(?U)` (движок ICU на Android его не знает). Непечатные и типографские символы в исходниках Kotlin — только экранированными: `\u00A0`, `\u2212`, никогда не литералом (и в комментариях тоже).
 - В графике, главной цифре и изменении — **только подходы в текущей единице** записи (`exercise_catalog.unit`). Подходы в других единицах видны только в списке сессий, со своей подписью. `session_sets.unit` не переписывается никогда.
 - Одна подпись подхода на всё приложение: `formatLoad` / `formatSet` / `formatSetList` в `presentation/utils/SetFormat.kt`. Один лучший подход: `bestSet()` в `domain/model/SessionSets.kt`. Один уровень точки по оси Y: `progressLevel()` (плита — `плита + добавка / 11`). Своих форматтеров веса на экране не заводить.
 - Математика графика (деления оси Y, время → X, уровень → Y, попадание тапа) и правила прогресса (период, точки, изменение) — чистые функции с JVM-тестами. `ProgressChart` только рисует по готовым позициям и передаёт тап.
@@ -805,7 +805,7 @@ class ProgressFormatTest {
     @Test
     fun `знак изменения — плюс, типографский минус или ноль`() {
         assertEquals("+2.5", signedNumber(2.5))
-        assertEquals("−2", signedNumber(-2.0))
+        assertEquals("\u22122", signedNumber(-2.0))
         assertEquals("+0.3", signedNumber(0.30000000000000004))
         assertEquals("0", signedNumber(0.0))
     }
@@ -829,7 +829,7 @@ class ProgressFormatTest {
     @Test
     fun `плиты склоняются по модулю числа, знак остаётся в тексте`() {
         assertEquals(
-            "−2 плит(2) за 3 мес",
+            "\u22122 плит(2) за 3 мес",
             formatDelta(ProgressDelta.Plates(-2), strings.getValue("progress_span_quarter"), templates)
         )
     }
@@ -992,12 +992,12 @@ class DeltaFormat(
     val plates: (count: Int, signed: String) -> String
 )
 
-// Типографский минус, а не дефис: «−2 кг» не путается с тире.
-private const val MINUS = "−"
+// Типографский минус U+2212, а не дефис: отрицательное изменение не путается с тире.
+private const val MINUS = "\u2212"
 
 private fun String.fill(vararg args: Any): String = String.format(Locale.ROOT, this, *args)
 
-/** «+2.5», «−2», «0». Разность весов из импорта может выйти 0.30000000000000004 — режем до сотых. */
+/** «+2.5», «0» или типографский минус и число. Разность весов из импорта может выйти 0.30000000000000004 — режем до сотых. */
 fun signedNumber(value: Double): String {
     val rounded = (value * 100).roundToLong() / 100.0
     return when {
@@ -1384,7 +1384,7 @@ class ExerciseProgressViewModel @Inject constructor(
     private var loadedId: Long? = null
 
     fun load(catalogId: Long) {
-        // LaunchedEffect перезапускается после поворота экрана, ViewModel — нет:
+        // LaunchedEffect перезапускается при пересоздании активити, ViewModel — нет:
         // второй подписчик на ту же запись только удвоил бы пересчёты.
         if (loadedId == catalogId) return
         loadedId = catalogId
@@ -1787,7 +1787,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.and
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -2942,7 +2941,7 @@ $ADB -s emulator-5554 shell run-as $PKG cp /data/local/tmp/workout_db databases/
 
 Если `run-as … cp` не читает `/data/local/tmp` — запасной путь: `$ADB -s emulator-5554 exec-in run-as $PKG sh -c 'cat > databases/workout_db' < "$SCRATCH/workout_db"`.
 
-Скриншот: `$ADB -s emulator-5554 exec-out screencap -p > "$SCRATCH/<имя>.png"`; каждый просмотреть (Read) и сверить с ожиданием ниже. Тап по точке графика: в дампе `uiautomator` у графика `content-desc` «График лучшего подхода: …» и `bounds`; последняя точка — у правого края, тап в `(right − 40, (top + bottom) / 2)`.
+Скриншот: `$ADB -s emulator-5554 exec-out screencap -p > "$SCRATCH/<имя>.png"`; каждый просмотреть (Read) и сверить с ожиданием ниже. Тап по точке графика: в дампе `uiautomator` у графика `content-desc` «График лучшего подхода: …» и `bounds`; последняя точка — у правого края, тап в `(right - 40, (top + bottom) / 2)`.
 
 - [ ] **Step 3: Прогресс в кг — из экрана «Упражнения»**
 
@@ -2973,7 +2972,7 @@ $ADB -s emulator-5554 shell run-as $PKG cp /data/local/tmp/workout_db databases/
 Список → меню «Спины» → «История» → тап по верхней сессии (3 дня назад): строки «Тяга блока — плита 5 +4 кг × 12 ›», «Подтягивания — 10 · 9 ›».
 
 - Тап по строке «Подтягивания»: `e3-10-from-history.png` — экран прогресса «Подтягивания», карточка истории при тапе не свернулась (вернуться «Назад» — `e3-11-history-back.png`: сессия по-прежнему развёрнута).
-- Повернуть экран на прогрессе (`$ADB -s emulator-5554 shell settings put system accelerometer_rotation 0 && $ADB -s emulator-5554 shell settings put system user_rotation 1`, затем вернуть `user_rotation 0`) — выбранный период и данные на месте, экран не мигает пустым состоянием.
+- Пересоздать активити на прогрессе: выбрать «всё», затем `$ADB -s emulator-5554 shell settings put system font_scale 1.15` и вернуть `font_scale 1.0` (поворот не годится: `MainActivity` зафиксирована в портрете, `screenOrientation="portrait"`) — выбранный период и данные на месте, экран не мигает пустым состоянием.
 
 - [ ] **Step 7: Итог**
 
