@@ -1,5 +1,6 @@
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
+import ru.hopes.workouttimer.presentation.session.WorkoutExecutionState
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
