@@ -23,6 +23,7 @@ import ru.hopes.workouttimer.domain.usecase.GetLastSessionDurationsUseCase
 import ru.hopes.workouttimer.domain.usecase.SearchWorkoutsUseCase
 import ru.hopes.workouttimer.domain.usecase.SkipWorkoutUseCase
 import ru.hopes.workouttimer.domain.usecase.UndoSkipWorkoutUseCase
+import ru.hopes.workouttimer.presentation.session.WorkoutSessionManager
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -33,7 +34,8 @@ class ListWorkoutViewModel @Inject constructor(
     private val deleteWorkoutUseCase: DeleteWorkoutUseCase,
     private val getLastSessionDurationsUseCase: GetLastSessionDurationsUseCase,
     private val skipWorkoutUseCase: SkipWorkoutUseCase,
-    private val undoSkipWorkoutUseCase: UndoSkipWorkoutUseCase
+    private val undoSkipWorkoutUseCase: UndoSkipWorkoutUseCase,
+    private val sessionManager: WorkoutSessionManager
 ) : ViewModel() {
 
     private val query = MutableStateFlow("")
@@ -63,6 +65,12 @@ class ListWorkoutViewModel @Inject constructor(
             .onEach { (workouts, durations) ->
                 _state.update { it.copy(workouts = workouts, lastSessionDurations = durations) }
             }
+            .launchIn(viewModelScope)
+
+        // Идущая тренировка: у неё «ВЕРНУТЬСЯ» вместо «НАЧАТЬ», правка и удаление закрыты.
+        // runningWorkout, а не session: тики отдыха список не перерисовывают.
+        sessionManager.runningWorkout
+            .onEach { running -> _state.update { it.copy(runningWorkoutId = running?.workoutId) } }
             .launchIn(viewModelScope)
     }
 
@@ -146,7 +154,9 @@ data class ListWorkoutState(
     val lastSessionDurations: Map<Int, Long> = emptyMap(),
     val skippedWorkout: SkippedWorkout? = null,
     /** Сбой операции с БД; показывается снекбаром и гасится `dismissError()`. */
-    @StringRes val errorMessage: Int? = null
+    @StringRes val errorMessage: Int? = null,
+    /** Тренировка идущей сессии (в том числе свёрнутой); null — сессии нет. */
+    val runningWorkoutId: Int? = null
 ) {
     /** Первая в очереди — та, которую не делали дольше всех. */
     val nextWorkout: WorkoutWithExercises? get() = workouts.firstOrNull()

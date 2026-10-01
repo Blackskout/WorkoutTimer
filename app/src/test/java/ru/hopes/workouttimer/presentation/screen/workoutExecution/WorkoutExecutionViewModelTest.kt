@@ -1,50 +1,44 @@
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
-import android.content.Context
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import io.mockk.coEvery
-import io.mockk.coVerify
-import io.mockk.coVerifyOrder
+import io.mockk.every
 import io.mockk.mockk
-import io.mockk.Runs
-import io.mockk.just
-import io.mockk.slot
-import kotlinx.coroutines.CompletableDeferred
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import ru.hopes.workouttimer.domain.model.Exercise
-import ru.hopes.workouttimer.domain.model.ExerciseUnit
-import ru.hopes.workouttimer.domain.model.RecordedSet
-import ru.hopes.workouttimer.domain.model.Workout
-import ru.hopes.workouttimer.domain.repository.WorkoutRepository
-import ru.hopes.workouttimer.domain.usecase.FinishWorkoutSessionUseCase
-import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
-import ru.hopes.workouttimer.presentation.utils.ActiveWorkoutTracker
-import ru.hopes.workouttimer.presentation.utils.SoundPlayer
-import ru.hopes.workouttimer.presentation.utils.VibrationManager
-import ru.hopes.workouttimer.presentation.utils.WakeLockHelper
+import ru.hopes.workouttimer.presentation.session.SessionExercise
+import ru.hopes.workouttimer.presentation.session.WorkoutExecutionState
+import ru.hopes.workouttimer.presentation.session.WorkoutSession
+import ru.hopes.workouttimer.presentation.session.WorkoutSessionManager
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WorkoutExecutionViewModelTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
+    private val session = MutableStateFlow<WorkoutSession>(WorkoutSession.None)
+    private val manager = mockk<WorkoutSessionManager>(relaxed = true)
+    private val store = ViewModelStore()
+
+    private val push = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, order = 1)
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
+        every { manager.session } returns session
+        every { manager.finishError } returns MutableStateFlow(false)
     }
 
     @After
@@ -52,811 +46,128 @@ class WorkoutExecutionViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun buildViewModel(
-        getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
-        workoutRepository: WorkoutRepository,
-        finishWorkoutSessionUseCase: FinishWorkoutSessionUseCase,
-        activeWorkoutTracker: ActiveWorkoutTracker = ActiveWorkoutTracker()
-    ): WorkoutExecutionViewModel {
-        return WorkoutExecutionViewModel(
-            context = mockk<Context>(relaxed = true),
-            soundPlayer = mockk<SoundPlayer>(relaxed = true),
-            getWorkoutByIdUseCase = getWorkoutByIdUseCase,
-            vibrationManager = mockk<VibrationManager>(relaxed = true),
-            wakeLockHelper = mockk<WakeLockHelper>(relaxed = true),
-            workoutRepository = workoutRepository,
-            finishWorkoutSessionUseCase = finishWorkoutSessionUseCase,
-            activeWorkoutTracker = activeWorkoutTracker
-        )
-    }
+    // Через ViewModelStore: store.clear() вызывает настоящий onCleared().
+    private fun viewModel(): WorkoutExecutionViewModel = ViewModelProvider.create(
+        store,
+        viewModelFactory { initializer { WorkoutExecutionViewModel(manager) } }
+    )[WorkoutExecutionViewModel::class]
 
-    private fun singleSetWorkout(): Workout {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
-        return Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-    }
+    private fun present(id: Long, phase: WorkoutExecutionState) = WorkoutSession.Present(
+        sessionId = id, workoutId = 1, workoutName = "Ноги",
+        exercises = listOf(SessionExercise(push)), exerciseIndex = 0, phase = phase
+    )
 
     @Test
-    fun `a loaded workout is marked active`() = runTest {
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns singleSetWorkout()
-        val tracker = ActiveWorkoutTracker()
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, mockk(relaxed = true), mockk(relaxed = true), tracker)
-
-        assertFalse(tracker.isActive)
-        viewModel.loadWorkout(1)
-
-        assertTrue(tracker.isActive)
-    }
-
-    @Test
-    fun `a workout that failed to load is not marked active`() = runTest {
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns null
-        val tracker = ActiveWorkoutTracker()
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, mockk(relaxed = true), mockk(relaxed = true), tracker)
-
-        viewModel.loadWorkout(1)
-
-        assertFalse(tracker.isActive)
-    }
-
-    @Test
-    fun `finishing the workout clears the active mark`() = runTest {
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns singleSetWorkout()
-        val tracker = ActiveWorkoutTracker()
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, mockk(relaxed = true), mockk(relaxed = true), tracker)
-        viewModel.loadWorkout(1)
-
-        viewModel.onExerciseFinished()
-
-        assertTrue(viewModel.uiState.value is WorkoutExecutionState.Finished)
-        assertFalse(tracker.isActive)
-    }
-
-    @Test
-    fun `leaving the execution screen clears the active mark`() = runTest {
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns singleSetWorkout()
-        val tracker = ActiveWorkoutTracker()
-        val store = ViewModelStore()
-        val viewModel = ViewModelProvider.create(
-            store,
-            viewModelFactory {
-                initializer { buildViewModel(getWorkoutByIdUseCase, mockk(relaxed = true), mockk(relaxed = true), tracker) }
-            }
-        )[WorkoutExecutionViewModel::class]
-        viewModel.loadWorkout(1)
+    fun `leaving before start closes nothing`() {
+        viewModel()
 
         store.clear()
 
-        assertFalse(tracker.isActive)
+        verify(exactly = 0) { manager.close(any()) }
+        verify(exactly = 0) { manager.abandon() }
     }
 
     @Test
-    fun `finishing the only exercise saves a session and exposes its duration`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>()
-        coEvery { workoutRepository.updateLastUseAt(1) } returns Unit
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
-        val durationSlot = slot<Long>()
-        coEvery {
-            finishWorkoutSessionUseCase(
-                workoutId = 1,
-                startedAt = any(),
-                finishedAt = any(),
-                durationMillis = capture(durationSlot),
-                sets = any()
-            )
-        } just Runs
+    fun `leaving a finished session closes the session this screen started`() {
+        every { manager.start(1) } returns 7L
+        val vm = viewModel()
+        vm.start(1)
+        session.value = present(7L, WorkoutExecutionState.Finished(1_000L))
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
-        viewModel.onExerciseFinished()
+        store.clear()
 
-        val state = viewModel.uiState.value
-        assertTrue(state is WorkoutExecutionState.Finished)
-        assertEquals(durationSlot.captured, (state as WorkoutExecutionState.Finished).durationMillis)
-        coVerify(exactly = 1) {
-            finishWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any(), sets = any())
-        }
-    }
-
-    // f5956c4 поменял порядок вызовов местами: пуш обновления виджета подвешен на
-    // updateLastUseAt(), поэтому он обязан срабатывать уже после записи сессии в БД, иначе
-    // виджет может перерисоваться со старой длительностью или без неё. До этого теста порядок
-    // не был закреплён ничем, кроме комментария в коде.
-    @Test
-    fun `finishing the workout records the session before pushing lastUseAt`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>()
-        coEvery { workoutRepository.updateLastUseAt(1) } returns Unit
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
-        coEvery {
-            finishWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any(), sets = any())
-        } just Runs
-
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
-        viewModel.onExerciseFinished()
-
-        coVerifyOrder {
-            finishWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any(), sets = any())
-            workoutRepository.updateLastUseAt(1)
-        }
+        verify { manager.close(7L) }
+        verify(exactly = 0) { manager.abandon() }
     }
 
     @Test
-    fun `excluded idle time is subtracted from the saved duration and clamped at zero`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>()
-        coEvery { workoutRepository.updateLastUseAt(1) } returns Unit
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
-        val durationSlot = slot<Long>()
-        coEvery {
-            finishWorkoutSessionUseCase(
-                workoutId = 1,
-                startedAt = any(),
-                finishedAt = any(),
-                durationMillis = capture(durationSlot),
-                sets = any()
-            )
-        } just Runs
+    fun `leaving a running session only asks to close it, which keeps it running`() {
+        every { manager.start(1) } returns 7L
+        every { manager.isRunning } returns true
+        val vm = viewModel()
+        vm.start(1)
+        session.value = present(7L, WorkoutExecutionState.Active(push, 1))
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
+        store.clear() // экран свернули
 
-        // Bank a large excluded gap using timestamps far in the "future" relative to real
-        // wall-clock: the jump from loadWorkout's real lastInteractionAt to farFutureBase is
-        // itself well over the threshold and banks its own excess, and the subsequent 45-minute
-        // gap banks a further 35 minutes on top -- the exact total isn't asserted, only that it's
-        // large enough to exceed the (near-zero, in a fast unit test) raw duration below. The
-        // automatic registerInteraction() inside onExerciseFinished() (which uses the real
-        // current time, far in the past relative to farFutureBase) then computes a negative gap
-        // and adds no further exclusion.
-        val farFutureBase = System.currentTimeMillis() + 10_000_000L
-        viewModel.registerInteraction(now = farFutureBase)
-        viewModel.registerInteraction(now = farFutureBase + 45 * 60 * 1000L) // additional 45 min gap
-
-        viewModel.onExerciseFinished()
-
-        // Raw elapsed (real loadWorkout time -> real finishedAt time) is near-zero in a fast unit
-        // test, while the banked exclusion is 35 minutes, so the coerceAtLeast(0L) clamp must apply.
-        assertEquals(0L, durationSlot.captured)
-        val state = viewModel.uiState.value
-        assertTrue(state is WorkoutExecutionState.Finished)
-        assertEquals(0L, (state as WorkoutExecutionState.Finished).durationMillis)
+        verify { manager.close(7L) } // менеджер сам ничего не сделает: тренировка в процессе
+        verify(exactly = 0) { manager.abandon() }
     }
 
     @Test
-    fun `loading a workout does not save a session by itself`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
+    fun `start on a finished session this screen owns does not start again`() {
+        every { manager.start(1) } returns 7L
+        val vm = viewModel()
+        vm.start(1)
+        session.value = present(7L, WorkoutExecutionState.Finished(1_000L))
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
+        vm.start(1) // пересоздание активности на «ГОТОВО»
 
-        coVerify(exactly = 0) {
-            finishWorkoutSessionUseCase(workoutId = any(), startedAt = any(), finishedAt = any(), durationMillis = any(), sets = any())
-        }
+        verify(exactly = 1) { manager.start(1) }
     }
 
     @Test
-    fun `a gap under the threshold excludes nothing`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
+    fun `retry starts a new load even for an owned session`() {
+        every { manager.start(1) } returnsMany listOf(7L, 8L)
+        val vm = viewModel()
+        vm.start(1)
+        session.value = present(7L, WorkoutExecutionState.Error)
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
+        vm.retry(1)
 
-        viewModel.registerInteraction(now = 1L) // ненулевая база: 0L совпал бы с "ещё не было взаимодействий"
-        viewModel.registerInteraction(now = 1L + 5 * 60 * 1000L) // 5 минут, меньше порога в 10
-
-        assertEquals(0L, viewModel.excludedIdleMillis)
+        verify(exactly = 2) { manager.start(1) }
     }
 
     @Test
-    fun `a gap over the threshold excludes only the excess`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
+    fun `exit without saving abandons the session`() {
+        viewModel().abandon()
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
-
-        viewModel.registerInteraction(now = 1L)
-        viewModel.registerInteraction(now = 1L + 45 * 60 * 1000L) // 45 минут простоя
-
-        assertEquals(35 * 60 * 1000L, viewModel.excludedIdleMillis) // исключены только 45 - 10 = 35 минут
+        verify { manager.abandon() }
     }
 
     @Test
-    fun `multiple gaps over the threshold accumulate`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
+    fun `retry after an error owns the new session`() {
+        every { manager.start(1) } returnsMany listOf(7L, 8L)
+        val vm = viewModel()
+        vm.start(1)
+        vm.retry(1) // «Повторить»
+        session.value = present(8L, WorkoutExecutionState.Error)
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
+        store.clear()
 
-        viewModel.registerInteraction(now = 1L)
-        viewModel.registerInteraction(now = 1L + 20 * 60 * 1000L) // гэп 20 мин -> исключено 10 мин
-        viewModel.registerInteraction(now = 1L + 20 * 60 * 1000L + 30 * 60 * 1000L) // ещё гэп 30 мин -> исключено ещё 20 мин
-
-        assertEquals(30 * 60 * 1000L, viewModel.excludedIdleMillis) // 10 + 20 = 30 минут суммарно
+        verify { manager.close(8L) }
+        verify(exactly = 0) { manager.close(7L) }
     }
 
     @Test
-    fun `loadWorkout resets excludedIdleMillis for a fresh session`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
+    fun `ui state starts from the current snapshot`() {
+        session.value = present(3L, WorkoutExecutionState.Rest(push, 2))
 
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
-        viewModel.registerInteraction(now = 1L)
-        viewModel.registerInteraction(now = 1L + 45 * 60 * 1000L)
-        assertEquals(35 * 60 * 1000L, viewModel.excludedIdleMillis)
+        val vm = viewModel()
 
-        viewModel.loadWorkout(1) // повторная загрузка = новая сессия
-
-        assertEquals(0L, viewModel.excludedIdleMillis)
+        assertTrue(vm.uiState.value is WorkoutExecutionState.Rest)
     }
 
     @Test
-    fun `onExerciseFinished registers an interaction`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
-
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
-        val farFuture = System.currentTimeMillis() + 1_000_000L
-        viewModel.registerInteraction(now = farFuture)
-
-        viewModel.onExerciseFinished()
-
-        assertTrue(viewModel.lastInteractionAt < farFuture)
-    }
-
-    @Test
-    fun `skipRest registers an interaction`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
-
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
-        val farFuture = System.currentTimeMillis() + 1_000_000L
-        viewModel.registerInteraction(now = farFuture)
-
-        viewModel.skipRest()
-
-        assertTrue(viewModel.lastInteractionAt < farFuture)
-    }
-
-    @Test
-    fun `moveToSelectedExercise registers an interaction`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
-
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
-        val farFuture = System.currentTimeMillis() + 1_000_000L
-        viewModel.registerInteraction(now = farFuture)
-
-        viewModel.moveToSelectedExercise(exercise)
-
-        assertTrue(viewModel.lastInteractionAt < farFuture)
-    }
-
-    @Test
-    fun `updateExerciseNote registers an interaction`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        coEvery { workoutRepository.updateExerciseNote(1, "note") } returns Unit
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
-
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
-        val farFuture = System.currentTimeMillis() + 1_000_000L
-        viewModel.registerInteraction(now = farFuture)
-
-        viewModel.updateExerciseNote(1, "note")
-
-        assertTrue(viewModel.lastInteractionAt < farFuture)
-    }
-
-    @Test
-    fun `automatic rest completion does not register an interaction`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
-
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
-        viewModel.onExerciseFinished() // sets=2, currentSet 1<2 -> переход в Rest, регистрирует взаимодействие
-        val afterRealInteraction = viewModel.lastInteractionAt
-
-        viewModel.onRestFinished()
-
-        assertEquals(afterRealInteraction, viewModel.lastInteractionAt)
-    }
-
-    @Test
-    fun `loading a workout schedules the idle reminder for the first exercise`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
-
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
-
-        assertTrue(viewModel.isIdleReminderJobActive)
-    }
-
-    @Test
-    fun `moving to rest cancels the idle reminder`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
-
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
-        viewModel.onExerciseFinished() // sets=2, currentSet 1<2 -> переход в Rest
-
-        assertFalse(viewModel.isIdleReminderJobActive)
-    }
-
-    @Test
-    fun `skipping rest re-schedules the idle reminder`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
-
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
-        viewModel.onExerciseFinished() // -> Rest
-        viewModel.skipRest() // -> Active
-
-        assertTrue(viewModel.isIdleReminderJobActive)
-    }
-
-    @Test
-    fun `finishing the workout cancels the idle reminder`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>()
-        coEvery { workoutRepository.updateLastUseAt(1) } returns Unit
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
-        coEvery {
-            finishWorkoutSessionUseCase(workoutId = 1, startedAt = any(), finishedAt = any(), durationMillis = any(), sets = any())
-        } just Runs
-
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
-        viewModel.loadWorkout(1)
-        viewModel.onExerciseFinished() // единственное упражнение, единственный подход -> Finished
-
-        assertFalse(viewModel.isIdleReminderJobActive)
-    }
-
-    @Test
-    fun `isLastSetOfWorkout is false on an intermediate set`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val viewModel = buildViewModel(
-            getWorkoutByIdUseCase,
-            mockk<WorkoutRepository>(relaxed = true),
-            mockk<FinishWorkoutSessionUseCase>()
-        )
-
-        viewModel.loadWorkout(1) // подход 1 из 2
-
-        assertFalse(viewModel.isLastSetOfWorkout)
-    }
-
-    @Test
-    fun `isLastSetOfWorkout is false on the last set of a non-final exercise`() = runTest {
-        val first = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
-        val second = Exercise(id = 2, name = "Pull", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 2)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(first, second), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val viewModel = buildViewModel(
-            getWorkoutByIdUseCase,
-            mockk<WorkoutRepository>(relaxed = true),
-            mockk<FinishWorkoutSessionUseCase>()
-        )
-
-        viewModel.loadWorkout(1) // единственный подход первого из двух упражнений
-
-        assertFalse(viewModel.isLastSetOfWorkout)
-    }
-
-    @Test
-    fun `isLastSetOfWorkout is true on the last set of the last exercise`() = runTest {
-        val first = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
-        val second = Exercise(id = 2, name = "Pull", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 2)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(first, second), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val viewModel = buildViewModel(
-            getWorkoutByIdUseCase,
-            mockk<WorkoutRepository>(relaxed = true),
-            mockk<FinishWorkoutSessionUseCase>()
-        )
-
-        viewModel.loadWorkout(1)
-        viewModel.moveToSelectedExercise(second) // единственный подход последнего упражнения
-
-        assertTrue(viewModel.isLastSetOfWorkout)
-    }
-
-    @Test
-    fun `isLastSetOfWorkout is false while resting`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val viewModel = buildViewModel(
-            getWorkoutByIdUseCase,
-            mockk<WorkoutRepository>(relaxed = true),
-            mockk<FinishWorkoutSessionUseCase>()
-        )
-
-        viewModel.loadWorkout(1)
-        viewModel.onExerciseFinished() // sets=2, currentSet 1<2 -> Rest
-
-        assertTrue(viewModel.uiState.value is WorkoutExecutionState.Rest)
-        assertFalse(viewModel.isLastSetOfWorkout)
-    }
-
-    @Test
-    fun `updateExerciseWeightAndReps stores the new values`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, mockk<FinishWorkoutSessionUseCase>())
-
-        viewModel.loadWorkout(1)
-        viewModel.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, extraWeight = 0.0, reps = 8)
-
-        coVerify(exactly = 1) {
-            workoutRepository.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, extraWeight = 0.0, reps = 8)
-        }
-    }
-
-    // Плитки на экране выполнения берут числа из Active.weight/Active.reps, а не из
-    // Active.exercise, поэтому правка обязана обновить и отдельные поля состояния тоже.
-    @Test
-    fun `updateExerciseWeightAndReps refreshes the tiles of the current exercise`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val viewModel = buildViewModel(
-            getWorkoutByIdUseCase,
-            mockk<WorkoutRepository>(relaxed = true),
-            mockk<FinishWorkoutSessionUseCase>()
-        )
-
-        viewModel.loadWorkout(1)
-        viewModel.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, extraWeight = 0.0, reps = 8)
-
-        val state = viewModel.uiState.value as WorkoutExecutionState.Active
-        assertEquals(12.5, state.weight, 0.0)
-        assertEquals(8, state.reps)
-        assertEquals(12.5, state.exercise.weight, 0.0)
-        assertEquals(8, state.exercise.reps)
-    }
-
-    @Test
-    fun `updateExerciseWeightAndReps refreshes the exercise shown while resting`() = runTest {
-        val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 1_000, order = 1)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val viewModel = buildViewModel(
-            getWorkoutByIdUseCase,
-            mockk<WorkoutRepository>(relaxed = true),
-            mockk<FinishWorkoutSessionUseCase>()
-        )
-
-        viewModel.loadWorkout(1)
-        viewModel.onExerciseFinished() // sets=2, currentSet 1<2 -> Rest
-        viewModel.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, extraWeight = 0.0, reps = 8)
-
-        val state = viewModel.uiState.value as WorkoutExecutionState.Rest
-        assertEquals(12.5, state.exercise.weight, 0.0)
-        assertEquals(8, state.exercise.reps)
-    }
-
-    @Test
-    fun `updateExerciseWeightAndReps of another exercise reaches it only when its turn comes`() = runTest {
-        val first = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
-        val second = Exercise(id = 2, name = "Pull", weight = 20.0, sets = 1, reps = 6, timeMillis = 1_000, order = 2)
-        val workout = Workout(id = 1, name = "Test", exercises = listOf(first, second), lastUseAt = 0L)
-        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val viewModel = buildViewModel(
-            getWorkoutByIdUseCase,
-            mockk<WorkoutRepository>(relaxed = true),
-            mockk<FinishWorkoutSessionUseCase>()
-        )
-
-        viewModel.loadWorkout(1)
-        viewModel.updateExerciseWeightAndReps(exerciseId = 2, weight = 25.0, extraWeight = 0.0, reps = 9)
-
-        val stillFirst = viewModel.uiState.value as WorkoutExecutionState.Active
-        assertEquals(10.0, stillFirst.weight, 0.0)
-        assertEquals(5, stillFirst.reps)
-
-        viewModel.moveToSelectedExercise(second)
-
-        val nowSecond = viewModel.uiState.value as WorkoutExecutionState.Active
-        assertEquals(25.0, nowSecond.weight, 0.0)
-        assertEquals(9, nowSecond.reps)
-    }
-
-    private fun workoutOf(vararg exercises: Exercise) =
-        Workout(id = 1, name = "Test", exercises = exercises.toList(), lastUseAt = 0L)
-
-    private fun ex(id: Int, name: String, sets: Int, weight: Double = 50.0, reps: Int = 8) =
-        Exercise(id = id, name = name, weight = weight, sets = sets, reps = reps,
-            timeMillis = 1_000, order = id, catalogId = id.toLong() * 10)
-
-    @Test
-    fun `last set of the workout is recorded together with the session`() = runTest {
-        val getWorkout = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkout(1) } returns workoutOf(ex(1, "Присед", sets = 2))
-        val repo = mockk<WorkoutRepository>(relaxed = true)
-        val finish = mockk<FinishWorkoutSessionUseCase>()
-        val setsSlot = slot<List<RecordedSet>>()
-        coEvery { finish(any(), any(), any(), any(), capture(setsSlot)) } returns Unit
-        val vm = buildViewModel(getWorkout, repo, finish)
-
-        vm.loadWorkout(1)
-        vm.onExerciseFinished()   // подход 1 → отдых
-        vm.skipRest()
-        vm.onExerciseFinished()   // подход 2 — последний
-
-        assertEquals(
-            listOf(
-                RecordedSet(10L, "Присед", 50.0, 0.0, 8, ExerciseUnit.KG),
-                RecordedSet(10L, "Присед", 50.0, 0.0, 8, ExerciseUnit.KG)
-            ),
-            setsSlot.captured
-        )
-    }
-
-    @Test
-    fun `jumping to another exercise records only finished sets`() = runTest {
-        val squat = ex(1, "Присед", sets = 3)
-        val press = ex(2, "Жим", sets = 1)
-        val getWorkout = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkout(1) } returns workoutOf(squat, press)
-        val finish = mockk<FinishWorkoutSessionUseCase>()
-        val setsSlot = slot<List<RecordedSet>>()
-        coEvery { finish(any(), any(), any(), any(), capture(setsSlot)) } returns Unit
-        val vm = buildViewModel(getWorkout, mockk(relaxed = true), finish)
-
-        vm.loadWorkout(1)
-        vm.onExerciseFinished()            // присед, подход 1
-        vm.moveToSelectedExercise(press)   // бросили присед
-        vm.onExerciseFinished()            // жим — последнее упражнение, последний подход
-
-        assertEquals(listOf("Присед", "Жим"), setsSlot.captured.map { it.exerciseName })
-    }
-
-    @Test
-    fun `leaving without finishing writes no session`() = runTest {
-        val getWorkout = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkout(1) } returns workoutOf(ex(1, "Присед", sets = 3))
-        val finish = mockk<FinishWorkoutSessionUseCase>(relaxed = true)
-        val vm = buildViewModel(getWorkout, mockk(relaxed = true), finish)
-
-        vm.loadWorkout(1)
-        vm.onExerciseFinished()
-
-        coVerify(exactly = 0) { finish(any(), any(), any(), any(), any()) }
-        assertEquals(1, vm.recordedSets.size)
-    }
-
-    @Test
-    fun `edited tiles are recorded right away even if the db write is slow`() = runTest {
-        val getWorkout = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkout(1) } returns workoutOf(ex(1, "Присед", sets = 1))
-        val repo = mockk<WorkoutRepository>(relaxed = true)
-        val gate = CompletableDeferred<Unit>()
-        coEvery { repo.updateExerciseWeightAndReps(any(), any(), any(), any()) } coAnswers { gate.await() }
-        val finish = mockk<FinishWorkoutSessionUseCase>()
-        val setsSlot = slot<List<RecordedSet>>()
-        coEvery { finish(any(), any(), any(), any(), capture(setsSlot)) } returns Unit
-        val vm = buildViewModel(getWorkout, repo, finish)
-
-        vm.loadWorkout(1)
-        vm.updateExerciseWeightAndReps(exerciseId = 1, weight = 62.5, extraWeight = 0.0, reps = 6) // запись в БД висит
-        vm.onExerciseFinished()
-
-        assertEquals(62.5, setsSlot.captured.single().weight, 0.0)
-        assertEquals(6, setsSlot.captured.single().reps)
-        gate.complete(Unit)
-    }
-
-    @Test
-    fun `double tap on the last set gives one session and one set`() = runTest {
-        val getWorkout = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkout(1) } returns workoutOf(ex(1, "Присед", sets = 1))
-        val gate = CompletableDeferred<Unit>()
-        val finish = mockk<FinishWorkoutSessionUseCase>()
-        coEvery { finish(any(), any(), any(), any(), any()) } coAnswers { gate.await() }
-        val vm = buildViewModel(getWorkout, mockk(relaxed = true), finish)
-
-        vm.loadWorkout(1)
-        vm.onExerciseFinished()
-        vm.onExerciseFinished()   // второй тап, пока запись висит
-        gate.complete(Unit)
-
-        coVerify(exactly = 1) { finish(any(), any(), any(), any(), any()) }
-        assertEquals(1, vm.recordedSets.size)
-    }
-
-    @Test
-    fun `failed finish keeps sets, reports error and retry does not duplicate the last set`() = runTest {
-        val getWorkout = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkout(1) } returns workoutOf(ex(1, "Присед", sets = 1))
-        val finish = mockk<FinishWorkoutSessionUseCase>()
-        val attempts = mutableListOf<List<RecordedSet>>()
-        coEvery { finish(any(), any(), any(), any(), capture(attempts)) } throws
-            IllegalStateException("disk full") andThen Unit
-        val vm = buildViewModel(getWorkout, mockk(relaxed = true), finish)
-
-        vm.loadWorkout(1)
-        vm.onExerciseFinished()
-        assertTrue(vm.finishError.value)
+    fun `ui state follows the manager and keeps the last phase when the session ends`() {
+        val vm = viewModel()
+        assertEquals(WorkoutExecutionState.Loading, vm.uiState.value)
+
+        session.value = present(3L, WorkoutExecutionState.Active(push, 1))
         assertTrue(vm.uiState.value is WorkoutExecutionState.Active)
 
-        vm.dismissFinishError()
-        vm.onExerciseFinished()   // повтор
-
-        assertEquals(2, attempts.size)
-        assertEquals(1, attempts.last().size)
-        assertTrue(vm.uiState.value is WorkoutExecutionState.Finished)
+        session.value = WorkoutSession.None
+        assertTrue(vm.uiState.value is WorkoutExecutionState.Active)
     }
 
     @Test
-    fun `failed finish then jumping back and finishing again keeps every tapped set`() = runTest {
-        val a = ex(1, "Присед", sets = 1)
-        val b = ex(2, "Жим", sets = 1)
-        val getWorkout = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkout(1) } returns workoutOf(a, b)
-        val finish = mockk<FinishWorkoutSessionUseCase>()
-        val attempts = mutableListOf<List<RecordedSet>>()
-        coEvery { finish(any(), any(), any(), any(), capture(attempts)) } throws
-            IllegalStateException("disk full") andThen Unit
-        val vm = buildViewModel(getWorkout, mockk(relaxed = true), finish)
+    fun `chrome shows the session name and position`() {
+        session.value = present(3L, WorkoutExecutionState.Active(push, 1))
 
-        vm.loadWorkout(1)
-        vm.onExerciseFinished()            // A → отдых перед B
-        vm.skipRest()
-        vm.onExerciseFinished()            // B, последний подход — запись падает
-        assertTrue(vm.finishError.value)
+        val chrome = viewModel().chrome.value
 
-        vm.dismissFinishError()
-        vm.moveToSelectedExercise(a)       // ушли с последнего подхода
-        vm.onExerciseFinished()            // A ещё раз
-        vm.skipRest()
-        vm.onExerciseFinished()            // B — запись проходит
-
-        val setA = RecordedSet(10L, "Присед", 50.0, 0.0, 8, ExerciseUnit.KG)
-        val setB = RecordedSet(20L, "Жим", 50.0, 0.0, 8, ExerciseUnit.KG)
-        assertEquals(2, attempts.size)
-        assertEquals(listOf(setA, setB), attempts.first())
-        // Неудавшийся подход B остаётся в истории: он был сделан, а не потерян.
-        assertEquals(listOf(setA, setB, setA, setB), attempts.last())
-        assertTrue(vm.uiState.value is WorkoutExecutionState.Finished)
-    }
-
-    @Test
-    fun `failed finish then weight edit is recorded by the retry without growing the list`() = runTest {
-        val getWorkout = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkout(1) } returns workoutOf(ex(1, "Присед", sets = 1))
-        val finish = mockk<FinishWorkoutSessionUseCase>()
-        val attempts = mutableListOf<List<RecordedSet>>()
-        coEvery { finish(any(), any(), any(), any(), capture(attempts)) } throws
-            IllegalStateException("disk full") andThen Unit
-        val vm = buildViewModel(getWorkout, mockk(relaxed = true), finish)
-
-        vm.loadWorkout(1)
-        vm.onExerciseFinished()
-        vm.dismissFinishError()
-        vm.updateExerciseWeightAndReps(exerciseId = 1, weight = 70.0, extraWeight = 0.0, reps = 5)
-        vm.onExerciseFinished()   // повтор
-
-        assertEquals(1, attempts.last().size)
-        assertEquals(70.0, attempts.last().single().weight, 0.0)
-        assertEquals(5, attempts.last().single().reps)
-        assertEquals(1, vm.recordedSets.size)
-    }
-
-    @Test
-    fun `plate extra weight edited on the tiles is recorded with the set`() = runTest {
-        val plate = Exercise(
-            id = 1, name = "Тяга блока", weight = 5.0, sets = 1, reps = 12, timeMillis = 1_000, order = 1,
-            catalogId = 4L, unit = ExerciseUnit.PLATE
-        )
-        val getWorkout = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkout(1) } returns Workout(id = 1, name = "Спина", exercises = listOf(plate), lastUseAt = 0L)
-        val finish = mockk<FinishWorkoutSessionUseCase>()
-        val setsSlot = slot<List<RecordedSet>>()
-        coEvery { finish(any(), any(), any(), any(), capture(setsSlot)) } returns Unit
-        val vm = buildViewModel(getWorkout, mockk(relaxed = true), finish)
-
-        vm.loadWorkout(1)
-        vm.updateExerciseWeightAndReps(exerciseId = 1, weight = 6.0, extraWeight = 2.0, reps = 10)
-
-        assertEquals(2.0, (vm.uiState.value as WorkoutExecutionState.Active).extraWeight, 0.0)
-        vm.onExerciseFinished()
-        assertEquals(
-            RecordedSet(4L, "Тяга блока", 6.0, 2.0, 10, ExerciseUnit.PLATE),
-            setsSlot.captured.single()
-        )
+        assertEquals("Ноги", chrome.workoutName)
+        assertEquals(1, chrome.currentExerciseNumber)
+        assertEquals(1, chrome.totalExercises)
     }
 }

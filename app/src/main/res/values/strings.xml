@@ -56,6 +56,9 @@
     <string name="list_error_delete">Не удалось удалить тренировку</string>
     <string name="list_error_skip">Не удалось пропустить тренировку</string>
     <string name="list_error_undo_skip">Не удалось отменить пропуск</string>
+    <string name="list_return_button">ВЕРНУТЬСЯ</string>
+    <string name="list_action_return">Вернуться к тренировке</string>
+    <string name="list_action_locked">Недоступно во время тренировки</string>
 
     <!-- Выполнение тренировки -->
     <string name="execution_workout_fallback">Тренировка</string>
@@ -92,6 +95,39 @@
     <string name="execution_loading_subtitle">Секунду…</string>
     <string name="execution_note_dialog_title">Заметка к упражнению</string>
     <string name="execution_note_placeholder" tools:ignore="TypographyEllipsis">Введите заметку...</string>
+    <string name="execution_minimize">Свернуть тренировку</string>
+    <string name="execution_more">Ещё</string>
+    <string name="execution_exit_without_saving">Выйти без сохранения</string>
+    <string name="execution_added_today">сегодня</string>
+
+    <!-- Плашка свёрнутой тренировки -->
+    <string name="minibar_rest">Отдых %1$s</string>
+    <string name="minibar_set">Подход %1$d из %2$d · %3$s</string>
+    <string name="minibar_rest_over">Пора: подход %1$d</string>
+    <string name="minibar_open">Вернуться к тренировке</string>
+    <string name="minibar_exit">Выйти из тренировки без сохранения</string>
+
+    <!-- Просмотр тренировки -->
+    <string name="preview_start">Начать</string>
+    <string name="preview_return">Вернуться к тренировке</string>
+    <string name="preview_running_other">Идёт «%1$s» — упражнение можно добавить в неё</string>
+    <string name="preview_add_today">В сегодняшнюю</string>
+    <string name="preview_add_today_description">Добавить «%1$s» в сегодняшнюю тренировку</string>
+    <string name="preview_added">Добавлено</string>
+    <string name="preview_added_snackbar">%1$s — в сегодняшней тренировке</string>
+    <plurals name="preview_sets">
+        <item quantity="one">%1$d подход</item>
+        <item quantity="few">%1$d подхода</item>
+        <item quantity="many">%1$d подходов</item>
+        <item quantity="other">%1$d подхода</item>
+    </plurals>
+    <string name="preview_rest">отдых %1$s</string>
+    <string name="preview_last_time">Прошлый раз · %1$s: %2$s</string>
+    <string name="preview_never">Ещё не делали</string>
+    <string name="preview_open_progress">%1$s, открыть прогресс</string>
+    <string name="preview_not_found">Тренировка не найдена</string>
+    <string name="preview_empty">В тренировке нет упражнений</string>
+    <string name="preview_error_load">Не удалось загрузить тренировку</string>
 
     <!-- Создание и редактирование тренировки -->
     <string name="create_save_error">Не удалось сохранить тренировку</string>

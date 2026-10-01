@@ -1,5 +1,6 @@
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
+import ru.hopes.workouttimer.presentation.session.WorkoutExecutionState
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText

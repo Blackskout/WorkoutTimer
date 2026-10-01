@@ -56,16 +56,21 @@ fun formatLoad(unit: ExerciseUnit, weight: Double, extraWeight: Double, format: 
     }
 
 /**
+ * Подпись подхода по значениям, без SessionSet: план из шаблона тренировки на экране
+ * просмотра — «60 кг × 8», «плита 5 +2 кг × 12», «12». То же правило, что у сделанного подхода.
+ */
+fun formatPlannedSet(unit: ExerciseUnit, weight: Double, extraWeight: Double, reps: Int, format: SetFormat): String {
+    val load = formatLoad(unit, weight, extraWeight, format) ?: return reps.toString()
+    return format.set.fill(load, reps)
+}
+
+/**
  * Подпись подхода — одна на всё приложение: «60 кг × 8», «плита 5 +2 кг × 12», «12».
  * [bareKg] — для перечисления: следующие подходы в кг пишутся без единицы, «60 × 8».
  */
 fun formatSet(set: SessionSet, format: SetFormat, bareKg: Boolean = false): String {
-    val load = if (bareKg && set.unit == ExerciseUnit.KG) {
-        set.weight.toCorrectNum()
-    } else {
-        formatLoad(set.unit, set.weight, set.extraWeight, format)
-    } ?: return set.reps.toString()
-    return format.set.fill(load, set.reps)
+    if (bareKg && set.unit == ExerciseUnit.KG) return format.set.fill(set.weight.toCorrectNum(), set.reps)
+    return formatPlannedSet(set.unit, set.weight, set.extraWeight, set.reps, format)
 }
 
 /** Подходы одного упражнения: «60 кг × 8 · 60 × 8 · 62.5 × 6». */

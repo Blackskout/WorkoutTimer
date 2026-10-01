@@ -2,6 +2,7 @@ package ru.hopes.workouttimer.presentation.screen.workouts
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -88,7 +89,9 @@ fun ListWorkoutScreen(
     modifier: Modifier = Modifier,
     viewModel: ListWorkoutViewModel = hiltViewModel(),
     onAddWorkoutClick: () -> Unit,
-    onWorkoutClick: (WorkoutEntity) -> Unit,
+    onOpen: (WorkoutEntity) -> Unit,
+    onStart: (WorkoutEntity) -> Unit,
+    onReturn: () -> Unit,
     onEditClick: (WorkoutEntity) -> Unit = {},
     onExportImportClick: () -> Unit = {},
     onHistoryClick: (WorkoutEntity) -> Unit = {},
@@ -145,41 +148,49 @@ fun ListWorkoutScreen(
     }
 
     menuFor?.let { target ->
-        val items = buildList {
-            add(
-                ActionSheetItem(stringResource(R.string.list_action_start), Icons.Default.PlayArrow, {
-                    menuFor = null
-                    onWorkoutClick(target)
-                })
-            )
-            // В режиме поиска очередь не видна целиком, поэтому пропуск скрыт:
-            // он переставил бы порядок, которого пользователь сейчас не наблюдает.
-            if (!state.isSearching) {
-                add(
+        val locked = stringResource(R.string.list_action_locked)
+        val items = listMenuEntries(target.id, state.runningWorkoutId, state.isSearching).map { entry ->
+            when (entry.action) {
+                ListMenuAction.START ->
+                    ActionSheetItem(stringResource(R.string.list_action_start), Icons.Default.PlayArrow, {
+                        menuFor = null
+                        onStart(target)
+                    })
+                ListMenuAction.RETURN ->
+                    ActionSheetItem(stringResource(R.string.list_action_return), Icons.Default.PlayArrow, {
+                        menuFor = null
+                        onReturn()
+                    })
+                ListMenuAction.SKIP ->
                     ActionSheetItem(stringResource(R.string.list_action_skip), Icons.Default.SkipNext, {
                         menuFor = null
                         viewModel.skipWorkout(target)
                     }, subtitle = stringResource(R.string.list_action_skip_subtitle))
-                )
+                ListMenuAction.EDIT ->
+                    ActionSheetItem(
+                        stringResource(R.string.list_action_edit), Icons.Default.Edit, {
+                            menuFor = null
+                            onEditClick(target)
+                        },
+                        subtitle = if (entry.enabled) null else locked,
+                        enabled = entry.enabled
+                    )
+                ListMenuAction.HISTORY ->
+                    ActionSheetItem(stringResource(R.string.list_action_history), Icons.Default.History, {
+                        menuFor = null
+                        onHistoryClick(target)
+                    })
+                ListMenuAction.DELETE ->
+                    ActionSheetItem(
+                        stringResource(R.string.common_delete), Icons.Default.Delete, {
+                            menuFor = null
+                            workoutToDelete = target
+                        },
+                        subtitle = if (entry.enabled) null else locked,
+                        destructive = true,
+                        enabled = entry.enabled
+                    )
             }
-            add(
-                ActionSheetItem(stringResource(R.string.list_action_edit), Icons.Default.Edit, {
-                    menuFor = null
-                    onEditClick(target)
-                })
-            )
-            add(
-                ActionSheetItem(stringResource(R.string.list_action_history), Icons.Default.History, {
-                    menuFor = null
-                    onHistoryClick(target)
-                })
-            )
-            add(
-                ActionSheetItem(stringResource(R.string.common_delete), Icons.Default.Delete, {
-                    menuFor = null
-                    workoutToDelete = target
-                }, destructive = true)
-            )
         }
         ActionSheet(
             title = target.name,
@@ -265,7 +276,9 @@ fun ListWorkoutScreen(
 
             QueueContent(
                 state = state,
-                onWorkoutClick = onWorkoutClick,
+                onOpen = onOpen,
+                onStart = onStart,
+                onReturn = onReturn,
                 onMenuClick = { menuFor = it },
                 onAddWorkoutClick = onAddWorkoutClick
             )
@@ -279,9 +292,11 @@ fun ListWorkoutScreen(
  * каждое состояние экрана можно было превьюшить без `hiltViewModel()`.
  */
 @Composable
-private fun QueueContent(
+internal fun QueueContent(
     state: ListWorkoutState,
-    onWorkoutClick: (WorkoutEntity) -> Unit,
+    onOpen: (WorkoutEntity) -> Unit,
+    onStart: (WorkoutEntity) -> Unit,
+    onReturn: () -> Unit,
     onMenuClick: (WorkoutEntity) -> Unit,
     onAddWorkoutClick: () -> Unit
 ) {
@@ -317,8 +332,12 @@ private fun QueueContent(
                     NextWorkoutCard(
                         item = next,
                         durationMillis = state.lastSessionDurations[next.workout.id],
-                        onStart = { onWorkoutClick(next.workout) },
-                        onMenu = { onMenuClick(next.workout) }
+                        action = heroActionOf(next.workout.id, state.runningWorkoutId),
+                        onAction = {
+                            if (state.runningWorkoutId == null) onStart(next.workout) else onReturn()
+                        },
+                        onMenu = { onMenuClick(next.workout) },
+                        onOpen = { onOpen(next.workout) }
                     )
                 }
             }
@@ -341,7 +360,7 @@ private fun QueueContent(
                 item = item,
                 position = if (state.isSearching) null else index + 2,
                 durationMillis = state.lastSessionDurations[item.workout.id],
-                onClick = { onWorkoutClick(item.workout) },
+                onClick = { onOpen(item.workout) },
                 onMenu = { onMenuClick(item.workout) }
             )
         }
@@ -352,14 +371,17 @@ private fun QueueContent(
 private fun NextWorkoutCard(
     item: WorkoutWithExercises,
     durationMillis: Long?,
-    onStart: () -> Unit,
-    onMenu: () -> Unit
+    action: HeroAction?,
+    onAction: () -> Unit,
+    onMenu: () -> Unit,
+    onOpen: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
             .background(Brush.linearGradient(listOf(Accent, AccentDark)))
+            .clickable(onClick = onOpen)
             .padding(16.dp)
     ) {
         IconButton(
@@ -390,23 +412,31 @@ private fun NextWorkoutCard(
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(top = 6.dp)
             )
-            Box(
-                modifier = Modifier
-                    .padding(top = 14.dp)
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .clip(MaterialTheme.shapes.small)
-                    .background(MaterialTheme.colorScheme.background)
-                    .combinedClickable(onClick = onStart),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = stringResource(R.string.list_start_button),
-                    color = Accent,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 14.sp,
-                    letterSpacing = 1.sp
-                )
+            // У другой тренировки при идущей сессии кнопки нет: вторую сессию не начать.
+            if (action != null) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 14.dp)
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(MaterialTheme.colorScheme.background)
+                        .combinedClickable(onClick = onAction),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(
+                            when (action) {
+                                HeroAction.START -> R.string.list_start_button
+                                HeroAction.RETURN -> R.string.list_return_button
+                            }
+                        ),
+                        color = Accent,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 14.sp,
+                        letterSpacing = 1.sp
+                    )
+                }
             }
         }
     }
@@ -535,7 +565,7 @@ private fun QueueContentSixWorkoutsPreview() {
                 ),
                 lastSessionDurations = mapOf(4 to 3_125_000L)
             ),
-            onWorkoutClick = {},
+            onOpen = {}, onStart = {}, onReturn = {},
             onMenuClick = {},
             onAddWorkoutClick = {}
         )
@@ -548,7 +578,7 @@ private fun QueueContentEmptyPreview() {
     WorkoutTimerTheme {
         QueueContent(
             state = ListWorkoutState(),
-            onWorkoutClick = {},
+            onOpen = {}, onStart = {}, onReturn = {},
             onMenuClick = {},
             onAddWorkoutClick = {}
         )
@@ -565,7 +595,7 @@ private fun QueueContentSearchPreview() {
                 query = "ноги",
                 workouts = listOf(previewWorkout(3, "Ноги", now - 2 * 86_400_000L, 7))
             ),
-            onWorkoutClick = {},
+            onOpen = {}, onStart = {}, onReturn = {},
             onMenuClick = {},
             onAddWorkoutClick = {}
         )

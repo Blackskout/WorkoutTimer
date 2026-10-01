@@ -88,4 +88,12 @@ class SetFormatTest {
         assertEquals("плита 5 +2 кг", formatLoad(PLATE, 5.0, 2.0, format))
         assertNull(formatLoad(BODYWEIGHT, 0.0, 0.0, format))
     }
+
+    @Test
+    fun `план подхода из шаблона — та же подпись, что у сделанного`() {
+        assertEquals("60 кг × 8", formatPlannedSet(KG, 60.0, 0.0, 8, format))
+        assertEquals("плита 5 +2 кг × 12", formatPlannedSet(PLATE, 5.0, 2.0, 12, format))
+        assertEquals("плита 5 × 12", formatPlannedSet(PLATE, 5.0, 0.0, 12, format))
+        assertEquals("12", formatPlannedSet(BODYWEIGHT, 0.0, 0.0, 12, format))
+    }
 }

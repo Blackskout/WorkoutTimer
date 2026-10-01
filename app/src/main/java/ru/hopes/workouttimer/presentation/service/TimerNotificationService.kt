@@ -19,10 +19,10 @@ class TimerNotificationService : Service() {
     private val notificationId = 1
 
     private val finishedChannelId = "rest_finished_notification_channel"
-    private val finishedNotificationId = 2
+    private val finishedNotificationId = FINISHED_NOTIFICATION_ID
 
     private val idleReminderChannelId = "idle_reminder_notification_channel"
-    private val idleReminderNotificationId = 3
+    private val idleReminderNotificationId = IDLE_REMINDER_NOTIFICATION_ID
 
     override fun onCreate() {
         super.onCreate()
@@ -111,6 +111,8 @@ class TimerNotificationService : Service() {
         timeLeftMillis: Long
     ): android.app.Notification {
         val intent = Intent(this, MainActivity::class.java).apply {
+            // Свой action: при идущей сессии тап возвращает в неё с любого экрана.
+            action = MainActivity.ACTION_OPEN_ACTIVE_WORKOUT
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
@@ -145,6 +147,8 @@ class TimerNotificationService : Service() {
         totalSets: Int
     ): android.app.Notification {
         val intent = Intent(this, MainActivity::class.java).apply {
+            // Свой action: при идущей сессии тап возвращает в неё с любого экрана.
+            action = MainActivity.ACTION_OPEN_ACTIVE_WORKOUT
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
@@ -193,6 +197,8 @@ class TimerNotificationService : Service() {
         totalSets: Int
     ): android.app.Notification {
         val intent = Intent(this, MainActivity::class.java).apply {
+            // Свой action: при идущей сессии тап возвращает в неё с любого экрана.
+            action = MainActivity.ACTION_OPEN_ACTIVE_WORKOUT
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
@@ -243,5 +249,9 @@ class TimerNotificationService : Service() {
         const val EXTRA_CURRENT_SET = "current_set"
         const val EXTRA_TOTAL_SETS = "total_sets"
         const val EXTRA_TIME_LEFT = "time_left"
+
+        // Снимаются вне сервиса (WorkoutAlerts), поэтому видны снаружи.
+        const val FINISHED_NOTIFICATION_ID = 2
+        const val IDLE_REMINDER_NOTIFICATION_ID = 3
     }
 }

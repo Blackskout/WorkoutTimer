@@ -22,6 +22,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import kotlinx.coroutines.flow.MutableStateFlow
+import ru.hopes.workouttimer.presentation.session.RunningWorkout
+import ru.hopes.workouttimer.presentation.session.WorkoutSessionManager
 import ru.hopes.workouttimer.data.dao.ExerciseWithCatalog
 import ru.hopes.workouttimer.data.dao.WorkoutWithExercises
 import ru.hopes.workouttimer.data.entity.ExerciseEntity
@@ -65,13 +68,17 @@ class ListWorkoutViewModelTest {
         )
     )
 
+    private fun sessionWith(running: MutableStateFlow<RunningWorkout?> = MutableStateFlow(null)): WorkoutSessionManager =
+        mockk<WorkoutSessionManager>().also { every { it.runningWorkout } returns running }
+
     private fun viewModel(
         workouts: List<WorkoutWithExercises> = emptyList(),
         searchResults: List<WorkoutWithExercises> = workouts,
         durations: Map<Int, Long> = emptyMap(),
         skip: SkipWorkoutUseCase = mockk(relaxed = true),
         undoSkip: UndoSkipWorkoutUseCase = mockk(relaxed = true),
-        delete: DeleteWorkoutUseCase = mockk(relaxed = true)
+        delete: DeleteWorkoutUseCase = mockk(relaxed = true),
+        running: MutableStateFlow<RunningWorkout?> = MutableStateFlow(null)
     ): ListWorkoutViewModel {
         val getAll = mockk<GetAllWorkoutsWithExerciseUseCase>()
         val search = mockk<SearchWorkoutsUseCase>()
@@ -85,7 +92,8 @@ class ListWorkoutViewModelTest {
             delete,
             getDurations,
             skip,
-            undoSkip
+            undoSkip,
+            sessionWith(running)
         )
     }
 
@@ -166,7 +174,8 @@ class ListWorkoutViewModelTest {
             mockk(relaxed = true),
             getDurations,
             mockk(relaxed = true),
-            mockk(relaxed = true)
+            mockk(relaxed = true),
+            sessionWith()
         )
         testScheduler.advanceUntilIdle()
 
@@ -199,7 +208,8 @@ class ListWorkoutViewModelTest {
                 mockk(relaxed = true),
                 getDurations,
                 mockk(relaxed = true),
-                mockk(relaxed = true)
+                mockk(relaxed = true),
+                sessionWith()
             )
             testScheduler.advanceUntilIdle()
 
@@ -245,7 +255,8 @@ class ListWorkoutViewModelTest {
             mockk(relaxed = true),
             getDurations,
             mockk(relaxed = true),
-            mockk(relaxed = true)
+            mockk(relaxed = true),
+            sessionWith()
         )
         testScheduler.advanceUntilIdle()
 
@@ -376,5 +387,21 @@ class ListWorkoutViewModelTest {
         testScheduler.advanceUntilIdle()
         assertEquals(onlyWorkout, singleVm.state.value.nextWorkout)
         assertTrue(singleVm.state.value.restOfQueue.isEmpty())
+    }
+
+    @Test
+    fun `идущая тренировка отмечается в состоянии списка`() = runTest(dispatcher) {
+        val running = MutableStateFlow<RunningWorkout?>(null)
+        val vm = viewModel(workouts = listOf(workoutWith(3, "Ноги", 0L)), running = running)
+        testScheduler.advanceUntilIdle()
+        assertNull(vm.state.value.runningWorkoutId)
+
+        running.value = RunningWorkout(3, "Ноги", isLoading = false, addedExerciseIds = emptySet())
+        testScheduler.advanceUntilIdle()
+        assertEquals(3, vm.state.value.runningWorkoutId)
+
+        running.value = null
+        testScheduler.advanceUntilIdle()
+        assertNull(vm.state.value.runningWorkoutId)
     }
 }
