@@ -123,9 +123,20 @@ fun NavGraph(
                     onAddWorkoutClick = {
                         navController.navigate(Screen.CreateWorkout.route)
                     },
-                    onWorkoutClick = { workout ->
+                    // До экрана просмотра: без сессии тап по строке запускает тренировку, как
+                    // раньше; при идущей — возвращает в неё, а не начинает вторую.
+                    onOpen = { workout ->
+                        val runningId = miniBar.prepareReturn()
+                        if (runningId != null) {
+                            navController.returnToSession(runningId)
+                        } else {
+                            navController.navigate(Screen.Execution.createRoute(workout.id))
+                        }
+                    },
+                    onStart = { workout ->
                         navController.navigate(Screen.Execution.createRoute(workout.id))
                     },
+                    onReturn = returnToSession,
                     onEditClick = { workout ->
                         navController.navigate(Screen.EditWorkout.createRoute(workout.id))
                     },

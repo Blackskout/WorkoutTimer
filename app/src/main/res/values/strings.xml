@@ -56,6 +56,9 @@
     <string name="list_error_delete">Не удалось удалить тренировку</string>
     <string name="list_error_skip">Не удалось пропустить тренировку</string>
     <string name="list_error_undo_skip">Не удалось отменить пропуск</string>
+    <string name="list_return_button">ВЕРНУТЬСЯ</string>
+    <string name="list_action_return">Вернуться к тренировке</string>
+    <string name="list_action_locked">Недоступно во время тренировки</string>
 
     <!-- Выполнение тренировки -->
     <string name="execution_workout_fallback">Тренировка</string>

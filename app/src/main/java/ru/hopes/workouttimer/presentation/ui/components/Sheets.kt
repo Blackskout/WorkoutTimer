@@ -66,8 +66,13 @@ data class ActionSheetItem(
     val icon: ImageVector,
     val onClick: () -> Unit,
     val subtitle: String? = null,
-    val destructive: Boolean = false
+    val destructive: Boolean = false,
+    /** Неактивный пункт приглушён и не нажимается; причину пишет subtitle. */
+    val enabled: Boolean = true
 )
+
+// Стандартная прозрачность неактивного элемента Material.
+private const val DisabledAlpha = 0.38f
 
 @Composable
 fun ActionSheet(
@@ -84,7 +89,7 @@ fun ActionSheet(
 // Извлечено из ActionSheet, чтобы тело листа можно было превьюшить без
 // ModalBottomSheet — он требует Window и не рендерится в @Preview.
 @Composable
-private fun ColumnScope.ActionSheetContent(
+internal fun ColumnScope.ActionSheetContent(
     title: String,
     subtitle: String?,
     items: List<ActionSheetItem>
@@ -109,16 +114,17 @@ private fun ColumnScope.ActionSheetContent(
     }
     Column(modifier = Modifier.padding(top = 10.dp)) {
         items.forEach { item ->
-            val tint = if (item.destructive) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
+            val disabledColor = MaterialTheme.colorScheme.onSurface.copy(alpha = DisabledAlpha)
+            val tint = when {
+                !item.enabled -> disabledColor
+                item.destructive -> MaterialTheme.colorScheme.error
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
             }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(MaterialTheme.shapes.small)
-                    .clickable { item.onClick() }
+                    .clickable(enabled = item.enabled) { item.onClick() }
                     .padding(horizontal = ScreenPadding, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp)
@@ -132,10 +138,10 @@ private fun ColumnScope.ActionSheetContent(
                 Text(
                     text = item.text,
                     style = MaterialTheme.typography.titleMedium,
-                    color = if (item.destructive) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
+                    color = when {
+                        !item.enabled -> disabledColor
+                        item.destructive -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurface
                     }
                 )
                 if (item.subtitle != null) {
