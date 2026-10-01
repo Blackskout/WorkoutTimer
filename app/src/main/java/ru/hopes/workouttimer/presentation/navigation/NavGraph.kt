@@ -129,7 +129,9 @@ fun NavGraph(
                         navController.navigate(Screen.WorkoutPreview.createRoute(workout.id))
                     },
                     onStart = { workout ->
-                        navController.navigate(Screen.Execution.createRoute(workout.id))
+                        navController.navigate(Screen.Execution.createRoute(workout.id)) {
+                            launchSingleTop = true
+                        }
                     },
                     onReturn = returnToSession,
                     onEditClick = { workout ->
@@ -237,6 +239,7 @@ fun NavGraph(
                     onStart = {
                         navController.navigate(Screen.Execution.createRoute(workoutId)) {
                             popUpTo(Screen.WorkoutPreview.route) { inclusive = true }
+                            launchSingleTop = true
                         }
                     },
                     // Просмотр остаётся под выполнением: «Назад» вернёт сюда.
