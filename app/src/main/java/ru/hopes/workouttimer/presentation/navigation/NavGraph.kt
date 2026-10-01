@@ -191,6 +191,7 @@ fun NavGraph(
                     workoutId = Screen.Execution.getWorkoutId(entry.arguments),
                     onMinimize = { navController.minimizeExecution() },
                     onLeave = { navController.popBackStack() },
+                    hasScreenBelow = navController.previousBackStackEntry != null,
                     viewModel = hiltViewModel()
                 )
             }

@@ -79,6 +79,8 @@ fun WorkoutExecutionScreen(
     workoutId: Int,
     onMinimize: () -> Unit,
     onLeave: () -> Unit,
+    /** Под экраном есть запись стека: обычное «Назад» можно отдать навигации. */
+    hasScreenBelow: Boolean = true,
     viewModel: WorkoutExecutionViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -105,9 +107,9 @@ fun WorkoutExecutionScreen(
         viewModel.start(workoutId)
     }
 
-    // Пока пишется завершение, «Назад» поглощается и ничего не делает: свернуть посреди
-    // записи значило бы получить Finished, которого никто не увидит.
-    BackHandler(enabled = isLive) {
+    // Обычное сворачивание — pop, его делает навигация (с анимацией жеста). Перехват — только
+    // при записи завершения (тогда «Назад» поглощается) и когда под экраном пусто.
+    BackHandler(enabled = interceptsBack(isLive, chrome.isFinishing, hasScreenBelow)) {
         if (!chrome.isFinishing) onMinimize()
     }
 
