@@ -7,6 +7,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -19,7 +20,11 @@ import ru.hopes.workouttimer.presentation.ui.components.PlateExtraValues
 import ru.hopes.workouttimer.presentation.ui.components.PlateValues
 import ru.hopes.workouttimer.presentation.ui.components.PrimaryButton
 import ru.hopes.workouttimer.presentation.ui.components.RepsValues
-import ru.hopes.workouttimer.presentation.ui.components.WeightValues
+import ru.hopes.workouttimer.presentation.ui.components.WeightFractionValues
+import ru.hopes.workouttimer.presentation.ui.components.WeightWholeValues
+import ru.hopes.workouttimer.presentation.ui.components.formatWeightFraction
+import ru.hopes.workouttimer.presentation.ui.components.weightOf
+import ru.hopes.workouttimer.presentation.ui.components.weightWheelsOf
 import ru.hopes.workouttimer.presentation.ui.components.WheelPicker
 import ru.hopes.workouttimer.presentation.ui.components.WheelRow
 import ru.hopes.workouttimer.presentation.ui.components.wheelIndexOfNearest
@@ -45,9 +50,7 @@ internal fun WeightRepsSheetContent(
     reps: Int,
     onApply: (weight: Double, extraWeight: Double, reps: Int) -> Unit
 ) {
-    var weightIndex by remember(weight) {
-        mutableIntStateOf(wheelIndexOfNearest(WeightValues, weight))
-    }
+    var weightWheels by remember(weight) { mutableStateOf(weightWheelsOf(weight)) }
     var plateIndex by remember(weight) {
         mutableIntStateOf(wheelIndexOfNearest(PlateValues, weight))
     }
@@ -67,13 +70,22 @@ internal fun WeightRepsSheetContent(
         )
         WheelRow(modifier = Modifier.padding(vertical = 12.dp)) {
             when (unit) {
-                ExerciseUnit.KG -> WheelPicker(
-                    items = WeightValues,
-                    selectedIndex = weightIndex,
-                    onSelected = { weightIndex = it },
-                    label = stringResource(R.string.common_unit_kg),
-                    format = { it.toCorrectNum() }
-                )
+                ExerciseUnit.KG -> {
+                    WheelPicker(
+                        items = WeightWholeValues,
+                        selectedIndex = weightWheels.wholeIndex,
+                        onSelected = { weightWheels = weightWheels.copy(wholeIndex = it) },
+                        label = stringResource(R.string.common_unit_kg),
+                        format = { it.toString() }
+                    )
+                    WheelPicker(
+                        items = WeightFractionValues,
+                        selectedIndex = weightWheels.fractionIndex,
+                        onSelected = { weightWheels = weightWheels.copy(fractionIndex = it) },
+                        label = stringResource(R.string.unit_weight_fraction),
+                        format = { formatWeightFraction(it) }
+                    )
+                }
 
                 ExerciseUnit.PLATE -> {
                     WheelPicker(
@@ -107,7 +119,7 @@ internal fun WeightRepsSheetContent(
             onClick = {
                 val newReps = RepsValues[repsIndex]
                 when (unit) {
-                    ExerciseUnit.KG -> onApply(WeightValues[weightIndex], 0.0, newReps)
+                    ExerciseUnit.KG -> onApply(weightOf(weightWheels), 0.0, newReps)
                     ExerciseUnit.PLATE -> onApply(PlateValues[plateIndex], PlateExtraValues[extraIndex], newReps)
                     ExerciseUnit.BODYWEIGHT -> onApply(0.0, 0.0, newReps)
                 }

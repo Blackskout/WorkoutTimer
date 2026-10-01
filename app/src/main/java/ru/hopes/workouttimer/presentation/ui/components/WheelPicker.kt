@@ -1,6 +1,8 @@
 package ru.hopes.workouttimer.presentation.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,6 +56,32 @@ private const val EDGE_ITEMS = VISIBLE_ITEMS / 2
  */
 val WeightValues: List<Double> = generateSequence(0.0) { it + 0.25 }.takeWhile { it <= 300.0 }.toList()
 val RepsValues: List<Int> = (1..50).toList()
+
+/**
+ * Вес в кг набирается двумя барабанами — целые килограммы и доли: шаги в зале разные
+ * (1, 2,5, 5 кг), и один барабан по 0,25 требовал десятка прокруток на каждый блин.
+ * Сетка та же, что у [WeightValues]: 0..300 с шагом 0,25.
+ */
+val WeightWholeValues: List<Int> = (0..300).toList()
+val WeightFractionValues: List<Double> = listOf(0.0, 0.25, 0.5, 0.75)
+
+/** Позиции барабанов веса: индекс целых (он же килограммы) и индекс доли. */
+data class WeightWheels(val wholeIndex: Int, val fractionIndex: Int)
+
+/** Вес вне сетки (введённый когда-то с клавиатуры) прилипает к ближайшим 0,25. */
+fun weightWheelsOf(weight: Double): WeightWheels {
+    val snapped = WeightValues[wheelIndexOfNearest(WeightValues, weight)]
+    val whole = snapped.toInt()
+    return WeightWheels(whole, WeightFractionValues.indexOf(snapped - whole))
+}
+
+/** Подпись доли на барабане: «,00», «,25», «,50», «,75» — одинаковой ширины. */
+fun formatWeightFraction(fraction: Double): String = "," + (fraction * 100).toInt().toString().padStart(2, '0')
+
+/** Доля на 300 обрезается: выше максимума сетки вес не поднимается. */
+fun weightOf(wheels: WeightWheels): Double =
+    (WeightWholeValues[wheels.wholeIndex] + WeightFractionValues[wheels.fractionIndex])
+        .coerceAtMost(WeightValues.last())
 
 /** Барабан плиты: номер в стопке тренажёра. */
 val PlateValues: List<Double> = (PLATE_MIN..PLATE_MAX).map { it.toDouble() }
@@ -126,10 +154,14 @@ fun <T> WheelPicker(
             modifier = Modifier.height(LabelHeight),
             contentAlignment = Alignment.Center
         ) {
-            Text(
+            // Барабаны делят ширину поровну, и при крупном системном шрифте пять подписей
+            // в ряд не помещаются: подпись в одну строку и ужимается, а не обрезается.
+            val labelStyle = MaterialTheme.typography.labelSmall
+            BasicText(
                 text = label.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary
+                style = labelStyle.copy(color = MaterialTheme.colorScheme.primary),
+                maxLines = 1,
+                autoSize = TextAutoSize.StepBased(minFontSize = 6.sp, maxFontSize = labelStyle.fontSize)
             )
         }
         LazyColumn(

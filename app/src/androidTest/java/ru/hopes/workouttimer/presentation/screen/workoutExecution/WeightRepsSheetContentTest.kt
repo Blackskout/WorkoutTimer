@@ -44,6 +44,27 @@ class WeightRepsSheetContentTest {
         assertEquals(80.0 to 8, applied)
     }
 
+    /** Вес в кг — два барабана: целые килограммы и доли, чтобы блин 2,5 не крутить десятью шагами. */
+    @Test
+    fun у_веса_в_кг_барабаны_целых_и_долей() {
+        composeRule.setContent {
+            WorkoutTimerTheme {
+                WeightRepsSheetContent(
+                    exerciseName = "Жим лёжа",
+                    unit = ExerciseUnit.KG,
+                    weight = 61.75,
+                    extraWeight = 0.0,
+                    reps = 8,
+                    onApply = { _, _, _ -> }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("КГ").assertExists()
+        composeRule.onNodeWithText("ДОЛИ").assertExists()
+        composeRule.onNodeWithText(",75").assertExists()
+    }
+
     /**
      * Вес мог попасть в тренировку импортом или из старой версии приложения и не
      * лечь на шаг барабана. Барабан обязан встать на ближайшее значение, а не
