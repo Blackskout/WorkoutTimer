@@ -124,6 +124,10 @@
     <!-- История -->
     <string name="history_empty_title">История пуста</string>
     <string name="history_empty_subtitle">Завершите тренировку — она появится здесь</string>
+    <string name="history_no_sets">подходы не записывались</string>
+    <string name="history_exercise_sets">%1$s — %2$s</string>
+    <string name="history_expand">Показать подходы</string>
+    <string name="history_collapse">Скрыть подходы</string>
     <string name="rest_ring_total">из %1$s</string>
 
     <!-- Музыка -->
