@@ -16,6 +16,7 @@ import androidx.navigation.navDeepLink
 import ru.hopes.workouttimer.presentation.screen.creation.CreateWorkoutScreen
 import ru.hopes.workouttimer.presentation.screen.exportImport.ExportImportScreen
 import ru.hopes.workouttimer.presentation.screen.workoutExecution.WorkoutExecutionScreen
+import ru.hopes.workouttimer.presentation.screen.exercises.ExerciseCatalogScreen
 import ru.hopes.workouttimer.presentation.screen.workoutHistory.WorkoutHistoryScreen
 import ru.hopes.workouttimer.presentation.screen.workouts.ListWorkoutScreen
 
@@ -66,6 +67,7 @@ fun NavGraph(
                 onExportImportClick = {
                     navController.navigate(Screen.ExportImport.route)
                 },
+                onExercisesClick = { navController.navigate(Screen.Exercises.route) },
                 onHistoryClick = { workout ->
                     navController.navigate(Screen.History.createRoute(workout.id))
                 }
@@ -146,6 +148,15 @@ fun NavGraph(
                 }
             )
         }
+
+        // Экран «Упражнения» — справочник
+        composable(Screen.Exercises.route) {
+            ExerciseCatalogScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
     }
 }
 
@@ -153,6 +164,7 @@ internal sealed class Screen(val route: String) {
     data object Workouts : Screen("workouts")
     data object CreateWorkout : Screen("create_workout")
     data object ExportImport : Screen("export_import")
+    data object Exercises : Screen("exercises")
     data object EditWorkout : Screen("edit_workout/{workout_id}") {
         fun createRoute(workoutId: Int): String {
             return "edit_workout/$workoutId"

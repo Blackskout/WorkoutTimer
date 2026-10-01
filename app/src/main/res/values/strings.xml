@@ -130,6 +130,25 @@
     <string name="history_collapse">Скрыть подходы</string>
     <string name="rest_ring_total">из %1$s</string>
 
+    <!-- Справочник упражнений -->
+    <string name="catalog_title">Упражнения</string>
+    <string name="catalog_search_placeholder">Название упражнения</string>
+    <string name="catalog_actions">Действия с упражнением</string>
+    <string name="catalog_last_set">%1$s · %2$s</string>
+    <string name="catalog_empty_title">Упражнений пока нет</string>
+    <string name="catalog_empty_subtitle">Они появятся, когда вы сохраните тренировку</string>
+    <string name="catalog_search_empty_title">Ничего не найдено</string>
+    <string name="catalog_search_empty_subtitle">Попробуйте другой запрос</string>
+    <string name="catalog_action_rename">Переименовать</string>
+    <string name="catalog_action_unit">Единица</string>
+    <string name="catalog_rename_title">Переименовать упражнение</string>
+    <string name="catalog_rename_taken">Такое упражнение уже есть</string>
+    <string name="catalog_unit_title">Единица нагрузки</string>
+    <string name="catalog_unit_hint">Вес в тренировках приведётся к новой единице. Прошлые подходы не изменятся.</string>
+    <string name="catalog_error_load">Не удалось загрузить упражнения</string>
+    <string name="catalog_error_rename">Не удалось переименовать упражнение</string>
+    <string name="catalog_error_unit">Не удалось сменить единицу</string>
+
     <!-- Музыка -->
     <string name="music_service_label">Управление музыкой</string>
     <string name="music_grant_access">Разрешить управление музыкой</string>

@@ -80,6 +80,7 @@ import ru.hopes.workouttimer.presentation.ui.theme.ScreenPadding
 import ru.hopes.workouttimer.presentation.ui.theme.SectionSpacing
 import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
 import ru.hopes.workouttimer.presentation.utils.DateFormatter
+import ru.hopes.workouttimer.presentation.utils.daysAgoText
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,7 +91,8 @@ fun ListWorkoutScreen(
     onWorkoutClick: (WorkoutEntity) -> Unit,
     onEditClick: (WorkoutEntity) -> Unit = {},
     onExportImportClick: () -> Unit = {},
-    onHistoryClick: (WorkoutEntity) -> Unit = {}
+    onHistoryClick: (WorkoutEntity) -> Unit = {},
+    onExercisesClick: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     var workoutToDelete by rememberSaveable { mutableStateOf<WorkoutEntity?>(null) }
@@ -181,7 +183,7 @@ fun ListWorkoutScreen(
         }
         ActionSheet(
             title = target.name,
-            subtitle = subtitleFor(target.lastUseAt),
+            subtitle = daysAgoText(target.lastUseAt),
             items = items,
             onDismiss = { menuFor = null }
         )
@@ -223,6 +225,13 @@ fun ListWorkoutScreen(
                     Icon(
                         Icons.Default.Search,
                         contentDescription = stringResource(R.string.list_search),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = onExercisesClick) {
+                    Icon(
+                        Icons.Default.FitnessCenter,
+                        contentDescription = stringResource(R.string.catalog_title),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -339,18 +348,6 @@ private fun QueueContent(
     }
 }
 
-/** Подпись давности. `lastUseAt == 0` означает «ещё не делали» (см. Task 12). */
-@Composable
-private fun subtitleFor(lastUseAt: Long): String {
-    if (lastUseAt == 0L) return stringResource(R.string.common_never_done)
-    val days = ((System.currentTimeMillis() - lastUseAt) / 86_400_000L).toInt()
-    return when {
-        days <= 0 -> stringResource(R.string.list_today)
-        days == 1 -> stringResource(R.string.list_yesterday)
-        else -> stringResource(R.string.d_ago, days)
-    }
-}
-
 @Composable
 private fun NextWorkoutCard(
     item: WorkoutWithExercises,
@@ -387,7 +384,7 @@ private fun NextWorkoutCard(
                 modifier = Modifier.padding(top = 4.dp)
             )
             Text(
-                text = "${metaLine(item, durationMillis)} · ${subtitleFor(item.workout.lastUseAt)}",
+                text = "${metaLine(item, durationMillis)} · ${daysAgoText(item.workout.lastUseAt)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = OnAccent.copy(alpha = 0.8f),
                 fontWeight = FontWeight.Medium,
@@ -465,7 +462,7 @@ private fun WorkoutRow(
             )
         }
         Text(
-            text = subtitleFor(item.workout.lastUseAt),
+            text = daysAgoText(item.workout.lastUseAt),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

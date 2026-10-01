@@ -12,4 +12,10 @@ class ScreenDeepLinkTest {
     fun `createDeepLink builds a uri from DEEP_LINK_PATTERN`() {
         assertEquals("workouttimer://execution/7", Screen.Execution.createDeepLink(7))
     }
+
+    // Маршрут из спеки; E3 добавит рядом exercise_progress/{catalogId}.
+    @Test
+    fun `exercises screen has its own route`() {
+        assertEquals("exercises", Screen.Exercises.route)
+    }
 }
