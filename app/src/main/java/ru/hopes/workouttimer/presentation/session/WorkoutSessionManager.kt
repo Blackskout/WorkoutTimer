@@ -238,7 +238,8 @@ class WorkoutSessionManager @Inject constructor(
             exerciseName = rest.exercise.name,
             currentSet = rest.currentSet,
             totalSets = rest.totalSets,
-            timeLeftMillis = rest.restTimeMillis
+            timeLeftMillis = rest.restTimeMillis,
+            isTransition = rest.isTransition
         )
 
         timerJob = sessionScope.launch {
@@ -270,7 +271,8 @@ class WorkoutSessionManager @Inject constructor(
                             exerciseName = rest.exercise.name,
                             currentSet = rest.currentSet,
                             totalSets = rest.totalSets,
-                            timeLeftMillis = timeLeft
+                            timeLeftMillis = timeLeft,
+                            isTransition = rest.isTransition
                         )
                     }
                 }
@@ -301,7 +303,8 @@ class WorkoutSessionManager @Inject constructor(
             showRestFinishedNotification(
                 exerciseName = previous.exercise.name,
                 currentSet = previous.currentSet,
-                totalSets = previous.totalSets
+                totalSets = previous.totalSets,
+                isTransition = previous.isTransition
             )
         }
 
@@ -348,6 +351,7 @@ class WorkoutSessionManager @Inject constructor(
             _recordedSets += set
         }
         val updated = current.withSetDone(phase.currentSet)
+        if (moveWithinSuperset(updated)) return
         if (phase.currentSet < phase.totalSets) {
             setSession(
                 updated.copy(
@@ -366,6 +370,42 @@ class WorkoutSessionManager @Inject constructor(
         } else {
             moveToNextExercise(updated)
         }
+    }
+
+    /**
+     * Чередование пары: после ведущего — короткий переход ко второму, после второго — отдых
+     * (больший из двух) и снова ведущий. Если напарник уже сделан, пары как бы нет: false,
+     * дальше обычный порядок.
+     */
+    private fun moveWithinSuperset(current: WorkoutSession.Present): Boolean {
+        val index = current.exerciseIndex
+        val pair = current.supersetOf(index) ?: return false
+        val partnerIndex = if (index == pair.lead) pair.second else pair.lead
+        val partner = current.exercises[partnerIndex]
+        if (partner.isDone) return false
+        val isTransition = index == pair.lead
+        val restMillis = if (isTransition) {
+            TRANSITION_MILLIS
+        } else {
+            maxOf(current.exercises[index].exercise.timeMillis, partner.exercise.timeMillis)
+        }
+        setSession(
+            current.copy(
+                exerciseIndex = partnerIndex,
+                phase = WorkoutExecutionState.Rest(
+                    exercise = partner.exercise,
+                    currentSet = partner.nextSet,
+                    totalSets = partner.exercise.sets,
+                    restTimeMillis = restMillis,
+                    totalRestTimeMillis = restMillis,
+                    isTransition = isTransition
+                ),
+                restOver = false
+            )
+        )
+        startRestTimer()
+        scheduleIdleReminderIfActive()
+        return true
     }
 
     private fun moveToNextExercise(current: WorkoutSession.Present) {
@@ -462,6 +502,31 @@ class WorkoutSessionManager @Inject constructor(
             )
         )
         scheduleIdleReminderIfActive()
+    }
+
+    /**
+     * Суперсет на сегодня: текущее упражнение ведёт, [index] идёт вторым. Текущие индекс и фаза
+     * не меняются — чередование начнётся с ближайшего подхода. Отказ, если упражнение то же,
+     * одно из двух сделано или уже в паре.
+     */
+    fun pairWith(index: Int): Boolean {
+        val current = present ?: return false
+        if (current.isFinishing || !current.phase.isInProgress) return false
+        val lead = current.exerciseIndex
+        val target = current.exercises.getOrNull(index) ?: return false
+        if (index == lead || target.isDone || current.exercises[lead].isDone) return false
+        if (current.supersetOf(lead) != null || current.supersetOf(index) != null) return false
+        registerInteraction()
+        setSession(current.copy(supersets = current.supersets + Superset(lead = lead, second = index)))
+        return true
+    }
+
+    /** Разъединить пару текущего упражнения; идущий переход доигрывается как есть. */
+    fun unpair() {
+        val current = present ?: return
+        val pair = current.supersetOf(current.exerciseIndex) ?: return
+        registerInteraction()
+        setSession(current.copy(supersets = current.supersets - pair))
     }
 
     /**
@@ -593,24 +658,38 @@ class WorkoutSessionManager @Inject constructor(
     private fun newSessionScope(): CoroutineScope =
         CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext.job))
 
-    private fun startNotification(exerciseName: String, currentSet: Int, totalSets: Int, timeLeftMillis: Long) {
+    private fun startNotification(
+        exerciseName: String,
+        currentSet: Int,
+        totalSets: Int,
+        timeLeftMillis: Long,
+        isTransition: Boolean
+    ) {
         val intent = Intent(context, TimerNotificationService::class.java).apply {
             action = TimerNotificationService.ACTION_START
             putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
             putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
             putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
             putExtra(TimerNotificationService.EXTRA_TIME_LEFT, timeLeftMillis)
+            putExtra(TimerNotificationService.EXTRA_TRANSITION, isTransition)
         }
         context.startService(intent)
     }
 
-    private fun updateNotification(exerciseName: String, currentSet: Int, totalSets: Int, timeLeftMillis: Long) {
+    private fun updateNotification(
+        exerciseName: String,
+        currentSet: Int,
+        totalSets: Int,
+        timeLeftMillis: Long,
+        isTransition: Boolean
+    ) {
         val intent = Intent(context, TimerNotificationService::class.java).apply {
             action = TimerNotificationService.ACTION_UPDATE
             putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
             putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
             putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
             putExtra(TimerNotificationService.EXTRA_TIME_LEFT, timeLeftMillis)
+            putExtra(TimerNotificationService.EXTRA_TRANSITION, isTransition)
         }
         context.startService(intent)
     }
@@ -622,12 +701,18 @@ class WorkoutSessionManager @Inject constructor(
         context.startService(intent)
     }
 
-    private fun showRestFinishedNotification(exerciseName: String, currentSet: Int, totalSets: Int) {
+    private fun showRestFinishedNotification(
+        exerciseName: String,
+        currentSet: Int,
+        totalSets: Int,
+        isTransition: Boolean
+    ) {
         val intent = Intent(context, TimerNotificationService::class.java).apply {
             action = TimerNotificationService.ACTION_SHOW_FINISHED
             putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
             putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
             putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
+            putExtra(TimerNotificationService.EXTRA_TRANSITION, isTransition)
         }
         context.startService(intent)
     }
@@ -654,5 +739,8 @@ class WorkoutSessionManager @Inject constructor(
         private const val TAG = "WorkoutSessionManager"
         internal const val IDLE_EXCLUSION_THRESHOLD_MILLIS = 10 * 60 * 1000L
         internal const val IDLE_REMINDER_DELAY_MILLIS = 5 * 60 * 1000L
+
+        /** Переход внутри суперсета: дойти до второго тренажёра. */
+        internal const val TRANSITION_MILLIS = 20_000L
     }
 }

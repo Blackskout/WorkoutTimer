@@ -38,14 +38,22 @@ class TimerNotificationService : Service() {
                 val currentSet = intent.getIntExtra(EXTRA_CURRENT_SET, 1)
                 val totalSets = intent.getIntExtra(EXTRA_TOTAL_SETS, 1)
                 val timeLeft = intent.getLongExtra(EXTRA_TIME_LEFT, 0L)
-                startForeground(notificationId, createNotification(exerciseName, currentSet, totalSets, timeLeft))
+                val isTransition = intent.getBooleanExtra(EXTRA_TRANSITION, false)
+                startForeground(
+                    notificationId,
+                    createNotification(exerciseName, currentSet, totalSets, timeLeft, isTransition)
+                )
             }
             ACTION_UPDATE -> {
                 val exerciseName = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: getString(R.string.create_fab_exercise)
                 val currentSet = intent.getIntExtra(EXTRA_CURRENT_SET, 1)
                 val totalSets = intent.getIntExtra(EXTRA_TOTAL_SETS, 1)
                 val timeLeft = intent.getLongExtra(EXTRA_TIME_LEFT, 0L)
-                notificationManager.notify(notificationId, createNotification(exerciseName, currentSet, totalSets, timeLeft))
+                val isTransition = intent.getBooleanExtra(EXTRA_TRANSITION, false)
+                notificationManager.notify(
+                    notificationId,
+                    createNotification(exerciseName, currentSet, totalSets, timeLeft, isTransition)
+                )
             }
             ACTION_STOP -> {
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -55,7 +63,11 @@ class TimerNotificationService : Service() {
                 val exerciseName = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: getString(R.string.create_fab_exercise)
                 val currentSet = intent.getIntExtra(EXTRA_CURRENT_SET, 1)
                 val totalSets = intent.getIntExtra(EXTRA_TOTAL_SETS, 1)
-                notificationManager.notify(finishedNotificationId, createFinishedNotification(exerciseName, currentSet, totalSets))
+                val isTransition = intent.getBooleanExtra(EXTRA_TRANSITION, false)
+                notificationManager.notify(
+                    finishedNotificationId,
+                    createFinishedNotification(exerciseName, currentSet, totalSets, isTransition)
+                )
             }
             ACTION_SHOW_IDLE_REMINDER -> {
                 val exerciseName = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: getString(R.string.create_fab_exercise)
@@ -108,7 +120,8 @@ class TimerNotificationService : Service() {
         exerciseName: String,
         currentSet: Int,
         totalSets: Int,
-        timeLeftMillis: Long
+        timeLeftMillis: Long,
+        isTransition: Boolean
     ): android.app.Notification {
         val intent = Intent(this, MainActivity::class.java).apply {
             // Свой action: при идущей сессии тап возвращает в неё с любого экрана.
@@ -124,7 +137,10 @@ class TimerNotificationService : Service() {
         )
 
         val timeText = formatTime(timeLeftMillis)
-        val title = getString(R.string.notification_rest_title, timeText)
+        val title = getString(
+            if (isTransition) R.string.notification_transition_title else R.string.notification_rest_title,
+            timeText
+        )
         val content = getString(R.string.notification_set_content, exerciseName, currentSet, totalSets)
 
         return NotificationCompat.Builder(this, channelId)
@@ -144,7 +160,8 @@ class TimerNotificationService : Service() {
     private fun createFinishedNotification(
         exerciseName: String,
         currentSet: Int,
-        totalSets: Int
+        totalSets: Int,
+        isTransition: Boolean
     ): android.app.Notification {
         val intent = Intent(this, MainActivity::class.java).apply {
             // Свой action: при идущей сессии тап возвращает в неё с любого экрана.
@@ -159,7 +176,9 @@ class TimerNotificationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = getString(R.string.notification_rest_finished_title)
+        val title = getString(
+            if (isTransition) R.string.notification_transition_finished_title else R.string.notification_rest_finished_title
+        )
         val content = getString(R.string.notification_set_content, exerciseName, currentSet, totalSets)
 
         return NotificationCompat.Builder(this, finishedChannelId)
@@ -249,6 +268,7 @@ class TimerNotificationService : Service() {
         const val EXTRA_CURRENT_SET = "current_set"
         const val EXTRA_TOTAL_SETS = "total_sets"
         const val EXTRA_TIME_LEFT = "time_left"
+        const val EXTRA_TRANSITION = "transition"
 
         // Снимаются вне сервиса (WorkoutAlerts), поэтому видны снаружи.
         const val FINISHED_NOTIFICATION_ID = 2

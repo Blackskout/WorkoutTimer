@@ -7,8 +7,15 @@ data class MiniBarState(
 )
 
 sealed interface MiniBarStatus {
-    /** Идёт отдых: «Отдых 01:18», кольцо — доля оставшегося времени. */
-    data class Resting(val timeLeftMillis: Long, val totalMillis: Long) : MiniBarStatus
+    /**
+     * Идёт отдых: «Отдых 01:18», кольцо — доля оставшегося времени. С [transitionTo] — переход
+     * внутри суперсета: «Переход 00:15 · Икры».
+     */
+    data class Resting(
+        val timeLeftMillis: Long,
+        val totalMillis: Long,
+        val transitionTo: String? = null
+    ) : MiniBarStatus
 
     /** Идёт подход: «Подход 2 из 4 · Жим лёжа». */
     data class Working(val currentSet: Int, val totalSets: Int, val exerciseName: String) : MiniBarStatus
@@ -22,7 +29,11 @@ fun miniBarStateOf(session: WorkoutSession): MiniBarState? {
     val present = session as? WorkoutSession.Present ?: return null
     val status = when (val phase = present.phase) {
         is WorkoutExecutionState.Rest ->
-            MiniBarStatus.Resting(phase.restTimeMillis, phase.totalRestTimeMillis)
+            MiniBarStatus.Resting(
+                phase.restTimeMillis,
+                phase.totalRestTimeMillis,
+                transitionTo = phase.exercise.name.takeIf { phase.isTransition }
+            )
         is WorkoutExecutionState.Active ->
             if (present.restOver) {
                 MiniBarStatus.RestOver(phase.currentSet)

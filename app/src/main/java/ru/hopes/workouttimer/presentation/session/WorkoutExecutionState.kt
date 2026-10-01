@@ -12,7 +12,9 @@ sealed class WorkoutExecutionState {
         val currentSet: Int,
         val totalSets: Int = exercise.sets,
         val restTimeMillis: Long = exercise.timeMillis,
-        val totalRestTimeMillis: Long = exercise.timeMillis
+        val totalRestTimeMillis: Long = exercise.timeMillis,
+        /** Короткий переход внутри суперсета: к второму упражнению пары, а не отдых. */
+        val isTransition: Boolean = false
     ) : WorkoutExecutionState()
 
     data class Active(

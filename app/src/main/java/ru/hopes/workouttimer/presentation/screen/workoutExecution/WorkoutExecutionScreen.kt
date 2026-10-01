@@ -1,6 +1,7 @@
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
 import ru.hopes.workouttimer.presentation.session.WorkoutExecutionState
+import ru.hopes.workouttimer.presentation.session.WorkoutSessionManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -89,6 +90,7 @@ fun WorkoutExecutionScreen(
     var showExitDialog by remember { mutableStateOf(false) }
     var showFinishDialog by remember { mutableStateOf(false) }
     var showExercisePicker by remember { mutableStateOf(false) }
+    var showSupersetPicker by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
 
     // Идёт тренировка — «Назад» и стрелка сворачивают её без диалога. В Loading, Error и
@@ -190,6 +192,23 @@ fun WorkoutExecutionScreen(
                             )
                         }
                         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                            if (chrome.partnerOf(chrome.exerciseIndex) != null) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.execution_superset_unpair)) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        viewModel.unpair()
+                                    }
+                                )
+                            } else if (chrome.supersetCandidates.isNotEmpty()) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.execution_superset_with)) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        showSupersetPicker = true
+                                    }
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.execution_exit_without_saving)) },
                                 onClick = {
@@ -270,8 +289,11 @@ fun WorkoutExecutionScreen(
                             modifier = Modifier.weight(1f)
                         )
                     } else {
+                        val isTransition = (currentState as? WorkoutExecutionState.Rest)?.isTransition == true
                         PrimaryButton(
-                            text = stringResource(R.string.execution_skip_rest),
+                            text = stringResource(
+                                if (isTransition) R.string.execution_skip_transition else R.string.execution_skip_rest
+                            ),
                             onClick = { viewModel.skipRest() },
                             modifier = Modifier.weight(1f)
                         )
@@ -321,6 +343,15 @@ fun WorkoutExecutionScreen(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
                         )
+                        // Пара суперсета: у обоих номер напарника.
+                        chrome.partnerOf(index)?.let { partner ->
+                            Text(
+                                text = stringResource(R.string.execution_superset_label, partner + 1),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
                         // Добавленные «+ в сегодняшнюю» стоят в конце списка с пометкой.
                         if (row.addedToday) {
                             Text(
@@ -340,6 +371,56 @@ fun WorkoutExecutionScreen(
                             modifier = Modifier.padding(start = 8.dp)
                         )
                     }
+                }
+            }
+        }
+    }
+
+    if (showSupersetPicker) {
+        val lead = chrome.exercises.getOrNull(chrome.exerciseIndex)
+        AppBottomSheet(onDismiss = { showSupersetPicker = false }) {
+            Text(
+                text = stringResource(R.string.execution_superset_pick_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 8.dp)
+            )
+            if (lead != null) {
+                Text(
+                    text = stringResource(
+                        R.string.execution_superset_pick_hint,
+                        lead.exercise.name,
+                        (WorkoutSessionManager.TRANSITION_MILLIS / 1000).toInt()
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 4.dp)
+                )
+            }
+            chrome.supersetCandidates.forEach { index ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            viewModel.pairWith(index)
+                            showSupersetPicker = false
+                        }
+                        .padding(horizontal = ScreenPadding, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${index + 1}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = chrome.exercises[index].exercise.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }
@@ -534,7 +615,10 @@ private fun RestContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         EyebrowLabel(
-            text = stringResource(R.string.execution_rest_next_set, state.currentSet),
+            text = stringResource(
+                if (state.isTransition) R.string.execution_transition_next_set else R.string.execution_rest_next_set,
+                state.currentSet
+            ),
             modifier = Modifier.padding(top = 18.dp)
         )
         RestRing(

@@ -29,6 +29,15 @@ class MiniBarStateTest {
     }
 
     @Test
+    fun `переход в суперсете — остаток и куда переходить`() {
+        val phase = WorkoutExecutionState.Rest(
+            press, 1, restTimeMillis = 15_000L, totalRestTimeMillis = 20_000L, isTransition = true
+        )
+        val state = miniBarStateOf(present(phase))
+        assertEquals(MiniBarState("Ноги", MiniBarStatus.Resting(15_000L, 20_000L, "Жим лёжа")), state)
+    }
+
+    @Test
     fun `подход — номер, число подходов и упражнение`() {
         val state = miniBarStateOf(present(WorkoutExecutionState.Active(press, 2)))
         assertEquals(MiniBarState("Ноги", MiniBarStatus.Working(2, 4, "Жим лёжа")), state)

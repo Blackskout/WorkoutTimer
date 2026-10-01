@@ -75,8 +75,14 @@ fun MiniWorkoutBarContent(
     val outline = MaterialTheme.colorScheme.outline
     val status = state.status
     val statusText = when (status) {
-        is MiniBarStatus.Resting ->
-            stringResource(R.string.minibar_rest, DateFormatter.formatDurationCompact(status.timeLeftMillis))
+        is MiniBarStatus.Resting -> {
+            val time = DateFormatter.formatDurationCompact(status.timeLeftMillis)
+            if (status.transitionTo != null) {
+                stringResource(R.string.minibar_transition, time, status.transitionTo)
+            } else {
+                stringResource(R.string.minibar_rest, time)
+            }
+        }
         is MiniBarStatus.Working ->
             stringResource(R.string.minibar_set, status.currentSet, status.totalSets, status.exerciseName)
         is MiniBarStatus.RestOver -> stringResource(R.string.minibar_rest_over, status.nextSet)
@@ -185,6 +191,7 @@ private fun MiniWorkoutBarPreview() {
             MiniWorkoutBarContent(MiniBarState("Ноги", MiniBarStatus.Resting(78_000L, 120_000L)), {}, {})
             MiniWorkoutBarContent(MiniBarState("Ноги", MiniBarStatus.Working(2, 4, "Жим лёжа")), {}, {})
             MiniWorkoutBarContent(MiniBarState("Ноги", MiniBarStatus.RestOver(2)), {}, {})
+            MiniWorkoutBarContent(MiniBarState("Ноги", MiniBarStatus.Resting(15_000L, 20_000L, "Икры")), {}, {})
         }
     }
 }

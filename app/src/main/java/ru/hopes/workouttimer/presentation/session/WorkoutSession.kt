@@ -16,6 +16,11 @@ data class SessionExercise(
     val nextSet: Int get() = if (isDone) 1 else doneSets + 1
 }
 
+/** Суперсет на сегодня: после подхода [lead] — переход к [second], после [second] — отдых. */
+data class Superset(val lead: Int, val second: Int) {
+    fun contains(index: Int): Boolean = index == lead || index == second
+}
+
 /**
  * Один снимок на всю сессию: список, индекс и фаза меняются вместе, поэтому экран
  * не увидит «индекс уже новый, список ещё старый».
@@ -34,8 +39,12 @@ sealed interface WorkoutSession {
         /** Идёт запись завершённой сессии: второй тап по последнему подходу ничего не делает. */
         val isFinishing: Boolean = false,
         /** Active наступил сам по истечении отдыха: плашка пишет «Пора: подход N». */
-        val restOver: Boolean = false
-    ) : WorkoutSession
+        val restOver: Boolean = false,
+        /** Пары суперсетов по индексам; список упражнений только дописывается, индексы не съезжают. */
+        val supersets: List<Superset> = emptyList()
+    ) : WorkoutSession {
+        fun supersetOf(index: Int): Superset? = supersets.firstOrNull { it.contains(index) }
+    }
 }
 
 /** Сессия идёт: Loading, Rest или Active. Error и Finished — уже нет. */

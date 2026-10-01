@@ -54,6 +54,13 @@ class MiniWorkoutBarContentTest {
     }
 
     @Test
+    fun переход_в_суперсете_показывает_отсчёт_и_упражнение() {
+        show(MiniBarStatus.Resting(15_000L, 20_000L, "Икры"))
+
+        composeRule.onNodeWithText("Переход 00:15 · Икры").assertIsDisplayed()
+    }
+
+    @Test
     fun подход_показывает_номер_и_упражнение() {
         show(MiniBarStatus.Working(2, 4, "Жим лёжа"))
 
