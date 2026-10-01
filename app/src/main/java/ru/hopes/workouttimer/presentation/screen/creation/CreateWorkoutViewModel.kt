@@ -7,12 +7,18 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import ru.hopes.workouttimer.domain.model.CatalogExercise
 import ru.hopes.workouttimer.domain.model.Exercise
+import ru.hopes.workouttimer.domain.model.ExerciseUnit
 import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.usecase.AddWorkoutUseCase
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
+import ru.hopes.workouttimer.domain.usecase.ObserveCatalogUseCase
 import ru.hopes.workouttimer.domain.usecase.UpdateWorkoutUseCase
 import javax.inject.Inject
 
@@ -20,7 +26,8 @@ import javax.inject.Inject
 class CreateWorkoutViewModel @Inject constructor(
     private val addWorkoutUseCase: AddWorkoutUseCase,
     private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
-    private val updateWorkoutUseCase: UpdateWorkoutUseCase
+    private val updateWorkoutUseCase: UpdateWorkoutUseCase,
+    observeCatalogUseCase: ObserveCatalogUseCase
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(CreateWorkoutState())
@@ -35,6 +42,15 @@ class CreateWorkoutViewModel @Inject constructor(
 
     /** Слепок состояния после загрузки — с ним сравнивается текущее при выходе. */
     private var savedSnapshot: CreateWorkoutState = CreateWorkoutState()
+
+    init {
+        // Справочник — не правка: hasUnsavedChanges сравнивает только название и упражнения.
+        observeCatalogUseCase()
+            .onEach { catalog -> _state.update { it.copy(catalog = catalog) } }
+            // Без подсказок редактор работает; падать из-за них нельзя.
+            .catch { e -> Log.e(TAG, "Справочник упражнений не прочитан", e) }
+            .launchIn(viewModelScope)
+    }
 
     fun processCommand(command: CreateWorkoutCommand) {
         when (command) {
@@ -102,6 +118,8 @@ class CreateWorkoutViewModel @Inject constructor(
 
             CreateWorkoutCommand.Save -> {
                 viewModelScope.launch {
+                    // Нагрузку к единице записи справочника приводит DAO при сохранении:
+                    // здесь единицы нет, связь находится по ключу названия.
                     val validExercises = _state.value.exercises
                         .filter { it.name.isNotBlank() }
                         .mapIndexed { index, ex ->
@@ -113,7 +131,8 @@ class CreateWorkoutViewModel @Inject constructor(
                                 reps = ex.reps,
                                 timeMillis = ex.restTimeSeconds * 1000L,
                                 order = index + 1,
-                                note = ex.note
+                                note = ex.note,
+                                extraWeight = ex.extraWeight
                             )
                         }
 
@@ -167,8 +186,10 @@ class CreateWorkoutViewModel @Inject constructor(
             workout?.let { w ->
                 editingWorkoutId = w.id
                 editingLastUseAt = w.lastUseAt
+                // copy, а не новое состояние: справочник мог прийти раньше тренировки,
+                // и без него в режиме правки пропали бы подсказки и единицы.
                 _state.update {
-                    CreateWorkoutState(
+                    it.copy(
                         workoutName = w.name,
                         exercises = w.exercises.map { ex ->
                             ExerciseItem(
@@ -178,10 +199,13 @@ class CreateWorkoutViewModel @Inject constructor(
                                 sets = ex.sets,
                                 reps = ex.reps,
                                 restTimeSeconds = (ex.timeMillis / 1000).toInt(),
-                                note = ex.note
+                                note = ex.note,
+                                extraWeight = ex.extraWeight
                             )
                         },
-                        isFinished = false
+                        isFinished = false,
+                        hasUnsavedChanges = false,
+                        saveFailed = false
                     )
                 }
                 savedSnapshot = _state.value
@@ -202,6 +226,11 @@ sealed interface CreateWorkoutCommand {
     data object Back : CreateWorkoutCommand
 }
 
+/**
+ * Упражнение в редакторе. catalogId сюда не протаскивается — связь находится при
+ * сохранении по ключу названия. extraWeight протаскивается: без него сохранение
+ * обнуляло бы добавку к плите.
+ */
 data class ExerciseItem(
     val id: Int,
     val name: String,
@@ -209,7 +238,8 @@ data class ExerciseItem(
     val sets: Int,
     val reps: Int,
     val restTimeSeconds: Int,
-    val note: String = ""
+    val note: String = "",
+    val extraWeight: Double = 0.0
 )
 
 data class CreateWorkoutState(
@@ -217,8 +247,13 @@ data class CreateWorkoutState(
     val exercises: List<ExerciseItem> = emptyList(),
     val isFinished: Boolean = false,
     val hasUnsavedChanges: Boolean = false,
-    val saveFailed: Boolean = false
+    val saveFailed: Boolean = false,
+    val catalog: List<CatalogExercise> = emptyList()
 ) {
     val isSaveEnabled: Boolean
         get() = workoutName.isNotBlank() && exercises.any { it.name.isNotBlank() }
+
+    fun suggestionsFor(item: ExerciseItem): List<CatalogExercise> = exerciseSuggestions(item.name, catalog)
+
+    fun unitOf(item: ExerciseItem): ExerciseUnit = unitForName(item.name, catalog)
 }

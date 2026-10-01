@@ -95,7 +95,8 @@
     <string name="create_exit_title">Выйти без сохранения?</string>
     <string name="create_exit_message">Изменения, включая порядок упражнений, будут потеряны.</string>
     <string name="create_untitled">Без названия</string>
-    <string name="create_exercise_summary">%1$s кг · %2$d×%3$d · отдых %4$s</string>
+    <string name="create_exercise_summary">%1$s · %2$d×%3$d · отдых %4$s</string>
+    <string name="create_exercise_summary_no_weight">%1$d×%2$d · отдых %3$s</string>
     <string name="create_exercise_name">Название упражнения</string>
     <string name="create_unit_sets">подх</string>
     <string name="create_unit_rest">отдых</string>
