@@ -1,5 +1,6 @@
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
+import android.os.SystemClock
 import ru.hopes.workouttimer.presentation.session.WorkoutExecutionState
 import ru.hopes.workouttimer.presentation.session.WorkoutSessionManager
 import androidx.activity.compose.BackHandler
@@ -270,6 +271,10 @@ fun WorkoutExecutionScreen(
                         bottom = 10.dp
                     )
                 )
+                // Когда кнопка сменила смысл: подход ↔ отдых. Ключ — вид фазы, а не сама фаза:
+                // отдых тикает каждые 200 мс, и отметка не должна сдвигаться от тиков.
+                val isActivePhase = currentState is WorkoutExecutionState.Active
+                val phaseShownAt = remember(isActivePhase) { SystemClock.uptimeMillis() }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -280,10 +285,12 @@ fun WorkoutExecutionScreen(
                         PrimaryButton(
                             text = stringResource(R.string.execution_finish_set),
                             onClick = {
-                                if (viewModel.isLastSetOfWorkout) {
-                                    showFinishDialog = true
-                                } else {
-                                    viewModel.onExerciseFinished()
+                                if (acceptsPhaseTap(phaseShownAt, SystemClock.uptimeMillis())) {
+                                    if (viewModel.isLastSetOfWorkout) {
+                                        showFinishDialog = true
+                                    } else {
+                                        viewModel.onExerciseFinished()
+                                    }
                                 }
                             },
                             modifier = Modifier.weight(1f)
@@ -294,7 +301,9 @@ fun WorkoutExecutionScreen(
                             text = stringResource(
                                 if (isTransition) R.string.execution_skip_transition else R.string.execution_skip_rest
                             ),
-                            onClick = { viewModel.skipRest() },
+                            onClick = {
+                                if (acceptsPhaseTap(phaseShownAt, SystemClock.uptimeMillis())) viewModel.skipRest()
+                            },
                             modifier = Modifier.weight(1f)
                         )
                     }

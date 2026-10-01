@@ -151,6 +151,28 @@ class CreateWorkoutViewModelTest {
     }
 
     @Test
+    fun `лист нового упражнения закрыт без названия — упражнения нет и выход без вопроса`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.processCommand(CreateWorkoutCommand.AddExercise())
+        val id = vm.state.value.exercises.last().id
+
+        vm.processCommand(CreateWorkoutCommand.CloseExercise(id))
+
+        assertTrue(vm.state.value.exercises.isEmpty())
+        assertFalse(vm.state.value.hasUnsavedChanges)
+    }
+
+    @Test
+    fun `лист закрыт с названием — упражнение остаётся`() = runTest(dispatcher) {
+        val vm = viewModel()
+        val item = vm.exerciseNamed("Присед")
+
+        vm.processCommand(CreateWorkoutCommand.CloseExercise(item.id))
+
+        assertEquals(listOf("Присед"), vm.state.value.exercises.map { it.name })
+    }
+
+    @Test
     fun `свежезагруженное состояние не считается изменённым`() = runTest(dispatcher) {
         val vm = viewModel()
 

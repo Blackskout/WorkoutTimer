@@ -81,6 +81,14 @@ class CreateWorkoutViewModel @Inject constructor(
                 }
             }
 
+            is CreateWorkoutCommand.CloseExercise -> {
+                // Упражнение без названия при сохранении всё равно отбрасывается; оставь мы его
+                // в списке — пустая строка висела бы в редакторе и звала диалог «выйти без сохранения».
+                _state.update {
+                    it.copy(exercises = it.exercises.filterNot { ex -> ex.id == command.id && ex.name.isBlank() })
+                }
+            }
+
             is CreateWorkoutCommand.UpdateExercise -> {
                 _state.update {
                     it.copy(
@@ -219,6 +227,8 @@ sealed interface CreateWorkoutCommand {
     data class UpdateExercise(val id: Int, val exercise: ExerciseItem) : CreateWorkoutCommand
     data class AddExercise(val dummy: Unit = Unit) : CreateWorkoutCommand
     data class RemoveExercise(val id: Int) : CreateWorkoutCommand
+    /** Лист упражнения закрыт: безымянное упражнение убирается. */
+    data class CloseExercise(val id: Int) : CreateWorkoutCommand
     data class MoveExercise(val from: Int, val to: Int) : CreateWorkoutCommand
     data class UpdateExerciseNote(val id: Int, val note: String) : CreateWorkoutCommand
     data object Save : CreateWorkoutCommand

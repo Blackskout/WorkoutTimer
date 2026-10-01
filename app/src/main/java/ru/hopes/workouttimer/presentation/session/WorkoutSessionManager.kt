@@ -299,7 +299,7 @@ class WorkoutSessionManager @Inject constructor(
         vibrationManager.vibrate()
         wakeLockHelper.release()
 
-        if (previous != null) {
+        if (previous != null && !workoutAlerts.isAppInForeground()) {
             showRestFinishedNotification(
                 exerciseName = previous.exercise.name,
                 currentSet = previous.currentSet,
