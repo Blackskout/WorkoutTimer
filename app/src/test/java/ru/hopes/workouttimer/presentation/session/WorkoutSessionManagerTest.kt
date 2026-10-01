@@ -23,6 +23,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -1107,5 +1108,202 @@ class WorkoutSessionManagerTest {
         other.onRestFinished()
         other.moveToExercise(0)
         assertFalse(other.restOver)
+    }
+
+    // --- «+ в сегодняшнюю» ---
+
+    // Упражнение другой тренировки (workoutId = 2), строка шаблона id = 21.
+    private val fromBack = Exercise(
+        id = 21, name = "Тяга блока", weight = 5.0, sets = 2, reps = 12, timeMillis = 60_000,
+        order = 1, catalogId = 210L, unit = ExerciseUnit.PLATE, extraWeight = 2.0, note = "локти вниз"
+    )
+
+    private val WorkoutSessionManager.snapshot: WorkoutSession.Present
+        get() = session.value as WorkoutSession.Present
+
+    @Test
+    fun `added exercise goes to the end without moving the current position`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        manager.start(1)
+        manager.onExerciseFinished() // отдых перед подходом 2
+
+        val result = manager.addExerciseToday(fromBack)
+
+        assertEquals(AddResult.ADDED, result)
+        assertEquals(listOf(false, true), manager.snapshot.exercises.map { it.addedToday })
+        assertEquals(fromBack, manager.snapshot.exercises.last().exercise)
+        assertEquals(0, manager.snapshot.exerciseIndex)
+        assertTrue(manager.phase is WorkoutExecutionState.Rest)
+        assertEquals(setOf(21), manager.runningWorkout.value?.addedExerciseIds)
+    }
+
+    @Test
+    fun `the same source row is added only once`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        manager.start(1)
+        manager.addExerciseToday(fromBack)
+
+        val again = manager.addExerciseToday(fromBack)
+
+        assertEquals(AddResult.ALREADY_ADDED, again)
+        assertEquals(2, manager.snapshot.exercises.size)
+    }
+
+    @Test
+    fun `nothing is added without a workout in progress`() = runTest {
+        val idle = managerWith(singleSetWorkout())
+        assertEquals(AddResult.NO_SESSION, idle.addExerciseToday(fromBack))
+
+        val finished = managerWith(singleSetWorkout())
+        finished.start(1)
+        finished.onExerciseFinished() // Finished
+        assertEquals(AddResult.NO_SESSION, finished.addExerciseToday(fromBack))
+
+        val gate = CompletableDeferred<Unit>()
+        val finish = mockk<FinishWorkoutSessionUseCase>()
+        coEvery { finish(any(), any(), any(), any(), any()) } coAnswers { gate.await() }
+        val finishing = managerWith(singleSetWorkout(), finish = finish)
+        finishing.start(1)
+        finishing.onExerciseFinished() // запись висит
+        assertEquals(AddResult.NO_SESSION, finishing.addExerciseToday(fromBack))
+        assertEquals(1, finishing.snapshot.exercises.size)
+        gate.complete(Unit)
+    }
+
+    @Test
+    fun `adding an exercise registers an interaction`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        manager.start(1)
+        val farFuture = System.currentTimeMillis() + 1_000_000L
+        manager.registerInteraction(now = farFuture)
+
+        manager.addExerciseToday(fromBack)
+
+        assertTrue(manager.lastInteractionAt < farFuture)
+    }
+
+    @Test
+    fun `adding on the last set moves the end of the workout`() = runTest {
+        val finish = mockk<FinishWorkoutSessionUseCase>(relaxed = true)
+        val manager = managerWith(singleSetWorkout(), finish = finish)
+        manager.start(1)
+        assertTrue(manager.isLastSetOfWorkout)
+
+        manager.addExerciseToday(fromBack)
+        assertFalse(manager.isLastSetOfWorkout)
+
+        manager.onExerciseFinished()
+
+        val rest = manager.phase as WorkoutExecutionState.Rest
+        assertEquals("Тяга блока", rest.exercise.name)
+        assertEquals(1, manager.snapshot.exerciseIndex)
+        coVerify(exactly = 0) { finish(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `sets of the added exercise are saved with the running workout`() = runTest {
+        val finish = mockk<FinishWorkoutSessionUseCase>()
+        val setsSlot = slot<List<RecordedSet>>()
+        coEvery { finish(1, any(), any(), any(), capture(setsSlot)) } returns Unit
+        val repo = mockk<WorkoutRepository>(relaxed = true)
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } returns workoutOf(ex(1, "Присед", sets = 1))
+        val manager = buildManager(getWorkout, repo, finish)
+        manager.start(1)
+        manager.addExerciseToday(fromBack.copy(sets = 1))
+
+        manager.onExerciseFinished() // присед → отдых перед тягой
+        manager.skipRest()
+        manager.onExerciseFinished() // тяга — последний подход
+
+        assertEquals(
+            listOf(
+                RecordedSet(10L, "Присед", 50.0, 0.0, 8, ExerciseUnit.KG),
+                RecordedSet(210L, "Тяга блока", 5.0, 2.0, 12, ExerciseUnit.PLATE)
+            ),
+            setsSlot.captured
+        )
+        coVerify(exactly = 1) { repo.updateLastUseAt(1) }
+        coVerify(exactly = 0) { repo.updateLastUseAt(2) }
+    }
+
+    @Test
+    fun `edits of an added exercise stay in the session`() = runTest {
+        val repo = mockk<WorkoutRepository>(relaxed = true)
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } returns twoSetWorkout()
+        val manager = buildManager(getWorkout, repo, mockk(relaxed = true))
+        manager.start(1)
+        manager.addExerciseToday(fromBack)
+
+        manager.updateExerciseWeightAndReps(index = 1, weight = 6.0, extraWeight = 0.0, reps = 10)
+        manager.updateExerciseNote(1, "без рывков")
+
+        val added = manager.snapshot.exercises[1].exercise
+        assertEquals(6.0, added.weight, 0.0)
+        assertEquals("без рывков", added.note)
+        coVerify(exactly = 0) { repo.updateExerciseWeightAndReps(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { repo.updateExerciseNote(any(), any()) }
+    }
+
+    @Test
+    fun `edits of a template row still go to the template`() = runTest {
+        val repo = mockk<WorkoutRepository>(relaxed = true)
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } returns twoSetWorkout()
+        val manager = buildManager(getWorkout, repo, mockk(relaxed = true))
+        manager.start(1)
+        manager.addExerciseToday(fromBack)
+
+        manager.updateExerciseWeightAndReps(index = 0, weight = 12.5, extraWeight = 0.0, reps = 6)
+        manager.updateExerciseNote(0, "медленно")
+
+        coVerify(exactly = 1) { repo.updateExerciseWeightAndReps(10, 12.5, 0.0, 6) }
+        coVerify(exactly = 1) { repo.updateExerciseNote(10, "медленно") }
+    }
+
+    @Test
+    fun `index addressing keeps an added copy apart from a template row of the same catalog entry`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        manager.start(1)
+        // Та же запись справочника, что у строки шаблона, но другая исходная строка.
+        val sameCatalog = fromBack.copy(id = 99, name = "Push", catalogId = 0L, unit = ExerciseUnit.KG, extraWeight = 0.0)
+        manager.addExerciseToday(sameCatalog)
+
+        manager.updateExerciseWeightAndReps(index = 1, weight = 40.0, extraWeight = 0.0, reps = 3)
+        assertEquals(10.0, manager.snapshot.exercises[0].exercise.weight, 0.0)
+
+        manager.moveToExercise(1)
+        val active = manager.phase as WorkoutExecutionState.Active
+        assertEquals(99, active.exercise.id)
+        assertEquals(40.0, active.weight, 0.0)
+    }
+
+    @Test
+    fun `after a failed finish the first set of an added exercise is appended`() = runTest {
+        val finish = mockk<FinishWorkoutSessionUseCase>()
+        val attempts = mutableListOf<List<RecordedSet>>()
+        coEvery { finish(any(), any(), any(), any(), capture(attempts)) } throws
+            IllegalStateException("disk full") andThen Unit
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } returns workoutOf(ex(1, "Присед", sets = 1))
+        val manager = buildManager(getWorkout, mockk(relaxed = true), finish)
+        manager.start(1)
+        manager.onExerciseFinished() // последний подход — запись падает
+        assertTrue(manager.finishError.value)
+        manager.dismissFinishError()
+
+        manager.addExerciseToday(fromBack) // два подхода тяги
+        manager.onExerciseFinished() // присед ещё раз — заменяет неудачный, ведёт на отдых
+        manager.skipRest()
+        manager.onExerciseFinished() // тяга, подход 1 — дописывается
+        manager.skipRest()
+        manager.onExerciseFinished() // тяга, подход 2 — последний, запись проходит
+
+        val squat = RecordedSet(10L, "Присед", 50.0, 0.0, 8, ExerciseUnit.KG)
+        val row = RecordedSet(210L, "Тяга блока", 5.0, 2.0, 12, ExerciseUnit.PLATE)
+        assertEquals(2, attempts.size)
+        assertEquals(listOf(squat, row, row), attempts.last())
+        assertNotNull(manager.phase as? WorkoutExecutionState.Finished)
     }
 }

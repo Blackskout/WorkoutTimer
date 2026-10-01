@@ -317,8 +317,18 @@ fun WorkoutExecutionScreen(
                             else -> MaterialTheme.colorScheme.onSurface
                         },
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
+                    // Добавленные «+ в сегодняшнюю» стоят в конце списка с пометкой.
+                    if (row.addedToday) {
+                        Text(
+                            text = stringResource(R.string.execution_added_today),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
                 }
             }
         }

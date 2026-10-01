@@ -62,3 +62,6 @@ internal fun runningWorkoutOf(session: WorkoutSession): RunningWorkout? {
         addedExerciseIds = present.exercises.filter { it.addedToday }.map { it.exercise.id }.toSet()
     )
 }
+
+/** Итог «+ в сегодняшнюю». */
+enum class AddResult { ADDED, ALREADY_ADDED, NO_SESSION }

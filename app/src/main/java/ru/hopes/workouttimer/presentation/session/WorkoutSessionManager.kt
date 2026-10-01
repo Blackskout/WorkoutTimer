@@ -20,6 +20,7 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.di.ApplicationScope
+import ru.hopes.workouttimer.domain.model.Exercise
 import ru.hopes.workouttimer.domain.model.RecordedSet
 import ru.hopes.workouttimer.domain.repository.WorkoutRepository
 import ru.hopes.workouttimer.domain.usecase.FinishWorkoutSessionUseCase
@@ -335,9 +336,11 @@ class WorkoutSessionManager @Inject constructor(
             unit = phase.exercise.unit
         )
         // Повтор после сбоя записи: последний подход уже в списке — заменяем
-        // его текущими значениями (плитку могли поправить), а не дублируем.
+        // его текущими значениями (плитку могли поправить), а не дублируем. Флаг снимается
+        // сразу: если после сбоя добавили упражнение, его подходы должны дописываться.
         if (finishPending && _recordedSets.isNotEmpty()) {
             _recordedSets[_recordedSets.lastIndex] = set
+            finishPending = false
         } else {
             _recordedSets += set
         }
@@ -457,10 +460,33 @@ class WorkoutSessionManager @Inject constructor(
         scheduleIdleReminderIfActive()
     }
 
-    /** Заметка: сначала БД, потом состояние — как было. */
+    /**
+     * «+ в сегодняшнюю»: копия упражнения другой тренировки в конец сессии, только на сегодня.
+     * Тренировка в БД не меняется. Одна копия на исходную строку (exercise.id сохраняется в
+     * копии) — от двойного тапа. Текущие индекс и фаза не трогаются; это действие сессии.
+     */
+    fun addExerciseToday(exercise: Exercise): AddResult {
+        val current = present ?: return AddResult.NO_SESSION
+        if (current.isFinishing || !current.phase.isInProgress) return AddResult.NO_SESSION
+        if (current.exercises.any { it.addedToday && it.exercise.id == exercise.id }) {
+            return AddResult.ALREADY_ADDED
+        }
+        registerInteraction()
+        setSession(current.copy(exercises = current.exercises + SessionExercise(exercise.copy(), addedToday = true)))
+        return AddResult.ADDED
+    }
+
+    /**
+     * Заметка: для строки шаблона — сначала БД, потом состояние, как было; у добавленного
+     * упражнения exercise.id — строка чужой тренировки, его правка живёт только в сессии.
+     */
     fun updateExerciseNote(index: Int, note: String) {
         registerInteraction()
         val row = present?.exercises?.getOrNull(index) ?: return
+        if (row.addedToday) {
+            applyNote(index, note)
+            return
+        }
         // Индекс, взятый до записи, остаётся верным: список только дописывается,
         // а смена сессии отменяет эту корутину вместе с sessionScope.
         sessionScope.launch {
@@ -506,8 +532,11 @@ class WorkoutSessionManager @Inject constructor(
             else -> phase
         }
         setSession(current.copy(exercises = exercises, phase = newPhase))
-        sessionScope.launch {
-            workoutRepository.updateExerciseWeightAndReps(row.exercise.id, weight, extraWeight, reps)
+        // Правка добавленного упражнения не трогает шаблон чужой тренировки.
+        if (!row.addedToday) {
+            sessionScope.launch {
+                workoutRepository.updateExerciseWeightAndReps(row.exercise.id, weight, extraWeight, reps)
+            }
         }
     }
 
