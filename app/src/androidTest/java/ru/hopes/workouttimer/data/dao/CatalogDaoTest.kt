@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -186,5 +187,36 @@ class CatalogDaoTest {
         val created = dao.findCatalogByKey(exerciseNameKey("Новая тяга"))!!
         assertEquals("PLATE", created.unit)
         assertEquals(created.id, dao.observeSetsForWorkout(workoutId).first().single().catalogId)
+    }
+
+    @Test
+    fun подходы_упражнения_собираются_из_всех_тренировок_по_времени_включая_удалённую() = runBlocking {
+        val legs = saveWorkout("Ноги", exercise("Присед"), exercise("Выпады", order = 1))
+        val fullBody = saveWorkout("Фулбади", exercise("присед"))
+        val squat = catalogId("Присед")
+        val lunge = catalogId("Выпады")
+        finish(legs, 300, kg(squat, "Присед", 65.0, 5))
+        finish(
+            fullBody, 100,
+            kg(squat, "Присед", 60.0, 8), kg(lunge, "Выпады", 20.0, 10), kg(squat, "Присед", 62.5, 6)
+        )
+        // Тренировку удалили — её сессии остаются в прогрессе упражнения.
+        dao.deleteWorkoutWithExercises(dao.getWorkoutById(fullBody.toInt())!!)
+
+        val rows = dao.observeSetsForCatalog(squat).first()
+
+        assertEquals(listOf(60.0, 62.5, 65.0), rows.map { it.weight })
+        assertEquals(listOf(100L, 100L, 300L), rows.map { it.finishedAt })
+        assertEquals(setOf("Присед"), rows.map { it.exerciseName }.toSet())
+    }
+
+    @Test
+    fun запись_справочника_наблюдается_по_id_и_null_для_несуществующей() = runBlocking {
+        saveWorkout("Ноги", exercise("Присед"))
+        val squat = catalogId("Присед")
+        dao.changeCatalogUnit(squat, ExerciseUnit.PLATE)
+
+        assertEquals("PLATE", dao.observeCatalogEntry(squat).first()!!.unit)
+        assertNull(dao.observeCatalogEntry(9_999L).first())
     }
 }

@@ -25,6 +25,12 @@ class ExerciseCatalogRepositoryImpl @Inject constructor(
     override fun observeSetsForWorkout(workoutId: Int): Flow<List<LoggedSet>> =
         dao.observeSetsForWorkout(workoutId.toLong()).map { rows -> rows.map { it.toDomain() } }
 
+    override fun observeExercise(id: Long): Flow<CatalogExercise?> =
+        dao.observeCatalogEntry(id).map { it?.toDomain() }
+
+    override fun observeSetsForExercise(id: Long): Flow<List<LoggedSet>> =
+        dao.observeSetsForCatalog(id).map { rows -> rows.map { it.toDomain() } }
+
     override suspend fun rename(id: Long, name: String): RenameResult = dao.renameCatalog(id, name)
 
     override suspend fun changeUnit(id: Long, unit: ExerciseUnit) = dao.changeCatalogUnit(id, unit)

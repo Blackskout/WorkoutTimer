@@ -19,6 +19,10 @@ class FakeExerciseCatalogRepository(
 
     override fun observeSetsForWorkout(workoutId: Int): Flow<List<LoggedSet>> = flowOf(emptyList())
 
+    override fun observeExercise(id: Long): Flow<CatalogExercise?> = flowOf(catalog.firstOrNull { it.id == id })
+
+    override fun observeSetsForExercise(id: Long): Flow<List<LoggedSet>> = flowOf(emptyList())
+
     override suspend fun rename(id: Long, name: String): RenameResult = RenameResult.RENAMED
 
     override suspend fun changeUnit(id: Long, unit: ExerciseUnit) = Unit

@@ -16,6 +16,12 @@ interface ExerciseCatalogRepository {
     /** Все подходы всех сессий тренировки, в порядке записи. */
     fun observeSetsForWorkout(workoutId: Int): Flow<List<LoggedSet>>
 
+    /** Запись справочника; null — записи нет (неверный id или её убрала автоочистка). */
+    fun observeExercise(id: Long): Flow<CatalogExercise?>
+
+    /** Все подходы записи по времени сессий, внутри сессии — в порядке записи. */
+    fun observeSetsForExercise(id: Long): Flow<List<LoggedSet>>
+
     suspend fun rename(id: Long, name: String): RenameResult
 
     suspend fun changeUnit(id: Long, unit: ExerciseUnit)
