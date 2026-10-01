@@ -51,7 +51,8 @@ class WorkoutRepositoryImpl @Inject constructor(
                 restTimeMillis = ex.timeMillis,
                 orderInWorkout = ex.order,
                 note = ex.note,
-                catalogId = 0L // проставит транзакция DAO
+                catalogId = 0L, // проставит транзакция DAO
+                extraWeight = ex.extraWeight
             )
         }
         withContext(Dispatchers.IO) {
@@ -83,7 +84,8 @@ class WorkoutRepositoryImpl @Inject constructor(
                 restTimeMillis = ex.timeMillis,
                 orderInWorkout = ex.order,
                 note = ex.note,
-                catalogId = 0L // проставит транзакция DAO
+                catalogId = 0L, // проставит транзакция DAO
+                extraWeight = ex.extraWeight
             )
         }
         dao.insertWorkoutResolvingCatalog(workoutEntity, exerciseEntities)
@@ -112,9 +114,9 @@ class WorkoutRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun updateExerciseWeightAndReps(exerciseId: Int, weight: Double, reps: Int) {
+    override suspend fun updateExerciseWeightAndReps(exerciseId: Int, weight: Double, extraWeight: Double, reps: Int) {
         withContext(Dispatchers.IO) {
-            dao.updateExerciseWeightAndReps(exerciseId, weight, reps)
+            dao.updateExerciseWeightAndReps(exerciseId, weight, extraWeight, reps)
         }
     }
 

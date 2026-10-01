@@ -11,7 +11,7 @@ class ExerciseNameAndroidTest {
 
     @Test
     fun пробелы_схлопываются_включая_неразрывный_и_табуляцию() {
-        assertEquals("Жим лёжа", normalizedExerciseName("  Жим    лёжа\t"))
+        assertEquals("Жим лёжа", normalizedExerciseName("  Жим\u00A0 \u00A0 лёжа\t"))
     }
 
     @Test

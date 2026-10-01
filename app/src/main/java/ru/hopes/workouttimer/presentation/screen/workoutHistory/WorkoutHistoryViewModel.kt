@@ -1,25 +1,32 @@
 package ru.hopes.workouttimer.presentation.screen.workoutHistory
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import ru.hopes.workouttimer.domain.model.SessionExerciseSets
 import ru.hopes.workouttimer.domain.model.WorkoutSession
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
+import ru.hopes.workouttimer.domain.usecase.GetWorkoutSessionSetsUseCase
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutSessionsUseCase
 import javax.inject.Inject
+
+private const val TAG = "WorkoutHistoryVM"
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class WorkoutHistoryViewModel @Inject constructor(
     private val getWorkoutSessionsUseCase: GetWorkoutSessionsUseCase,
-    private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase
+    private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
+    private val getWorkoutSessionSetsUseCase: GetWorkoutSessionSetsUseCase
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(WorkoutHistoryState())
@@ -36,10 +43,18 @@ class WorkoutHistoryViewModel @Inject constructor(
                 _state.update { it.copy(sessions = sessions) }
             }
             .launchIn(viewModelScope)
+
+        getWorkoutSessionSetsUseCase(workoutId)
+            .onEach { sets -> _state.update { it.copy(setsBySession = sets) } }
+            // Без подходов история всё равно показывает сессии — падать из-за них нельзя.
+            .catch { e -> Log.e(TAG, "Подходы истории не прочитаны", e) }
+            .launchIn(viewModelScope)
     }
 }
 
 data class WorkoutHistoryState(
     val workoutName: String = "",
-    val sessions: List<WorkoutSession> = emptyList()
+    val sessions: List<WorkoutSession> = emptyList(),
+    // null — подходы ещё не загрузились: карточки не должны врать «подходы не записывались».
+    val setsBySession: Map<Long, List<SessionExerciseSets>>? = null
 )

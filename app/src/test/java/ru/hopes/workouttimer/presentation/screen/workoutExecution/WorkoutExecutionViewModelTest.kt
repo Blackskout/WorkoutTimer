@@ -506,10 +506,10 @@ class WorkoutExecutionViewModelTest {
         val viewModel = buildViewModel(getWorkoutByIdUseCase, workoutRepository, mockk<FinishWorkoutSessionUseCase>())
 
         viewModel.loadWorkout(1)
-        viewModel.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, reps = 8)
+        viewModel.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, extraWeight = 0.0, reps = 8)
 
         coVerify(exactly = 1) {
-            workoutRepository.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, reps = 8)
+            workoutRepository.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, extraWeight = 0.0, reps = 8)
         }
     }
 
@@ -528,7 +528,7 @@ class WorkoutExecutionViewModelTest {
         )
 
         viewModel.loadWorkout(1)
-        viewModel.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, reps = 8)
+        viewModel.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, extraWeight = 0.0, reps = 8)
 
         val state = viewModel.uiState.value as WorkoutExecutionState.Active
         assertEquals(12.5, state.weight, 0.0)
@@ -551,7 +551,7 @@ class WorkoutExecutionViewModelTest {
 
         viewModel.loadWorkout(1)
         viewModel.onExerciseFinished() // sets=2, currentSet 1<2 -> Rest
-        viewModel.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, reps = 8)
+        viewModel.updateExerciseWeightAndReps(exerciseId = 1, weight = 12.5, extraWeight = 0.0, reps = 8)
 
         val state = viewModel.uiState.value as WorkoutExecutionState.Rest
         assertEquals(12.5, state.exercise.weight, 0.0)
@@ -572,7 +572,7 @@ class WorkoutExecutionViewModelTest {
         )
 
         viewModel.loadWorkout(1)
-        viewModel.updateExerciseWeightAndReps(exerciseId = 2, weight = 25.0, reps = 9)
+        viewModel.updateExerciseWeightAndReps(exerciseId = 2, weight = 25.0, extraWeight = 0.0, reps = 9)
 
         val stillFirst = viewModel.uiState.value as WorkoutExecutionState.Active
         assertEquals(10.0, stillFirst.weight, 0.0)
@@ -655,14 +655,14 @@ class WorkoutExecutionViewModelTest {
         coEvery { getWorkout(1) } returns workoutOf(ex(1, "Присед", sets = 1))
         val repo = mockk<WorkoutRepository>(relaxed = true)
         val gate = CompletableDeferred<Unit>()
-        coEvery { repo.updateExerciseWeightAndReps(any(), any(), any()) } coAnswers { gate.await() }
+        coEvery { repo.updateExerciseWeightAndReps(any(), any(), any(), any()) } coAnswers { gate.await() }
         val finish = mockk<FinishWorkoutSessionUseCase>()
         val setsSlot = slot<List<RecordedSet>>()
         coEvery { finish(any(), any(), any(), any(), capture(setsSlot)) } returns Unit
         val vm = buildViewModel(getWorkout, repo, finish)
 
         vm.loadWorkout(1)
-        vm.updateExerciseWeightAndReps(exerciseId = 1, weight = 62.5, reps = 6) // запись в БД висит
+        vm.updateExerciseWeightAndReps(exerciseId = 1, weight = 62.5, extraWeight = 0.0, reps = 6) // запись в БД висит
         vm.onExerciseFinished()
 
         assertEquals(62.5, setsSlot.captured.single().weight, 0.0)
@@ -757,12 +757,36 @@ class WorkoutExecutionViewModelTest {
         vm.loadWorkout(1)
         vm.onExerciseFinished()
         vm.dismissFinishError()
-        vm.updateExerciseWeightAndReps(exerciseId = 1, weight = 70.0, reps = 5)
+        vm.updateExerciseWeightAndReps(exerciseId = 1, weight = 70.0, extraWeight = 0.0, reps = 5)
         vm.onExerciseFinished()   // повтор
 
         assertEquals(1, attempts.last().size)
         assertEquals(70.0, attempts.last().single().weight, 0.0)
         assertEquals(5, attempts.last().single().reps)
         assertEquals(1, vm.recordedSets.size)
+    }
+
+    @Test
+    fun `plate extra weight edited on the tiles is recorded with the set`() = runTest {
+        val plate = Exercise(
+            id = 1, name = "Тяга блока", weight = 5.0, sets = 1, reps = 12, timeMillis = 1_000, order = 1,
+            catalogId = 4L, unit = ExerciseUnit.PLATE
+        )
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } returns Workout(id = 1, name = "Спина", exercises = listOf(plate), lastUseAt = 0L)
+        val finish = mockk<FinishWorkoutSessionUseCase>()
+        val setsSlot = slot<List<RecordedSet>>()
+        coEvery { finish(any(), any(), any(), any(), capture(setsSlot)) } returns Unit
+        val vm = buildViewModel(getWorkout, mockk(relaxed = true), finish)
+
+        vm.loadWorkout(1)
+        vm.updateExerciseWeightAndReps(exerciseId = 1, weight = 6.0, extraWeight = 2.0, reps = 10)
+
+        assertEquals(2.0, (vm.uiState.value as WorkoutExecutionState.Active).extraWeight, 0.0)
+        vm.onExerciseFinished()
+        assertEquals(
+            RecordedSet(4L, "Тяга блока", 6.0, 2.0, 10, ExerciseUnit.PLATE),
+            setsSlot.captured.single()
+        )
     }
 }

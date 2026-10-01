@@ -31,6 +31,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ru.hopes.workouttimer.domain.model.PLATE_EXTRA_MAX
+import ru.hopes.workouttimer.domain.model.PLATE_EXTRA_STEP
+import ru.hopes.workouttimer.domain.model.PLATE_MAX
+import ru.hopes.workouttimer.domain.model.PLATE_MIN
 import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
 import kotlin.math.abs
 
@@ -50,6 +54,13 @@ private const val EDGE_ITEMS = VISIBLE_ITEMS / 2
  */
 val WeightValues: List<Double> = generateSequence(0.0) { it + 0.25 }.takeWhile { it <= 300.0 }.toList()
 val RepsValues: List<Int> = (1..50).toList()
+
+/** Барабан плиты: номер в стопке тренажёра. */
+val PlateValues: List<Double> = (PLATE_MIN..PLATE_MAX).map { it.toDouble() }
+
+/** Барабан добавки к плите: гантель поверх стопки, шаг 0.5 кг. */
+val PlateExtraValues: List<Double> =
+    generateSequence(0.0) { it + PLATE_EXTRA_STEP }.takeWhile { it <= PLATE_EXTRA_MAX }.toList()
 
 /**
  * Индекс значения, ближайшего к [target]. Нужен, чтобы вес, введённый когда-то

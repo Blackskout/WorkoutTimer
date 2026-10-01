@@ -33,4 +33,19 @@ class WheelPickerTest {
     fun `пустой список даёт нулевой индекс`() {
         assertEquals(0, wheelIndexOfNearest(emptyList(), 5.0))
     }
+
+    @Test
+    fun `барабан плиты — номера с 1 по 30`() {
+        assertEquals(30, PlateValues.size)
+        assertEquals(1.0, PlateValues.first(), 0.0)
+        assertEquals(30.0, PlateValues.last(), 0.0)
+    }
+
+    @Test
+    fun `барабан добавки — от 0 до 10 с шагом 0_5`() {
+        assertEquals(21, PlateExtraValues.size)
+        assertEquals(0.0, PlateExtraValues.first(), 0.0)
+        assertEquals(10.0, PlateExtraValues.last(), 0.0)
+        assertEquals(2.5, PlateExtraValues[wheelIndexOfNearest(PlateExtraValues, 2.3)], 0.0)
+    }
 }

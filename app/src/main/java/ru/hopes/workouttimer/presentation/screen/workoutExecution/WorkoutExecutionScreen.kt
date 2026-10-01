@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.domain.model.Exercise
+import ru.hopes.workouttimer.domain.model.ExerciseUnit
 import ru.hopes.workouttimer.presentation.components.music.MusicSection
 import ru.hopes.workouttimer.presentation.ui.components.AppBottomSheet
 import ru.hopes.workouttimer.presentation.ui.components.EmptyState
@@ -61,6 +63,8 @@ import ru.hopes.workouttimer.presentation.ui.components.StatTile
 import ru.hopes.workouttimer.presentation.ui.theme.ScreenPadding
 import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
 import ru.hopes.workouttimer.presentation.utils.DateFormatter
+import ru.hopes.workouttimer.presentation.utils.formatLoad
+import ru.hopes.workouttimer.presentation.utils.setFormat
 import ru.hopes.workouttimer.presentation.utils.toCorrectNum
 
 @Composable
@@ -289,10 +293,12 @@ fun WorkoutExecutionScreen(
         AppBottomSheet(onDismiss = { weightSheetExercise = null }) {
             WeightRepsSheetContent(
                 exerciseName = exercise.name,
+                unit = exercise.unit,
                 weight = exercise.weight,
+                extraWeight = exercise.extraWeight,
                 reps = exercise.reps,
-                onApply = { weight, reps ->
-                    viewModel.updateExerciseWeightAndReps(exercise.id, weight, reps)
+                onApply = { weight, extraWeight, reps ->
+                    viewModel.updateExerciseWeightAndReps(exercise.id, weight, extraWeight, reps)
                     weightSheetExercise = null
                 }
             )
@@ -387,7 +393,7 @@ private fun ExerciseChip(
 }
 
 @Composable
-private fun ActiveContent(
+internal fun ActiveContent(
     state: WorkoutExecutionState.Active,
     onEditNote: (Exercise) -> Unit,
     onEditWeightAndReps: (Exercise) -> Unit
@@ -416,12 +422,28 @@ private fun ActiveContent(
                 .padding(top = 22.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            StatTile(
-                value = state.weight.toCorrectNum(),
-                unit = stringResource(R.string.common_unit_kg),
-                modifier = Modifier.weight(1f),
-                onClick = { onEditWeightAndReps(state.exercise) }
-            )
+            when (state.exercise.unit) {
+                ExerciseUnit.KG -> StatTile(
+                    value = state.weight.toCorrectNum(),
+                    unit = stringResource(R.string.common_unit_kg),
+                    modifier = Modifier.weight(1f),
+                    onClick = { onEditWeightAndReps(state.exercise) }
+                )
+
+                ExerciseUnit.PLATE -> StatTile(
+                    value = state.weight.toCorrectNum(),
+                    unit = if (state.extraWeight > 0.0) {
+                        stringResource(R.string.unit_plate_with_extra, state.extraWeight.toCorrectNum())
+                    } else {
+                        stringResource(R.string.unit_name_plate)
+                    },
+                    modifier = Modifier.weight(1f),
+                    onClick = { onEditWeightAndReps(state.exercise) }
+                )
+
+                // Без веса плитки нагрузки нет: повторы занимают всю ширину.
+                ExerciseUnit.BODYWEIGHT -> Unit
+            }
             StatTile(
                 value = state.reps.toString(),
                 unit = stringResource(R.string.common_unit_reps),
@@ -468,12 +490,15 @@ private fun RestContent(
         )
         // Отдых — самый удобный момент, чтобы поправить вес на следующий подход,
         // поэтому строка ведёт в тот же лист, что и плитки в Active.
+        val load = formatLoad(state.exercise.unit, state.exercise.weight, state.exercise.extraWeight, setFormat())
         Text(
-            text = stringResource(
-                R.string.execution_rest_weight_reps,
-                state.exercise.weight.toCorrectNum(),
-                state.exercise.reps
-            ),
+            text = if (load != null) {
+                pluralStringResource(
+                    R.plurals.execution_rest_weight_reps, state.exercise.reps, load, state.exercise.reps
+                )
+            } else {
+                pluralStringResource(R.plurals.execution_rest_reps, state.exercise.reps, state.exercise.reps)
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier

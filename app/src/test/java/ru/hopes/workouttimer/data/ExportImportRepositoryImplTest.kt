@@ -12,9 +12,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import ru.hopes.workouttimer.data.dao.ExerciseDraft
 import ru.hopes.workouttimer.data.dao.WorkoutDao
-import ru.hopes.workouttimer.data.entity.ExerciseEntity
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
+import ru.hopes.workouttimer.domain.model.ExerciseUnit
 import ru.hopes.workouttimer.domain.repository.ImportError
 import ru.hopes.workouttimer.domain.repository.WidgetUpdater
 import java.io.ByteArrayInputStream
@@ -63,7 +64,7 @@ class ExportImportRepositoryImplTest {
             workout("Пустая", exercise("", 0), exercise("", 1)),
             workout("Рабочая", exercise("", 0), exercise("Присед", 1))
         )
-        val saved = slot<List<Pair<WorkoutEntity, List<ExerciseEntity>>>>()
+        val saved = slot<List<Pair<WorkoutEntity, List<ExerciseDraft>>>>()
         val repo = repository(json)
         coEvery { dao.importWorkouts(capture(saved)) } answers { saved.captured.size }
 
@@ -73,6 +74,39 @@ class ExportImportRepositoryImplTest {
         assertEquals(1, result.importedCount)
         assertEquals(3, result.skippedCount)
         assertEquals(1, saved.captured.size)
-        assertEquals(listOf("Присед"), saved.captured.single().second.map { it.name })
+        assertEquals(listOf("Присед"), saved.captured.single().second.map { it.exercise.name })
+    }
+
+    private fun exerciseWith(name: String, fields: String) =
+        """{"name":"$name","weight":5.0,"sets":3,"reps":12,"restTimeMillis":60000,"order":1,"note":""$fields}"""
+
+    private suspend fun importedDraft(json: String): ExerciseDraft {
+        val saved = slot<List<Pair<WorkoutEntity, List<ExerciseDraft>>>>()
+        val repo = repository(json)
+        coEvery { dao.importWorkouts(capture(saved)) } answers { saved.captured.size }
+        assertTrue(repo.importFromJson(uri).success)
+        return saved.captured.single().second.single()
+    }
+
+    @Test
+    fun `старый файл без единицы импортируется в кг`() = runTest {
+        val draft = importedDraft(file(workout("Ноги", exercise("Присед", 0))))
+        assertEquals(ExerciseUnit.KG, draft.unitIfNew)
+        assertEquals(0.0, draft.exercise.extraWeight, 0.0)
+    }
+
+    @Test
+    fun `единица и добавка из файла доходят до DAO`() = runTest {
+        val draft = importedDraft(
+            file(workout("Спина", exerciseWith("Тяга блока", ""","unit":"PLATE","extraWeight":2.5""")))
+        )
+        assertEquals(ExerciseUnit.PLATE, draft.unitIfNew)
+        assertEquals(2.5, draft.exercise.extraWeight, 0.0)
+    }
+
+    @Test
+    fun `неизвестная единица в файле читается как кг`() = runTest {
+        val draft = importedDraft(file(workout("Спина", exerciseWith("Тяга", ""","unit":"LBS""""))))
+        assertEquals(ExerciseUnit.KG, draft.unitIfNew)
     }
 }

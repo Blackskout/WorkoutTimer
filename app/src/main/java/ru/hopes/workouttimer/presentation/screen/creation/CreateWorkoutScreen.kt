@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,14 +47,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.hopes.workouttimer.R
+import ru.hopes.workouttimer.domain.model.CatalogExercise
+import ru.hopes.workouttimer.domain.model.ExerciseUnit
+import ru.hopes.workouttimer.domain.model.fitLoadToUnit
 import ru.hopes.workouttimer.presentation.ui.components.AppBottomSheet
 import ru.hopes.workouttimer.presentation.ui.components.EmptyState
+import ru.hopes.workouttimer.presentation.ui.components.PlateExtraValues
+import ru.hopes.workouttimer.presentation.ui.components.PlateValues
 import ru.hopes.workouttimer.presentation.ui.components.PrimaryButton
 import ru.hopes.workouttimer.presentation.ui.components.RepsValues
 import ru.hopes.workouttimer.presentation.ui.components.SectionHeader
@@ -64,7 +72,10 @@ import ru.hopes.workouttimer.presentation.ui.components.wheelIndexOfNearest
 import ru.hopes.workouttimer.presentation.ui.theme.CardSpacing
 import ru.hopes.workouttimer.presentation.ui.theme.ScreenPadding
 import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
+import ru.hopes.workouttimer.presentation.utils.formatLoad
+import ru.hopes.workouttimer.presentation.utils.setFormat
 import ru.hopes.workouttimer.presentation.utils.toCorrectNum
+import ru.hopes.workouttimer.presentation.utils.unitName
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.util.Locale
@@ -221,6 +232,7 @@ fun CreateWorkoutScreen(
                     ReorderableItem(reorderState, key = item.id) { _ ->
                         ExerciseRow(
                             item = item,
+                            unit = state.unitOf(item),
                             onClick = { editingId = item.id },
                             dragHandle = {
                                 Icon(
@@ -257,6 +269,8 @@ fun CreateWorkoutScreen(
         } else {
             ExerciseEditSheet(
                 item = item,
+                unit = state.unitOf(item),
+                suggestions = state.suggestionsFor(item),
                 onDismiss = { editingId = null },
                 onChange = { updated ->
                     viewModel.processCommand(CreateWorkoutCommand.UpdateExercise(id, updated))
@@ -293,6 +307,7 @@ private const val HEADER_ITEMS = 2
 @Composable
 private fun ExerciseRow(
     item: ExerciseItem,
+    unit: ExerciseUnit,
     onClick: () -> Unit,
     dragHandle: @Composable () -> Unit
 ) {
@@ -321,14 +336,16 @@ private fun ExerciseRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            // Нагрузка показывается приведённой к единице записи — так её и сохранит DAO.
+            val load = fitLoadToUnit(item.weight, item.extraWeight, unit)
+            val loadText = formatLoad(unit, load.weight, load.extraWeight, setFormat())
+            val rest = formatRest(item.restTimeSeconds)
             Text(
-                text = stringResource(
-                    R.string.create_exercise_summary,
-                    item.weight.toCorrectNum(),
-                    item.sets,
-                    item.reps,
-                    formatRest(item.restTimeSeconds)
-                ),
+                text = if (loadText != null) {
+                    stringResource(R.string.create_exercise_summary, loadText, item.sets, item.reps, rest)
+                } else {
+                    stringResource(R.string.create_exercise_summary_no_weight, item.sets, item.reps, rest)
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -339,6 +356,8 @@ private fun ExerciseRow(
 @Composable
 private fun ExerciseEditSheet(
     item: ExerciseItem,
+    unit: ExerciseUnit,
+    suggestions: List<CatalogExercise>,
     onDismiss: () -> Unit,
     onChange: (ExerciseItem) -> Unit,
     onDelete: () -> Unit
@@ -346,6 +365,8 @@ private fun ExerciseEditSheet(
     AppBottomSheet(onDismiss = onDismiss) {
         ExerciseEditSheetContent(
             item = item,
+            unit = unit,
+            suggestions = suggestions,
             onChange = onChange,
             onDelete = onDelete,
             onDone = onDismiss
@@ -353,17 +374,33 @@ private fun ExerciseEditSheet(
     }
 }
 
-// Извлечено из ExerciseEditSheet, чтобы тело листа можно было превьюшить без
-// ModalBottomSheet — он требует Window и не рендерится в @Preview.
+// Извлечено из ExerciseEditSheet, чтобы тело листа можно было превьюшить и тестировать
+// без ModalBottomSheet — он требует Window.
 @Composable
-private fun ExerciseEditSheetContent(
+internal fun ExerciseEditSheetContent(
     item: ExerciseItem,
+    unit: ExerciseUnit,
+    suggestions: List<CatalogExercise>,
     onChange: (ExerciseItem) -> Unit,
     onDelete: () -> Unit,
     onDone: () -> Unit
 ) {
-    var weightIndex by remember(item.id) {
-        mutableIntStateOf(wheelIndexOfNearest(WeightValues, item.weight))
+    // TextFieldValue, а не String: после выбора подсказки курсор встаёт в конец
+    // названия, а не остаётся там, где кончался набранный кусок.
+    var nameField by remember(item.id) {
+        mutableStateOf(TextFieldValue(item.name, TextRange(item.name.length)))
+    }
+    // Ключ включает единицу: подсказка с другой единицей меняет набор барабанов,
+    // и индексы прежнего набора к новому не относятся.
+    val load = fitLoadToUnit(item.weight, item.extraWeight, unit)
+    var weightIndex by remember(item.id, unit) {
+        mutableIntStateOf(wheelIndexOfNearest(WeightValues, load.weight))
+    }
+    var plateIndex by remember(item.id, unit) {
+        mutableIntStateOf(wheelIndexOfNearest(PlateValues, load.weight))
+    }
+    var extraIndex by remember(item.id, unit) {
+        mutableIntStateOf(wheelIndexOfNearest(PlateExtraValues, load.extraWeight))
     }
     var setsIndex by remember(item.id) {
         mutableIntStateOf(wheelIndexOfNearest(SetsValues.map { it.toDouble() }, item.sets.toDouble()))
@@ -379,55 +416,100 @@ private fun ExerciseEditSheetContent(
 
     Column(modifier = Modifier.padding(horizontal = ScreenPadding)) {
         OutlinedTextField(
-            value = item.name,
-            onValueChange = { onChange(item.copy(name = it)) },
+            value = nameField,
+            onValueChange = {
+                nameField = it
+                if (it.text != item.name) onChange(item.copy(name = it.text))
+            },
             modifier = Modifier.fillMaxWidth(),
             label = { Text(stringResource(R.string.create_exercise_name)) },
             singleLine = true,
             shape = MaterialTheme.shapes.small
         )
 
-        WheelRow(modifier = Modifier.padding(vertical = 12.dp)) {
-            WheelPicker(
-                items = WeightValues,
-                selectedIndex = weightIndex,
-                onSelected = {
-                    weightIndex = it
-                    onChange(item.copy(weight = WeightValues[it]))
-                },
-                label = stringResource(R.string.common_unit_kg),
-                format = { it.toCorrectNum() }
+        if (suggestions.isNotEmpty()) {
+            SuggestionList(
+                suggestions = suggestions,
+                onPick = { entry ->
+                    nameField = TextFieldValue(entry.name, TextRange(entry.name.length))
+                    onChange(item.copy(name = entry.name))
+                }
             )
-            WheelPicker(
-                items = SetsValues,
-                selectedIndex = setsIndex,
-                onSelected = {
-                    setsIndex = it
-                    onChange(item.copy(sets = SetsValues[it]))
-                },
-                label = stringResource(R.string.create_unit_sets),
-                format = { it.toString() }
-            )
-            WheelPicker(
-                items = RepsValues,
-                selectedIndex = repsIndex,
-                onSelected = {
-                    repsIndex = it
-                    onChange(item.copy(reps = RepsValues[it]))
-                },
-                label = stringResource(R.string.common_unit_reps),
-                format = { it.toString() }
-            )
-            WheelPicker(
-                items = RestValues,
-                selectedIndex = restIndex,
-                onSelected = {
-                    restIndex = it
-                    onChange(item.copy(restTimeSeconds = RestValues[it]))
-                },
-                label = stringResource(R.string.create_unit_rest),
-                format = { formatRest(it) }
-            )
+        }
+
+        // WheelPicker запоминает позицию при первом показе, поэтому смена единицы
+        // пересоздаёт ряд барабанов целиком. Единицу редактор показывает, но не меняет.
+        key(unit) {
+            WheelRow(modifier = Modifier.padding(vertical = 12.dp)) {
+                when (unit) {
+                    ExerciseUnit.KG -> WheelPicker(
+                        items = WeightValues,
+                        selectedIndex = weightIndex,
+                        onSelected = {
+                            weightIndex = it
+                            onChange(item.copy(weight = WeightValues[it]))
+                        },
+                        label = stringResource(R.string.common_unit_kg),
+                        format = { it.toCorrectNum() }
+                    )
+
+                    ExerciseUnit.PLATE -> {
+                        WheelPicker(
+                            items = PlateValues,
+                            selectedIndex = plateIndex,
+                            onSelected = {
+                                plateIndex = it
+                                onChange(item.copy(weight = PlateValues[it], extraWeight = PlateExtraValues[extraIndex]))
+                            },
+                            label = stringResource(R.string.unit_name_plate),
+                            format = { it.toCorrectNum() }
+                        )
+                        WheelPicker(
+                            items = PlateExtraValues,
+                            selectedIndex = extraIndex,
+                            onSelected = {
+                                extraIndex = it
+                                onChange(item.copy(weight = PlateValues[plateIndex], extraWeight = PlateExtraValues[it]))
+                            },
+                            label = stringResource(R.string.unit_plate_extra),
+                            format = { it.toCorrectNum() }
+                        )
+                    }
+
+                    // Без веса барабана нагрузки нет: только подходы, повторы, отдых.
+                    ExerciseUnit.BODYWEIGHT -> Unit
+                }
+                WheelPicker(
+                    items = SetsValues,
+                    selectedIndex = setsIndex,
+                    onSelected = {
+                        setsIndex = it
+                        onChange(item.copy(sets = SetsValues[it]))
+                    },
+                    label = stringResource(R.string.create_unit_sets),
+                    format = { it.toString() }
+                )
+                WheelPicker(
+                    items = RepsValues,
+                    selectedIndex = repsIndex,
+                    onSelected = {
+                        repsIndex = it
+                        onChange(item.copy(reps = RepsValues[it]))
+                    },
+                    label = stringResource(R.string.common_unit_reps),
+                    format = { it.toString() }
+                )
+                WheelPicker(
+                    items = RestValues,
+                    selectedIndex = restIndex,
+                    onSelected = {
+                        restIndex = it
+                        onChange(item.copy(restTimeSeconds = RestValues[it]))
+                    },
+                    label = stringResource(R.string.create_unit_rest),
+                    format = { formatRest(it) }
+                )
+            }
         }
 
         OutlinedTextField(
@@ -455,12 +537,52 @@ private fun ExerciseEditSheetContent(
     }
 }
 
+/** Подсказки из справочника под полем названия; справа — единица записи. */
+@Composable
+private fun SuggestionList(
+    suggestions: List<CatalogExercise>,
+    onPick: (CatalogExercise) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp)
+            .clip(MaterialTheme.shapes.small)
+            .background(MaterialTheme.colorScheme.surface)
+    ) {
+        suggestions.forEach { entry ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onPick(entry) }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = entry.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = unitName(entry.unit),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
 @Preview(backgroundColor = 0xFF0B0B0F, showBackground = true)
 @Composable
 private fun ExerciseRowPreview() {
     WorkoutTimerTheme {
         Column(modifier = Modifier.padding(ScreenPadding)) {
             ExerciseRow(
+                unit = ExerciseUnit.KG,
                 item = ExerciseItem(
                     id = 1,
                     name = "Жим лёжа",
@@ -498,6 +620,36 @@ private fun ExerciseEditSheetContentPreview() {
                     reps = 5,
                     restTimeSeconds = 180,
                     note = "Пояс с третьего подхода"
+                ),
+                unit = ExerciseUnit.KG,
+                suggestions = emptyList(),
+                onChange = {},
+                onDelete = {},
+                onDone = {}
+            )
+        }
+    }
+}
+
+@Preview(backgroundColor = 0xFF0B0B0F, showBackground = true)
+@Composable
+private fun ExerciseEditSheetContentPlatePreview() {
+    WorkoutTimerTheme {
+        Column(modifier = Modifier.padding(vertical = ScreenPadding)) {
+            ExerciseEditSheetContent(
+                item = ExerciseItem(
+                    id = 2,
+                    name = "Тяга",
+                    weight = 5.0,
+                    sets = 3,
+                    reps = 12,
+                    restTimeSeconds = 90,
+                    extraWeight = 2.0
+                ),
+                unit = ExerciseUnit.PLATE,
+                suggestions = listOf(
+                    CatalogExercise(1, "Тяга блока", ExerciseUnit.PLATE),
+                    CatalogExercise(2, "Тяга штанги в наклоне", ExerciseUnit.KG)
                 ),
                 onChange = {},
                 onDelete = {},

@@ -15,6 +15,17 @@
     <string name="common_never_done">ещё не делали</string>
     <string name="d_ago">%1$d дн. назад</string>
 
+    <!-- Единицы нагрузки. Шаблоны unit_load_* и unit_set собирает SetFormat. -->
+    <string name="unit_name_kg">кг</string>
+    <string name="unit_name_plate">плита</string>
+    <string name="unit_name_bodyweight">без веса</string>
+    <string name="unit_plate_extra">+кг</string>
+    <string name="unit_plate_with_extra">плита +%1$s кг</string>
+    <string name="unit_load_kg">%1$s кг</string>
+    <string name="unit_load_plate">плита %1$s</string>
+    <string name="unit_load_plate_extra">плита %1$s +%2$s кг</string>
+    <string name="unit_set">%1$s × %2$d</string>
+
     <!-- Список тренировок -->
     <string name="list_title">Тренировки</string>
     <string name="list_fab_new">Новая</string>
@@ -61,7 +72,18 @@
     <string name="execution_finish_confirm">Завершить</string>
     <string name="execution_set_of">Подход %1$d из %2$d</string>
     <string name="execution_rest_next_set">Отдых · далее подход %1$d</string>
-    <string name="execution_rest_weight_reps">%1$s кг · %2$d повторений</string>
+    <plurals name="execution_rest_weight_reps">
+        <item quantity="one">%1$s · %2$d повторение</item>
+        <item quantity="few">%1$s · %2$d повторения</item>
+        <item quantity="many">%1$s · %2$d повторений</item>
+        <item quantity="other">%1$s · %2$d повторения</item>
+    </plurals>
+    <plurals name="execution_rest_reps">
+        <item quantity="one">%1$d повторение</item>
+        <item quantity="few">%1$d повторения</item>
+        <item quantity="many">%1$d повторений</item>
+        <item quantity="other">%1$d повторения</item>
+    </plurals>
     <string name="execution_edit_note">Редактировать заметку</string>
     <string name="execution_no_notes">Нет заметок</string>
     <string name="execution_to_home">На главную</string>
@@ -84,7 +106,8 @@
     <string name="create_exit_title">Выйти без сохранения?</string>
     <string name="create_exit_message">Изменения, включая порядок упражнений, будут потеряны.</string>
     <string name="create_untitled">Без названия</string>
-    <string name="create_exercise_summary">%1$s кг · %2$d×%3$d · отдых %4$s</string>
+    <string name="create_exercise_summary">%1$s · %2$d×%3$d · отдых %4$s</string>
+    <string name="create_exercise_summary_no_weight">%1$d×%2$d · отдых %3$s</string>
     <string name="create_exercise_name">Название упражнения</string>
     <string name="create_unit_sets">подх</string>
     <string name="create_unit_rest">отдых</string>
@@ -111,7 +134,33 @@
     <!-- История -->
     <string name="history_empty_title">История пуста</string>
     <string name="history_empty_subtitle">Завершите тренировку — она появится здесь</string>
+    <string name="history_no_sets">подходы не записывались</string>
+    <string name="history_exercise_sets">%1$s — %2$s</string>
+    <string name="history_expand">Показать подходы</string>
+    <string name="history_collapse">Скрыть подходы</string>
+    <string name="history_state_expanded">Развёрнуто</string>
+    <string name="history_state_collapsed">Свёрнуто</string>
     <string name="rest_ring_total">из %1$s</string>
+
+    <!-- Справочник упражнений -->
+    <string name="catalog_title">Упражнения</string>
+    <string name="catalog_search_placeholder">Название упражнения</string>
+    <string name="catalog_actions">Действия с упражнением</string>
+    <string name="catalog_last_reps">%1$d повт.</string>
+    <string name="catalog_last_set">%1$s · %2$s</string>
+    <string name="catalog_empty_title">Упражнений пока нет</string>
+    <string name="catalog_empty_subtitle">Они появятся, когда вы сохраните тренировку</string>
+    <string name="catalog_search_empty_title">Ничего не найдено</string>
+    <string name="catalog_search_empty_subtitle">Попробуйте другой запрос</string>
+    <string name="catalog_action_rename">Переименовать</string>
+    <string name="catalog_action_unit">Единица</string>
+    <string name="catalog_rename_title">Переименовать упражнение</string>
+    <string name="catalog_rename_taken">Такое упражнение уже есть</string>
+    <string name="catalog_unit_title">Единица нагрузки</string>
+    <string name="catalog_unit_hint">Вес в тренировках приведётся к новой единице. Прошлые подходы не изменятся.</string>
+    <string name="catalog_error_load">Не удалось загрузить упражнения</string>
+    <string name="catalog_error_rename">Не удалось переименовать упражнение</string>
+    <string name="catalog_error_unit">Не удалось сменить единицу</string>
 
     <!-- Музыка -->
     <string name="music_service_label">Управление музыкой</string>

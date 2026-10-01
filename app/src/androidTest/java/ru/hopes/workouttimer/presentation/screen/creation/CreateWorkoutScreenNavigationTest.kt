@@ -13,6 +13,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import ru.hopes.workouttimer.domain.usecase.AddWorkoutUseCase
 import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
+import ru.hopes.workouttimer.domain.usecase.ObserveCatalogUseCase
 import ru.hopes.workouttimer.domain.usecase.UpdateWorkoutUseCase
 
 /**
@@ -30,7 +31,8 @@ class CreateWorkoutScreenNavigationTest {
     private fun viewModel(repo: FakeWorkoutRepository) = CreateWorkoutViewModel(
         AddWorkoutUseCase(repo),
         GetWorkoutByIdUseCase(repo),
-        UpdateWorkoutUseCase(repo)
+        UpdateWorkoutUseCase(repo),
+        ObserveCatalogUseCase(FakeExerciseCatalogRepository())
     )
 
     private fun CreateWorkoutViewModel.fillAndSave() {
