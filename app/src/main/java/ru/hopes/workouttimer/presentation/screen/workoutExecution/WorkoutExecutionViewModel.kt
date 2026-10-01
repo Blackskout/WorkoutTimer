@@ -1,530 +1,104 @@
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
-import ru.hopes.workouttimer.presentation.session.WorkoutExecutionState
-import android.content.Context
-import android.content.Intent
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.onCompletion
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import ru.hopes.workouttimer.R
-import ru.hopes.workouttimer.domain.model.Exercise
-import ru.hopes.workouttimer.domain.model.RecordedSet
-import ru.hopes.workouttimer.domain.model.Workout
-import ru.hopes.workouttimer.domain.repository.WorkoutRepository
-import ru.hopes.workouttimer.domain.usecase.FinishWorkoutSessionUseCase
-import ru.hopes.workouttimer.domain.usecase.GetWorkoutByIdUseCase
-import ru.hopes.workouttimer.presentation.service.TimerNotificationService
-import ru.hopes.workouttimer.presentation.utils.ActiveWorkoutTracker
-import ru.hopes.workouttimer.presentation.utils.SoundPlayer
-import ru.hopes.workouttimer.presentation.utils.VibrationManager
-import ru.hopes.workouttimer.presentation.utils.WakeLockHelper
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.stateIn
+import ru.hopes.workouttimer.presentation.session.SessionExercise
+import ru.hopes.workouttimer.presentation.session.WorkoutExecutionState
+import ru.hopes.workouttimer.presentation.session.WorkoutSession
+import ru.hopes.workouttimer.presentation.session.WorkoutSessionManager
 import javax.inject.Inject
 
+/**
+ * Тонкий адаптер экрана выполнения: состояние и действия — у [WorkoutSessionManager].
+ * Сам решает одно: что делать с сессией, когда запись экрана уходит из стека.
+ */
 @HiltViewModel
 class WorkoutExecutionViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val soundPlayer: SoundPlayer,
-    private val getWorkoutByIdUseCase: GetWorkoutByIdUseCase,
-    private val vibrationManager: VibrationManager,
-    private val wakeLockHelper: WakeLockHelper,
-    private val workoutRepository: WorkoutRepository,
-    private val finishWorkoutSessionUseCase: FinishWorkoutSessionUseCase,
-    private val activeWorkoutTracker: ActiveWorkoutTracker
+    private val manager: WorkoutSessionManager
 ) : ViewModel() {
 
-    private var workout: Workout? = null
-    var exercises: List<Exercise> = emptyList()
-    private var exerciseIndex = 0
-    private var sessionStartedAt: Long = 0L
+    // Сессия, которую этот экран начал или застал; onCleared трогает только её.
+    private var ownedSessionId: Long? = null
 
-    internal var lastInteractionAt: Long = 0L
-        private set
-    internal var excludedIdleMillis: Long = 0L
-        private set
-
-    val workoutName: String
-        get() = workout?.name ?: ""
-
-    val totalExercises: Int
-        get() = exercises.size
-
-    val currentExerciseNumber: Int
-        get() = exerciseIndex + 1
-
-    // Текущий подход закрывает всю тренировку: экран спрашивает подтверждение перед
-    // onExerciseFinished(), потому что дальше сессия уже уйдёт в БД.
-    val isLastSetOfWorkout: Boolean
-        get() = (_uiState.value as? WorkoutExecutionState.Active)
-            ?.let { it.currentSet == it.totalSets && exerciseIndex == exercises.lastIndex } == true
-
-    private val _uiState = MutableStateFlow<WorkoutExecutionState>(
-        WorkoutExecutionState.Loading
-    )
-    val uiState: StateFlow<WorkoutExecutionState> = _uiState.asStateFlow()
-
-    private val _recordedSets = mutableListOf<RecordedSet>()
-    internal val recordedSets: List<RecordedSet> get() = _recordedSets
-
-    // Поднимается синхронно до запуска записи: второй тап по последнему подходу,
-    // пока корутина пишет сессию, ничего не делает.
-    private var isFinishing = false
-
-    // Последний подход уже в списке, но сессия не записалась: повторное нажатие
-    // пробует записать снова, не добавляя подход второй раз.
-    private var finishPending = false
-
-    private val _finishError = MutableStateFlow(false)
-    val finishError: StateFlow<Boolean> = _finishError.asStateFlow()
-
-    fun dismissFinishError() {
-        _finishError.value = false
-    }
-
-    private var timerJob: Job? = null
-    private var idleReminderJob: Job? = null
-
-    internal val isIdleReminderJobActive: Boolean
-        get() = idleReminderJob?.isActive == true
-
-    private fun startNotification(exerciseName: String, currentSet: Int, totalSets: Int, timeLeftMillis: Long) {
-        val intent = Intent(context, TimerNotificationService::class.java).apply {
-            action = TimerNotificationService.ACTION_START
-            putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
-            putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
-            putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
-            putExtra(TimerNotificationService.EXTRA_TIME_LEFT, timeLeftMillis)
-        }
-        context.startService(intent)
-    }
-
-    private fun updateNotification(exerciseName: String, currentSet: Int, totalSets: Int, timeLeftMillis: Long) {
-        val intent = Intent(context, TimerNotificationService::class.java).apply {
-            action = TimerNotificationService.ACTION_UPDATE
-            putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
-            putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
-            putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
-            putExtra(TimerNotificationService.EXTRA_TIME_LEFT, timeLeftMillis)
-        }
-        context.startService(intent)
-    }
-
-    private fun stopNotification() {
-        val intent = Intent(context, TimerNotificationService::class.java).apply {
-            action = TimerNotificationService.ACTION_STOP
-        }
-        context.startService(intent)
-    }
-
-    private fun showRestFinishedNotification(exerciseName: String, currentSet: Int, totalSets: Int) {
-        val intent = Intent(context, TimerNotificationService::class.java).apply {
-            action = TimerNotificationService.ACTION_SHOW_FINISHED
-            putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
-            putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
-            putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
-        }
-        context.startService(intent)
-    }
-
-    fun loadWorkout(workoutId: Int) {
-        viewModelScope.launch {
-            _uiState.value = WorkoutExecutionState.Loading
-            val loadedWorkout = getWorkoutByIdUseCase(workoutId)
-            
-            if (loadedWorkout != null && loadedWorkout.exercises.isNotEmpty()) {
-                workout = loadedWorkout
-                exercises = loadedWorkout.exercises.sortedBy { it.order }
-                exerciseIndex = 0
-                sessionStartedAt = System.currentTimeMillis()
-                lastInteractionAt = sessionStartedAt
-                excludedIdleMillis = 0L
-                _recordedSets.clear()
-                finishPending = false
-                isFinishing = false
-
-                // Начинаем с первого упражнения в состоянии Rest
-                val firstExercise = exercises[0]
-                _uiState.value = WorkoutExecutionState.Active(
-                    exercise = firstExercise,
-                    currentSet = 1,
-                    totalSets = firstExercise.sets,
-                )
-                // С этого момента тап по виджету не должен сбрасывать экран (см. MainActivity).
-                activeWorkoutTracker.start(this@WorkoutExecutionViewModel)
-                scheduleIdleReminderIfActive()
-            } else {
-                _uiState.value = WorkoutExecutionState.Error
-            }
-        }
-    }
-
-    fun skipRest() {
-        registerInteraction()
-        timerJob?.cancel()
-        wakeLockHelper.release()
-        stopNotification()
-        _uiState.update { state ->
-            when (state) {
-                is WorkoutExecutionState.Rest -> {
-                    WorkoutExecutionState.Active(
-                        exercise = state.exercise,
-                        currentSet = state.currentSet,
-                        totalSets = state.totalSets,
-                        weight = state.exercise.weight,
-                        reps = state.exercise.reps
-                    )
-                }
-
-                else -> state
-            }
-        }
-        scheduleIdleReminderIfActive()
-    }
-
-    fun startRestTimer() {
-        val currentState = _uiState.value as? WorkoutExecutionState.Rest ?: return
-        timerJob?.cancel()
-
-        wakeLockHelper.acquire(currentState.restTimeMillis)
-
-        val finishTime = System.currentTimeMillis() + currentState.restTimeMillis
-
-        // Запускаем уведомление с таймером
-        startNotification(
-            exerciseName = currentState.exercise.name,
-            currentSet = currentState.currentSet,
-            totalSets = currentState.totalSets,
-            timeLeftMillis = currentState.restTimeMillis
+    /**
+     * Фаза текущей сессии. None экрану не отдаётся: после выхода уходящий экран держит
+     * последний кадр, а не мигает «Загрузкой». Начальное значение — из текущего снимка,
+     * иначе при возврате в идущую тренировку экран на кадр показал бы Loading.
+     */
+    val uiState: StateFlow<WorkoutExecutionState> = manager.session
+        .mapNotNull { (it as? WorkoutSession.Present)?.phase }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            (manager.session.value as? WorkoutSession.Present)?.phase ?: WorkoutExecutionState.Loading
         )
 
-        timerJob = viewModelScope.launch {
-            var lastNotificationSecond = -1L
+    /** Шапка и шторка выбора: название, список, позиция. Тики отдыха её не меняют. */
+    val chrome: StateFlow<ExecutionChrome> = manager.session
+        .mapNotNull { (it as? WorkoutSession.Present)?.toChrome() }
+        .distinctUntilChanged()
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            (manager.session.value as? WorkoutSession.Present)?.toChrome() ?: ExecutionChrome()
+        )
 
-            countdownFlow(finishTime)
-                .onCompletion { cause ->
-                    if (cause == null) {
-                        onRestFinished()
-                    } else {
-                        wakeLockHelper.release()
-                    }
-                }
-                .collect { timeLeft ->
-                    _uiState.update { state ->
-                        when (state) {
-                            is WorkoutExecutionState.Rest -> state.copy(restTimeMillis = timeLeft)
-                            else -> state
-                        }
-                    }
+    val finishError: StateFlow<Boolean> = manager.finishError
 
-                    // Обновляем уведомление только раз в секунду (не чаще)
-                    val currentSecond = timeLeft / 1000
-                    if (currentSecond != lastNotificationSecond) {
-                        lastNotificationSecond = currentSecond
-                        updateNotification(
-                            exerciseName = currentState.exercise.name,
-                            currentSet = currentState.currentSet,
-                            totalSets = currentState.totalSets,
-                            timeLeftMillis = timeLeft
-                        )
-                    }
-                }
-        }
+    val isLastSetOfWorkout: Boolean
+        get() = manager.isLastSetOfWorkout
+
+    /** «Повторить» после ошибки тоже идёт сюда — владение переходит к новой сессии. */
+    fun start(workoutId: Int) {
+        ownedSessionId = manager.start(workoutId)
     }
 
-    private fun countdownFlow(finishTime: Long): Flow<Long> = flow {
-        while (true) {
-            val currentTime = System.currentTimeMillis()
+    fun skipRest() = manager.skipRest()
 
-            val remaining = finishTime - currentTime
+    fun onExerciseFinished() = manager.onExerciseFinished()
 
-            if (remaining <= 0) {
-                emit(0L)
-                break
-            }
+    fun moveToExercise(index: Int) = manager.moveToExercise(index)
 
-            emit(remaining)
-            delay(200)
-        }
-    }
+    fun updateExerciseNote(index: Int, note: String) = manager.updateExerciseNote(index, note)
 
-    internal fun onRestFinished() {
-        val previousState = _uiState.value as? WorkoutExecutionState.Rest
-        timerJob?.cancel()
-        stopNotification()
-        soundPlayer.playSound(R.raw.timer)
-        vibrationManager.vibrate()
-        wakeLockHelper.release()
+    fun updateExerciseWeightAndReps(index: Int, weight: Double, extraWeight: Double, reps: Int) =
+        manager.updateExerciseWeightAndReps(index, weight, extraWeight, reps)
 
-        // Показываем уведомление о завершении отдыха
-        if (previousState != null) {
-            showRestFinishedNotification(
-                exerciseName = previousState.exercise.name,
-                currentSet = previousState.currentSet,
-                totalSets = previousState.totalSets
-            )
-        }
-
-        _uiState.update { state ->
-            when (state) {
-                is WorkoutExecutionState.Rest -> {
-                    WorkoutExecutionState.Active(
-                        exercise = state.exercise,
-                        currentSet = state.currentSet,
-                        totalSets = state.totalSets
-                    )
-                }
-                else -> state
-            }
-        }
-        scheduleIdleReminderIfActive()
-    }
+    fun dismissFinishError() = manager.dismissFinishError()
 
     override fun onCleared() {
         super.onCleared()
-        soundPlayer.release()
-        wakeLockHelper.release()
-        stopNotification()
-        idleReminderJob?.cancel()
-        activeWorkoutTracker.stop(this)
-    }
-
-    fun onExerciseFinished() {
-        if (isFinishing) return
-        registerInteraction()
-        val currentState = _uiState.value
-        if (currentState is WorkoutExecutionState.Active) {
-            // Подход снимается до перехода: на последнем подходе moveToNextExercise
-            // сразу пишет сессию, и снимать будет уже поздно.
-            val set = RecordedSet(
-                catalogId = currentState.exercise.catalogId,
-                exerciseName = currentState.exercise.name,
-                weight = currentState.weight,
-                extraWeight = currentState.extraWeight,
-                reps = currentState.reps,
-                unit = currentState.exercise.unit
-            )
-            // Повтор после сбоя записи: последний подход уже в списке — заменяем
-            // его текущими значениями (плитку могли поправить), а не дублируем.
-            if (finishPending && _recordedSets.isNotEmpty()) {
-                _recordedSets[_recordedSets.lastIndex] = set
-            } else {
-                _recordedSets += set
-            }
-            if (currentState.currentSet < currentState.totalSets) {
-                // Переход к следующему подходу того же упражнения
-                _uiState.value = WorkoutExecutionState.Rest(
-                    exercise = currentState.exercise,
-                    currentSet = currentState.currentSet + 1,
-                    totalSets = currentState.totalSets,
-                    restTimeMillis = currentState.exercise.timeMillis,
-                    totalRestTimeMillis = currentState.exercise.timeMillis
-                )
-                startRestTimer()
-                scheduleIdleReminderIfActive()
-            } else {
-                // Упражнение завершено, переходим к следующему
-                moveToNextExercise()
-            }
-        }
-    }
-
-    private fun moveToNextExercise() {
-        if (exerciseIndex < exercises.size - 1) {
-            exerciseIndex++
-            val nextExercise = exercises[exerciseIndex]
-            _uiState.value = WorkoutExecutionState.Rest(
-                exercise = nextExercise,
-                currentSet = 1,
-                totalSets = nextExercise.sets,
-                restTimeMillis = nextExercise.timeMillis,
-                totalRestTimeMillis = nextExercise.timeMillis
-            )
-            startRestTimer()
-            scheduleIdleReminderIfActive()
+        val id = ownedSessionId ?: return
+        // Сворачивания ещё нет: уход с экрана идущей тренировки — это выход без сохранения.
+        val current = manager.session.value as? WorkoutSession.Present
+        if (current?.sessionId == id && manager.isRunning) {
+            manager.abandon()
         } else {
-            val workoutId = workout?.id ?: return
-            isFinishing = true
-            finishPending = true
-            viewModelScope.launch {
-                val finishedAt = System.currentTimeMillis()
-                val rawDurationMillis = finishedAt - sessionStartedAt
-                val durationMillis = (rawDurationMillis - excludedIdleMillis).coerceAtLeast(0L)
-                try {
-                    finishWorkoutSessionUseCase(
-                        workoutId = workoutId,
-                        startedAt = sessionStartedAt,
-                        finishedAt = finishedAt,
-                        durationMillis = durationMillis,
-                        sets = _recordedSets.toList()
-                    )
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    // Подходы остаются в памяти, экран — на последнем подходе:
-                    // повторное «Закончить подход» попробует записать ещё раз.
-                    Log.e(TAG, "Не удалось записать завершённую тренировку", e)
-                    isFinishing = false
-                    _finishError.value = true
-                    // Экран остался Active — заново взводим напоминание о простое.
-                    scheduleIdleReminderIfActive()
-                    return@launch
-                }
-                finishPending = false
-                // Экран должен показать Finished сразу после записи сессии, не дожидаясь
-                // перерисовки виджета: updateLastUseAt() внутри дёргает updateAll() (биндер,
-                // чтение DataStore, композиция Glance), и если поставить его раньше присваивания
-                // состояния, пользователь увидит финальный экран только после этой перерисовки.
-                // Порядок «сессия раньше updateLastUseAt()» при этом сохраняется: пуш обновления
-                // виджета подвешен на updateLastUseAt(), а виджет берёт длительность из последней
-                // сессии, так что сессия по-прежнему должна быть записана первой.
-                _uiState.value = WorkoutExecutionState.Finished(durationMillis = durationMillis)
-                // Тренировка записана — виджет снова может начать новую.
-                activeWorkoutTracker.stop(this@WorkoutExecutionViewModel)
-                workoutRepository.updateLastUseAt(workoutId)
-                scheduleIdleReminderIfActive()
-            }
+            manager.close(id)
         }
-    }
-
-    fun moveToSelectedExercise(exercise: Exercise) {
-        val index = exercises.indexOfFirst { it.id == exercise.id }
-
-        if (index != -1) {
-            registerInteraction()
-            // Ушли с последнего подхода — следующий закрытый подход записывается заново.
-            finishPending = false
-            timerJob?.cancel()
-            wakeLockHelper.release()
-            stopNotification()
-            exerciseIndex = index
-            val nextExercise = exercises[exerciseIndex]
-
-            _uiState.value = WorkoutExecutionState.Active(
-                exercise = nextExercise,
-                currentSet = 1,
-                totalSets = nextExercise.sets
-            )
-            scheduleIdleReminderIfActive()
-        }
-    }
-
-    fun updateExerciseNote(exerciseId: Int, note: String) {
-        registerInteraction()
-        viewModelScope.launch {
-            workoutRepository.updateExerciseNote(exerciseId, note)
-            
-            // Обновляем локальный список упражнений
-            val exerciseIndex = exercises.indexOfFirst { it.id == exerciseId }
-            if (exerciseIndex != -1) {
-                val updatedExercise = exercises[exerciseIndex].copy(note = note)
-                exercises = exercises.toMutableList().apply {
-                    set(exerciseIndex, updatedExercise)
-                }
-                
-                // Обновляем текущее состояние, если это текущее упражнение
-                val currentState = _uiState.value
-                when (currentState) {
-                    is WorkoutExecutionState.Active -> {
-                        if (currentState.exercise.id == exerciseId) {
-                            _uiState.value = currentState.copy(
-                                exercise = updatedExercise
-                            )
-                        }
-                    }
-                    is WorkoutExecutionState.Rest -> {
-                        if (currentState.exercise.id == exerciseId) {
-                            _uiState.value = currentState.copy(
-                                exercise = updatedExercise
-                            )
-                        }
-                    }
-                    else -> {}
-                }
-            }
-        }
-    }
-
-    fun updateExerciseWeightAndReps(exerciseId: Int, weight: Double, extraWeight: Double, reps: Int) {
-        registerInteraction()
-        val index = exercises.indexOfFirst { it.id == exerciseId }
-        if (index == -1) return
-        val updatedExercise = exercises[index].copy(weight = weight, extraWeight = extraWeight, reps = reps)
-        exercises = exercises.toMutableList().apply { set(index, updatedExercise) }
-
-        // Сначала экран, потом база: «Закончить подход» сразу после правки
-        // должен записать новые значения, а не ждать окончания записи.
-        // Плитки в Active берут числа из state.weight/extraWeight/reps, а не из
-        // state.exercise, поэтому одного обновления упражнения им мало.
-        _uiState.update { state ->
-            when {
-                state is WorkoutExecutionState.Active && state.exercise.id == exerciseId ->
-                    state.copy(exercise = updatedExercise, weight = weight, extraWeight = extraWeight, reps = reps)
-
-                state is WorkoutExecutionState.Rest && state.exercise.id == exerciseId ->
-                    state.copy(exercise = updatedExercise)
-
-                else -> state
-            }
-        }
-        viewModelScope.launch {
-            workoutRepository.updateExerciseWeightAndReps(exerciseId, weight, extraWeight, reps)
-        }
-    }
-
-    internal fun registerInteraction(now: Long = System.currentTimeMillis()) {
-        if (lastInteractionAt != 0L) {
-            val gap = now - lastInteractionAt
-            if (gap > IDLE_EXCLUSION_THRESHOLD_MILLIS) {
-                excludedIdleMillis += gap - IDLE_EXCLUSION_THRESHOLD_MILLIS
-            }
-        }
-        lastInteractionAt = now
-    }
-
-    private fun scheduleIdleReminderIfActive() {
-        idleReminderJob?.cancel()
-        if (_uiState.value is WorkoutExecutionState.Active) {
-            idleReminderJob = viewModelScope.launch {
-                delay(IDLE_REMINDER_DELAY_MILLIS)
-                showIdleReminderNotification()
-            }
-        }
-    }
-
-    private fun showIdleReminderNotification() {
-        val state = _uiState.value as? WorkoutExecutionState.Active ?: return
-        val intent = Intent(context, TimerNotificationService::class.java).apply {
-            action = TimerNotificationService.ACTION_SHOW_IDLE_REMINDER
-            putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, state.exercise.name)
-            putExtra(TimerNotificationService.EXTRA_CURRENT_SET, state.currentSet)
-            putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, state.totalSets)
-        }
-        try {
-            context.startService(intent)
-        } catch (e: IllegalStateException) {
-            // Best-effort, not correctness-critical: the app may be fully backgrounded with no
-            // foreground service running (the exact scenario this reminder exists for), in which
-            // case Android disallows starting a service (API 26+) and throws IllegalStateException
-            // (or its API 31+ subclass ForegroundServiceStartNotAllowedException). Swallow it.
-        }
-    }
-
-    companion object {
-        private const val TAG = "WorkoutExecutionVM"
-        internal const val IDLE_EXCLUSION_THRESHOLD_MILLIS = 10 * 60 * 1000L
-        internal const val IDLE_REMINDER_DELAY_MILLIS = 5 * 60 * 1000L
     }
 }
 
+/** Всё, что экрану выполнения нужно помимо фазы. */
+data class ExecutionChrome(
+    val workoutName: String = "",
+    val exercises: List<SessionExercise> = emptyList(),
+    val exerciseIndex: Int = 0,
+    val isFinishing: Boolean = false
+) {
+    val currentExerciseNumber: Int get() = exerciseIndex + 1
+    val totalExercises: Int get() = exercises.size
+}
+
+private fun WorkoutSession.Present.toChrome() = ExecutionChrome(
+    workoutName = workoutName,
+    exercises = exercises,
+    exerciseIndex = exerciseIndex,
+    isFinishing = isFinishing
+)

@@ -75,21 +75,25 @@ fun WorkoutExecutionScreen(
     workoutId: Int
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val chrome by viewModel.chrome.collectAsState()
 
-    var showNoteDialog by remember { mutableStateOf(false) }
-    var currentEditingExercise by remember { mutableStateOf<Exercise?>(null) }
+    // Диалог заметки и шторка веса запоминают позицию упражнения в сессии, а не сам
+    // Exercise: значения полей берутся из текущего снимка. Открываются они только для
+    // текущего упражнения (в Rest — упражнения следующего подхода).
+    var noteIndex by remember { mutableStateOf<Int?>(null) }
+    var weightSheetIndex by remember { mutableStateOf<Int?>(null) }
     var showExitDialog by remember { mutableStateOf(false) }
     var showFinishDialog by remember { mutableStateOf(false) }
     var showExercisePicker by remember { mutableStateOf(false) }
-    var weightSheetExercise by remember { mutableStateOf<Exercise?>(null) }
 
     // Уходить без подтверждения нечего терять только в Loading/Error/Finished:
     // в Finished сессия уже сохранена, в остальных двух её ещё нет.
     val hasUnsavedProgress =
         uiState is WorkoutExecutionState.Active || uiState is WorkoutExecutionState.Rest
 
+    // start() идемпотентен: при пересоздании активности идущая сессия не сбрасывается.
     LaunchedEffect(workoutId) {
-        viewModel.loadWorkout(workoutId)
+        viewModel.start(workoutId)
     }
 
     BackHandler(enabled = hasUnsavedProgress) { showExitDialog = true }
@@ -107,7 +111,7 @@ fun WorkoutExecutionScreen(
     val finishedState = uiState as? WorkoutExecutionState.Finished
     if (finishedState != null) {
         FinishedContent(
-            workoutName = viewModel.workoutName,
+            workoutName = chrome.workoutName,
             durationMillis = finishedState.durationMillis,
             onDone = onExerciseCompleted
         )
@@ -149,13 +153,13 @@ fun WorkoutExecutionScreen(
                     if (currentExercise != null) {
                         ExerciseChip(
                             name = currentExercise.name,
-                            position = viewModel.currentExerciseNumber,
-                            total = viewModel.totalExercises,
+                            position = chrome.currentExerciseNumber,
+                            total = chrome.totalExercises,
                             onClick = { showExercisePicker = true }
                         )
                     } else {
                         Text(
-                            text = viewModel.workoutName.ifEmpty { stringResource(R.string.execution_workout_fallback) },
+                            text = chrome.workoutName.ifEmpty { stringResource(R.string.execution_workout_fallback) },
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -164,10 +168,10 @@ fun WorkoutExecutionScreen(
                 Box(modifier = Modifier.size(48.dp))
             }
 
-            if (currentExercise != null && viewModel.totalExercises > 0) {
+            if (currentExercise != null && chrome.totalExercises > 0) {
                 ProgressSegments(
-                    total = viewModel.totalExercises,
-                    currentIndex = viewModel.currentExerciseNumber - 1,
+                    total = chrome.totalExercises,
+                    currentIndex = chrome.exerciseIndex,
                     modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 8.dp)
                 )
             }
@@ -181,25 +185,19 @@ fun WorkoutExecutionScreen(
                         title = stringResource(R.string.execution_load_error_title),
                         subtitle = stringResource(R.string.execution_load_error_subtitle),
                         actionText = stringResource(R.string.execution_retry),
-                        onAction = { viewModel.loadWorkout(workoutId) }
+                        onAction = { viewModel.start(workoutId) }
                     )
 
                     is WorkoutExecutionState.Active -> ActiveContent(
                         state = currentState,
-                        onEditNote = {
-                            currentEditingExercise = it
-                            showNoteDialog = true
-                        },
-                        onEditWeightAndReps = { weightSheetExercise = it }
+                        onEditNote = { noteIndex = chrome.exerciseIndex },
+                        onEditWeightAndReps = { weightSheetIndex = chrome.exerciseIndex }
                     )
 
                     is WorkoutExecutionState.Rest -> RestContent(
                         state = currentState,
-                        onEditNote = {
-                            currentEditingExercise = it
-                            showNoteDialog = true
-                        },
-                        onEditWeightAndReps = { weightSheetExercise = it }
+                        onEditNote = { noteIndex = chrome.exerciseIndex },
+                        onEditWeightAndReps = { weightSheetIndex = chrome.exerciseIndex }
                     )
 
                     is WorkoutExecutionState.Finished -> Unit
@@ -255,14 +253,14 @@ fun WorkoutExecutionScreen(
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 8.dp)
             )
-            viewModel.exercises.forEachIndexed { index, exercise ->
-                val isCurrent = index + 1 == viewModel.currentExerciseNumber
-                val isDone = index + 1 < viewModel.currentExerciseNumber
+            chrome.exercises.forEachIndexed { index, row ->
+                val isCurrent = index == chrome.exerciseIndex
+                val isDone = index < chrome.exerciseIndex
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            viewModel.moveToSelectedExercise(exercise)
+                            viewModel.moveToExercise(index)
                             showExercisePicker = false
                         }
                         .padding(horizontal = ScreenPadding, vertical = 12.dp),
@@ -275,7 +273,7 @@ fun WorkoutExecutionScreen(
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        text = exercise.name,
+                        text = row.exercise.name,
                         style = MaterialTheme.typography.titleMedium,
                         color = when {
                             isCurrent -> MaterialTheme.colorScheme.primary
@@ -290,33 +288,35 @@ fun WorkoutExecutionScreen(
         }
     }
 
-    weightSheetExercise?.let { exercise ->
-        AppBottomSheet(onDismiss = { weightSheetExercise = null }) {
+    val weightSheetExercise = weightSheetIndex?.let { chrome.exercises.getOrNull(it)?.exercise }
+    if (weightSheetIndex != null && weightSheetExercise != null) {
+        val index = weightSheetIndex ?: 0
+        AppBottomSheet(onDismiss = { weightSheetIndex = null }) {
             WeightRepsSheetContent(
-                exerciseName = exercise.name,
-                unit = exercise.unit,
-                weight = exercise.weight,
-                extraWeight = exercise.extraWeight,
-                reps = exercise.reps,
+                exerciseName = weightSheetExercise.name,
+                unit = weightSheetExercise.unit,
+                weight = weightSheetExercise.weight,
+                extraWeight = weightSheetExercise.extraWeight,
+                reps = weightSheetExercise.reps,
                 onApply = { weight, extraWeight, reps ->
-                    viewModel.updateExerciseWeightAndReps(exercise.id, weight, extraWeight, reps)
-                    weightSheetExercise = null
+                    viewModel.updateExerciseWeightAndReps(index, weight, extraWeight, reps)
+                    weightSheetIndex = null
                 }
             )
         }
     }
 
-    currentEditingExercise?.let { exercise ->
-        if (showNoteDialog) {
-            NoteEditDialog(
-                exercise = exercise,
-                onDismiss = { showNoteDialog = false },
-                onSave = { note ->
-                    viewModel.updateExerciseNote(exercise.id, note)
-                    showNoteDialog = false
-                }
-            )
-        }
+    val noteExercise = noteIndex?.let { chrome.exercises.getOrNull(it)?.exercise }
+    if (noteIndex != null && noteExercise != null) {
+        val index = noteIndex ?: 0
+        NoteEditDialog(
+            exercise = noteExercise,
+            onDismiss = { noteIndex = null },
+            onSave = { note ->
+                viewModel.updateExerciseNote(index, note)
+                noteIndex = null
+            }
+        )
     }
 
     if (showExitDialog) {

@@ -14,7 +14,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import ru.hopes.workouttimer.presentation.navigation.NavGraph
-import ru.hopes.workouttimer.presentation.utils.ActiveWorkoutTracker
+import ru.hopes.workouttimer.presentation.session.WorkoutSessionManager
 import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
 
 
@@ -22,7 +22,7 @@ import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
 class MainActivity : ComponentActivity() {
 
     @Inject
-    lateinit var activeWorkoutTracker: ActiveWorkoutTracker
+    lateinit var sessionManager: WorkoutSessionManager
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         // Тренировка идёт — тап по виджету просто возвращает в неё: разбор диплинка
         // перестроил бы стек и сбросил экран выполнения вместе с таймером.
-        if (activeWorkoutTracker.isActive) return
+        if (sessionManager.isRunning) return
         setIntent(intent)
         newIntent.value = intent
     }
