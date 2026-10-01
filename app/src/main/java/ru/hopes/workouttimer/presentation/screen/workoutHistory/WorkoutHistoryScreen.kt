@@ -8,11 +8,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.History
@@ -55,7 +58,8 @@ import ru.hopes.workouttimer.presentation.utils.setFormat
 fun WorkoutHistoryScreen(
     viewModel: WorkoutHistoryViewModel = hiltViewModel(),
     workoutId: Int,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onExerciseClick: (Long) -> Unit
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -87,7 +91,7 @@ fun WorkoutHistoryScreen(
                 )
             }
 
-            HistoryContent(sessions = state.sessions, setsBySession = state.setsBySession)
+            HistoryContent(sessions = state.sessions, setsBySession = state.setsBySession, onExerciseClick = onExerciseClick)
         }
     }
 }
@@ -99,7 +103,8 @@ fun WorkoutHistoryScreen(
 @Composable
 internal fun HistoryContent(
     sessions: List<WorkoutSession>,
-    setsBySession: Map<Long, List<SessionExerciseSets>>?
+    setsBySession: Map<Long, List<SessionExerciseSets>>?,
+    onExerciseClick: (Long) -> Unit
 ) {
     if (sessions.isEmpty()) {
         EmptyState(
@@ -114,7 +119,12 @@ internal fun HistoryContent(
             verticalArrangement = Arrangement.spacedBy(CardSpacing)
         ) {
             items(sessions, key = { it.id }) { session ->
-                SessionCard(session, setsBySession?.get(session.id.toLong()).orEmpty(), loaded = setsBySession != null)
+                SessionCard(
+                    session,
+                    setsBySession?.get(session.id.toLong()).orEmpty(),
+                    loaded = setsBySession != null,
+                    onExerciseClick = onExerciseClick
+                )
             }
         }
     }
@@ -125,7 +135,12 @@ internal fun HistoryContent(
  * подходов не имеет, не разворачивается и честно это подписывает.
  */
 @Composable
-private fun SessionCard(session: WorkoutSession, exercises: List<SessionExerciseSets>, loaded: Boolean) {
+private fun SessionCard(
+    session: WorkoutSession,
+    exercises: List<SessionExerciseSets>,
+    loaded: Boolean,
+    onExerciseClick: (Long) -> Unit
+) {
     val hasSets = exercises.isNotEmpty()
     // rememberSaveable: развёрнутая карточка переживает прокрутку и поворот экрана.
     var expanded by rememberSaveable(session.id) { mutableStateOf(false) }
@@ -182,21 +197,37 @@ private fun SessionCard(session: WorkoutSession, exercises: List<SessionExercise
                 modifier = Modifier.padding(top = 4.dp)
             )
         } else if (expanded) {
-            Column(
-                modifier = Modifier.padding(top = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                // Строка упражнения поведёт на его прогресс с E3; пока не нажимается.
+            Column(modifier = Modifier.padding(top = 4.dp)) {
+                // Свой clickable внутри карточки забирает тап: карточка при этом не сворачивается.
                 exercises.forEach { group ->
-                    Text(
-                        text = stringResource(
-                            R.string.history_exercise_sets,
-                            group.exerciseName,
-                            formatSetList(group.sets, format)
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .clip(MaterialTheme.shapes.extraSmall)
+                            .clickable(
+                                role = Role.Button,
+                                onClickLabel = stringResource(R.string.history_open_progress)
+                            ) { onExerciseClick(group.catalogId) },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(
+                                R.string.history_exercise_sets,
+                                group.exerciseName,
+                                formatSetList(group.sets, format)
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
         }
@@ -235,7 +266,8 @@ private fun HistoryContentPopulatedPreview() {
                         )
                     )
                 )
-            )
+            ),
+            onExerciseClick = {}
         )
     }
 }
@@ -244,6 +276,6 @@ private fun HistoryContentPopulatedPreview() {
 @Composable
 private fun HistoryContentEmptyPreview() {
     WorkoutTimerTheme {
-        HistoryContent(sessions = emptyList(), setsBySession = emptyMap())
+        HistoryContent(sessions = emptyList(), setsBySession = emptyMap(), onExerciseClick = {})
     }
 }

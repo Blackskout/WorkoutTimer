@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.navigation.NamedNavArgument
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -17,6 +18,7 @@ import ru.hopes.workouttimer.presentation.screen.creation.CreateWorkoutScreen
 import ru.hopes.workouttimer.presentation.screen.exportImport.ExportImportScreen
 import ru.hopes.workouttimer.presentation.screen.workoutExecution.WorkoutExecutionScreen
 import ru.hopes.workouttimer.presentation.screen.exercises.ExerciseCatalogScreen
+import ru.hopes.workouttimer.presentation.screen.progress.ExerciseProgressScreen
 import ru.hopes.workouttimer.presentation.screen.workoutHistory.WorkoutHistoryScreen
 import ru.hopes.workouttimer.presentation.screen.workouts.ListWorkoutScreen
 
@@ -145,6 +147,9 @@ fun NavGraph(
                 workoutId = workoutId,
                 onNavigateBack = {
                     navController.popBackStack()
+                },
+                onExerciseClick = { catalogId ->
+                    navController.navigate(Screen.ExerciseProgress.createRoute(catalogId))
                 }
             )
         }
@@ -152,6 +157,22 @@ fun NavGraph(
         // Экран «Упражнения» — справочник
         composable(Screen.Exercises.route) {
             ExerciseCatalogScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onOpenProgress = { exercise ->
+                    navController.navigate(Screen.ExerciseProgress.createRoute(exercise.id))
+                }
+            )
+        }
+
+        // Экран прогресса упражнения — из «Упражнений» и из развёрнутой сессии истории
+        composable(
+            route = Screen.ExerciseProgress.route,
+            arguments = Screen.ExerciseProgress.arguments
+        ) { entry ->
+            ExerciseProgressScreen(
+                catalogId = Screen.ExerciseProgress.getCatalogId(entry.arguments),
                 onNavigateBack = {
                     navController.popBackStack()
                 }
@@ -204,5 +225,18 @@ internal sealed class Screen(val route: String) {
         fun getWorkoutId(arguments: Bundle?): Int {
             return arguments?.getInt("workout_id") ?: 0
         }
+    }
+
+    data object ExerciseProgress : Screen("exercise_progress/{catalogId}") {
+        private const val CATALOG_ID = "catalogId"
+
+        // Long, а не Int: id справочника — Long, и getLong по аргументу IntType вернул бы 0.
+        // Геттер, а не поле: JVM-тест маршрута не должен собирать аргументы навигации.
+        val arguments: List<NamedNavArgument>
+            get() = listOf(navArgument(CATALOG_ID) { type = NavType.LongType })
+
+        fun createRoute(catalogId: Long): String = "exercise_progress/$catalogId"
+
+        fun getCatalogId(arguments: Bundle?): Long = arguments?.getLong(CATALOG_ID) ?: 0L
     }
 }

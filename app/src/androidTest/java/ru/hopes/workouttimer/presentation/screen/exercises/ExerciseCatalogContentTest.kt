@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,12 +26,19 @@ class ExerciseCatalogContentTest {
 
     private val squat = CatalogExercise(1L, "Присед", ExerciseUnit.KG)
 
-    private fun showRows(vararg rows: CatalogSummary, onMenu: (CatalogExercise) -> Unit = {}) =
-        composeRule.setContent {
-            WorkoutTimerTheme {
-                CatalogContent(state = ExerciseCatalogState(rows = rows.toList(), isLoaded = true), onMenu = onMenu)
-            }
+    private fun showRows(
+        vararg rows: CatalogSummary,
+        onOpen: (CatalogExercise) -> Unit = {},
+        onMenu: (CatalogExercise) -> Unit = {}
+    ) = composeRule.setContent {
+        WorkoutTimerTheme {
+            CatalogContent(
+                state = ExerciseCatalogState(rows = rows.toList(), isLoaded = true),
+                onOpen = onOpen,
+                onMenu = onMenu
+            )
         }
+    }
 
     @Test
     fun строка_показывает_последний_лучший_подход_с_давностью() {
@@ -58,13 +66,25 @@ class ExerciseCatalogContentTest {
     }
 
     @Test
-    fun меню_строки_открывается_кнопкой() {
+    fun меню_строки_открывается_кнопкой_и_не_открывает_прогресс() {
         var menuFor: CatalogExercise? = null
-        showRows(CatalogSummary(squat, null, null), onMenu = { menuFor = it })
+        var opened: CatalogExercise? = null
+        showRows(CatalogSummary(squat, null, null), onOpen = { opened = it }, onMenu = { menuFor = it })
 
         composeRule.onNodeWithContentDescription("Действия с упражнением").performClick()
 
         assertEquals(squat, menuFor)
+        assertNull(opened)
+    }
+
+    @Test
+    fun тап_по_строке_открывает_прогресс_упражнения() {
+        var opened: CatalogExercise? = null
+        showRows(CatalogSummary(squat, null, null), onOpen = { opened = it })
+
+        composeRule.onNodeWithText("Присед").performClick()
+
+        assertEquals(squat, opened)
     }
 
     @Test
