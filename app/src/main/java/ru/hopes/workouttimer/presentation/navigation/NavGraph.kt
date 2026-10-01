@@ -57,7 +57,9 @@ private const val BAR_ANIMATION_MILLIS = 180
 @Composable
 fun NavGraph(
     newIntent: Intent? = null,
-    onIntentHandled: () -> Unit = {}
+    onIntentHandled: () -> Unit = {},
+    returnToSessionRequested: Boolean = false,
+    onReturnHandled: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     // Область — активность: плашка одна на все экраны.
@@ -76,16 +78,25 @@ fun NavGraph(
         miniBar.prepareReturn()?.let { navController.returnToSession(it) }
     }
 
-    // Виджет шлёт интент только с FLAG_ACTIVITY_NEW_TASK. Холодный старт разбирает стартовый
-    // интент в setGraph() (см. NavHost ниже). Если задача жива, интент приходит сюда через
-    // MainActivity.onNewIntent — только когда тренировка не идёт (иначе MainActivity его
-    // отбрасывает). handleDeepLink() с NEW_TASK без CLEAR_TASK сам перезапускает задачу со
-    // стеком «список → выполнение». Стартовый интент сюда не попадает — NavController уже
-    // обработал его сам, а публичный handleDeepLink() флагом deepLinkHandled не защищён.
+    // Виджет шлёт интент только с FLAG_ACTIVITY_NEW_TASK. Холодный старт без идущей сессии
+    // разбирает стартовый интент в setGraph() (см. NavHost ниже). Если задача жива и сессии
+    // нет, интент приходит сюда через MainActivity.onNewIntent: handleDeepLink() с NEW_TASK
+    // без CLEAR_TASK сам перезапускает задачу со стеком «список → выполнение». При идущей
+    // сессии MainActivity диплинк не отдаёт, а просит вернуться в тренировку (ниже).
+    // Стартовый интент сюда не попадает — NavController уже обработал его сам, а публичный
+    // handleDeepLink() флагом deepLinkHandled не защищён.
     LaunchedEffect(newIntent) {
         if (newIntent != null) {
             navController.handleDeepLink(newIntent)
             onIntentHandled()
+        }
+    }
+
+    // Виджет или уведомление при идущей сессии — тот же возврат, что тап по плашке.
+    LaunchedEffect(returnToSessionRequested) {
+        if (returnToSessionRequested) {
+            returnToSession()
+            onReturnHandled()
         }
     }
 

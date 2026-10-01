@@ -147,9 +147,10 @@ private fun WorkoutRow(workout: WidgetWorkout) {
 /**
  * Только NEW_TASK, без CLEAR_TASK: CLEAR_TASK сносил задачу до того, как приложение успевало
  * что-то решить, и идущая тренировка терялась. Теперь живая задача просто выходит вперёд и
- * получает интент в MainActivity.onNewIntent (singleTop), а та его игнорирует, если тренировка
- * идёт. На холодном старте NavController сам видит NEW_TASK без CLEAR_TASK, перезапускает
- * задачу с синтетическим стеком «список → выполнение», и «Назад» ведёт к списку, как раньше.
+ * получает интент в MainActivity.onNewIntent (singleTop): если тренировка идёт (в том числе
+ * свёрнутая), MainActivity возвращает в неё, какую бы тренировку ни показывал виджет. На холодном
+ * старте без сессии NavController сам видит NEW_TASK без CLEAR_TASK, перезапускает задачу с
+ * синтетическим стеком «список → выполнение», и «Назад» ведёт к списку, как раньше.
  */
 private fun startWorkoutIntent(context: Context, workoutId: Int): Intent =
     Intent(

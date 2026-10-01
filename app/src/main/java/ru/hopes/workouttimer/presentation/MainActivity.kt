@@ -32,9 +32,25 @@ class MainActivity : ComponentActivity() {
 
     private val newIntent = mutableStateOf<Intent?>(null)
 
+    // Просьба открыть идущую тренировку; NavGraph гасит её после перехода.
+    private val returnToSession = mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+
+        // Процесс жив, сессия идёт, а активность создана заново: тренировку свернули и
+        // закрыли приложение «Назад» со списка, потом тапнули виджет или уведомление.
+        // NavController сам разобрал бы диплинк стартового интента и открыл выполнение
+        // другой тренировки — поэтому данные снимаются, а вместо них — возврат в идущую.
+        // При восстановлении (savedInstanceState != null) стек восстанавливается сам,
+        // диплинк повторно не разбирается, а возврат выдернул бы пользователя с его экрана.
+        if (savedInstanceState == null &&
+            resolveIntent(intent.action, intent.dataString, sessionManager.isRunning) == IntentRoute.ReturnToSession
+        ) {
+            intent = Intent(intent).setData(null)
+            returnToSession.value = true
+        }
 
         // Запрашиваем разрешение на уведомления (Android 13+)
         requestNotificationPermission()
@@ -43,7 +59,9 @@ class MainActivity : ComponentActivity() {
             WorkoutTimerTheme {
                 NavGraph(
                     newIntent = newIntent.value,
-                    onIntentHandled = { newIntent.value = null }
+                    onIntentHandled = { newIntent.value = null },
+                    returnToSessionRequested = returnToSession.value,
+                    onReturnHandled = { returnToSession.value = false }
                 )
             }
         }
@@ -51,11 +69,16 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // Тренировка идёт — тап по виджету просто возвращает в неё: разбор диплинка
-        // перестроил бы стек и сбросил экран выполнения вместе с таймером.
-        if (sessionManager.isRunning) return
-        setIntent(intent)
-        newIntent.value = intent
+        when (resolveIntent(intent.action, intent.dataString, sessionManager.isRunning)) {
+            IntentRoute.OpenDeepLink -> {
+                setIntent(intent)
+                newIntent.value = intent
+            }
+            // Диплинк не разбирается: handleDeepLink перестроил бы стек. Пользователь может
+            // стоять на любом экране — выполнение откроется поверх него.
+            IntentRoute.ReturnToSession -> returnToSession.value = true
+            IntentRoute.Ignore -> Unit
+        }
     }
 
     private fun requestNotificationPermission() {
@@ -68,5 +91,10 @@ class MainActivity : ComponentActivity() {
                 requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
+    }
+
+    companion object {
+        /** Тап по уведомлению таймера: вернуть в идущую тренировку, если она есть. */
+        const val ACTION_OPEN_ACTIVE_WORKOUT = "ru.hopes.workouttimer.action.OPEN_ACTIVE_WORKOUT"
     }
 }

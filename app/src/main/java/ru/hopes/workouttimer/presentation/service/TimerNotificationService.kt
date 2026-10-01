@@ -111,6 +111,8 @@ class TimerNotificationService : Service() {
         timeLeftMillis: Long
     ): android.app.Notification {
         val intent = Intent(this, MainActivity::class.java).apply {
+            // Свой action: при идущей сессии тап возвращает в неё с любого экрана.
+            action = MainActivity.ACTION_OPEN_ACTIVE_WORKOUT
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
@@ -145,6 +147,8 @@ class TimerNotificationService : Service() {
         totalSets: Int
     ): android.app.Notification {
         val intent = Intent(this, MainActivity::class.java).apply {
+            // Свой action: при идущей сессии тап возвращает в неё с любого экрана.
+            action = MainActivity.ACTION_OPEN_ACTIVE_WORKOUT
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
@@ -193,6 +197,8 @@ class TimerNotificationService : Service() {
         totalSets: Int
     ): android.app.Notification {
         val intent = Intent(this, MainActivity::class.java).apply {
+            // Свой action: при идущей сессии тап возвращает в неё с любого экрана.
+            action = MainActivity.ACTION_OPEN_ACTIVE_WORKOUT
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
