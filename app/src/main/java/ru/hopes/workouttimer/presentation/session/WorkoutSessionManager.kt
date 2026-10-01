@@ -8,6 +8,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,6 +53,15 @@ class WorkoutSessionManager @Inject constructor(
 
     private val _finishError = MutableStateFlow(false)
     val finishError: StateFlow<Boolean> = _finishError.asStateFlow()
+
+    private val _runningWorkout = MutableStateFlow<RunningWorkout?>(null)
+
+    /** Сводка без тиков: MutableStateFlow не публикует равное значение. */
+    val runningWorkout: StateFlow<RunningWorkout?> = _runningWorkout.asStateFlow()
+
+    /** Сессия идёт: Loading, Rest или Active. Error, Finished и None — не идёт. */
+    val isRunning: Boolean
+        get() = present?.phase?.isRunning == true
 
     // Дочерняя область текущей сессии: загрузка, таймер, напоминание, записи заметки и веса.
     // Запись завершённой сессии идёт в scope — её не обрывает уход с экрана Finished.
@@ -98,8 +108,17 @@ class WorkoutSessionManager @Inject constructor(
         _finishError.value = false
     }
 
-    /** Начинает сессию тренировки и возвращает её sessionId. */
+    /**
+     * Начинает сессию и возвращает её sessionId. Идущую сессию (любой тренировки) не трогает
+     * и возвращает её sessionId: экран выполнения зовёт start из LaunchedEffect, а тот
+     * перезапускается при пересоздании активности (тема, шрифт, язык).
+     */
     fun start(workoutId: Int): Long {
+        present?.let { current -> if (current.phase.isRunning) return current.sessionId }
+        resetSessionScope()
+        _recordedSets.clear()
+        finishPending = false
+        _finishError.value = false
         val sessionId = ++lastSessionId
         setSession(
             WorkoutSession.Present(
@@ -141,6 +160,41 @@ class WorkoutSessionManager @Inject constructor(
             }
         }
         return sessionId
+    }
+
+    /** Выход без сохранения: всё, что раньше делал уход с экрана, плюс сброс состояния. */
+    fun abandon() {
+        endSession()
+    }
+
+    /**
+     * Закрыть сессию [sessionId], если она не идёт: Loading, Error или Finished. Идущую
+     * (свёрнутую) тренировку и чужую, более новую сессию не трогает.
+     */
+    fun close(sessionId: Long) {
+        val current = present ?: return
+        if (current.sessionId != sessionId || current.phase.isInProgress) return
+        endSession()
+    }
+
+    // В БД ничего не пишется. Запись завершения идёт в scope и не отменяется: пользователь
+    // уже подтвердил завершение; её корутина сверит sessionId и состояние не тронет.
+    // Уже показанные «Отдых завершён» и «Вы всё ещё тренируетесь?» не снимаются — как раньше.
+    private fun endSession() {
+        resetSessionScope()
+        wakeLockHelper.release()
+        stopNotification()
+        soundPlayer.release()
+        _recordedSets.clear()
+        finishPending = false
+        setSession(WorkoutSession.None)
+        _finishError.value = false
+    }
+
+    /** Отменяет таймер, напоминание, загрузку и незаконченные записи заметки и веса. */
+    private fun resetSessionScope() {
+        sessionScope.cancel()
+        sessionScope = newSessionScope()
     }
 
     fun skipRest() {
@@ -475,6 +529,7 @@ class WorkoutSessionManager @Inject constructor(
 
     private fun setSession(value: WorkoutSession) {
         _session.value = value
+        _runningWorkout.value = runningWorkoutOf(value)
     }
 
     private inline fun updatePresent(transform: (WorkoutSession.Present) -> WorkoutSession.Present) {

@@ -28,3 +28,35 @@ sealed interface WorkoutSession {
         val isFinishing: Boolean = false
     ) : WorkoutSession
 }
+
+/** Сессия идёт: Loading, Rest или Active. Error и Finished — уже нет. */
+internal val WorkoutExecutionState.isRunning: Boolean
+    get() = this is WorkoutExecutionState.Loading || isInProgress
+
+/** Тренировка в процессе — её можно свернуть, и её нельзя закрыть мимоходом. */
+internal val WorkoutExecutionState.isInProgress: Boolean
+    get() = this is WorkoutExecutionState.Rest || this is WorkoutExecutionState.Active
+
+/**
+ * Сводка для списка, просмотра и плашки — без тиков таймера: меняется только при старте
+ * и конце сессии и при добавлении упражнения. Подписчики, которым тики не нужны, читают её,
+ * а не session (та во время отдыха меняется каждые 200 мс).
+ */
+data class RunningWorkout(
+    val workoutId: Int,
+    val workoutName: String,
+    val isLoading: Boolean,
+    /** exercise.id исходных строк, добавленных «+ в сегодняшнюю». */
+    val addedExerciseIds: Set<Int>
+)
+
+internal fun runningWorkoutOf(session: WorkoutSession): RunningWorkout? {
+    val present = session as? WorkoutSession.Present ?: return null
+    if (!present.phase.isRunning) return null
+    return RunningWorkout(
+        workoutId = present.workoutId,
+        workoutName = present.workoutName,
+        isLoading = present.phase is WorkoutExecutionState.Loading,
+        addedExerciseIds = present.exercises.filter { it.addedToday }.map { it.exercise.id }.toSet()
+    )
+}

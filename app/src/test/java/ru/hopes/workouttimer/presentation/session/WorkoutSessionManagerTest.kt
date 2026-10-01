@@ -8,6 +8,7 @@ import io.mockk.mockk
 import io.mockk.Runs
 import io.mockk.just
 import io.mockk.slot
+import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +22,9 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -267,21 +271,19 @@ class WorkoutSessionManagerTest {
     }
 
     @Test
-    fun `start resets excludedIdleMillis for a fresh session`() = runTest {
+    fun `start after abandon resets excludedIdleMillis for a fresh session`() = runTest {
         val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
         val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)
         val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
         coEvery { getWorkoutByIdUseCase(1) } returns workout
-        val workoutRepository = mockk<WorkoutRepository>(relaxed = true)
-        val finishWorkoutSessionUseCase = mockk<FinishWorkoutSessionUseCase>()
-
-        val manager = buildManager(getWorkoutByIdUseCase, workoutRepository, finishWorkoutSessionUseCase)
+        val manager = buildManager(getWorkoutByIdUseCase, mockk(relaxed = true), mockk())
         manager.start(1)
         manager.registerInteraction(now = 1L)
         manager.registerInteraction(now = 1L + 45 * 60 * 1000L)
         assertEquals(35 * 60 * 1000L, manager.excludedIdleMillis)
 
-        manager.start(1) // повторный start = новая сессия
+        manager.abandon()
+        manager.start(1) // новая сессия
 
         assertEquals(0L, manager.excludedIdleMillis)
     }
@@ -815,5 +817,247 @@ class WorkoutSessionManagerTest {
             RecordedSet(4L, "Тяга блока", 6.0, 2.0, 10, ExerciseUnit.PLATE),
             setsSlot.captured.single()
         )
+    }
+
+    // --- Жизненный цикл сессии (спека, «Тестирование» → новые тесты менеджера) ---
+
+    private fun twoSetWorkout(id: Int = 1, name: String = "Test") = Workout(
+        id = id, name = name, lastUseAt = 0L,
+        exercises = listOf(Exercise(id = id * 10, name = "Push", weight = 10.0, sets = 2, reps = 5, timeMillis = 60_000, order = 1))
+    )
+
+    private fun managerWith(vararg workouts: Workout, finish: FinishWorkoutSessionUseCase = mockk(relaxed = true)): WorkoutSessionManager {
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(any()) } returns null
+        workouts.forEach { w -> coEvery { getWorkout(w.id) } returns w }
+        return buildManager(getWorkout, mockk(relaxed = true), finish)
+    }
+
+    @Test
+    fun `a loaded workout is running`() = runTest {
+        val manager = managerWith(singleSetWorkout())
+        assertFalse(manager.isRunning)
+
+        manager.start(1)
+
+        assertTrue(manager.isRunning)
+    }
+
+    @Test
+    fun `a workout that failed to load is not running`() = runTest {
+        val manager = managerWith()
+
+        manager.start(1)
+
+        assertTrue(manager.phase is WorkoutExecutionState.Error)
+        assertFalse(manager.isRunning)
+    }
+
+    @Test
+    fun `finishing the workout stops it running`() = runTest {
+        val manager = managerWith(singleSetWorkout())
+        manager.start(1)
+
+        manager.onExerciseFinished()
+
+        assertTrue(manager.phase is WorkoutExecutionState.Finished)
+        assertFalse(manager.isRunning)
+    }
+
+    @Test
+    fun `resting and loading count as running`() = runTest {
+        val gate = CompletableDeferred<Workout?>()
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } coAnswers { gate.await() }
+        val manager = buildManager(getWorkout, mockk(relaxed = true), mockk(relaxed = true))
+
+        manager.start(1)
+        assertTrue(manager.phase is WorkoutExecutionState.Loading)
+        assertTrue(manager.isRunning)
+
+        gate.complete(twoSetWorkout())
+        manager.onExerciseFinished()
+        assertTrue(manager.phase is WorkoutExecutionState.Rest)
+        assertTrue(manager.isRunning)
+    }
+
+    @Test
+    fun `start of the same workout while running resets nothing`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        val id = manager.start(1)
+        manager.onExerciseFinished() // подход 1 → отдых
+        manager.registerInteraction(now = 1L)
+        manager.registerInteraction(now = 1L + 45 * 60 * 1000L)
+
+        val again = manager.start(1) // пересоздание активности: LaunchedEffect снова зовёт start
+
+        assertEquals(id, again)
+        assertEquals(1, manager.recordedSets.size)
+        assertTrue(manager.phase is WorkoutExecutionState.Rest)
+        assertEquals(35 * 60 * 1000L, manager.excludedIdleMillis)
+    }
+
+    @Test
+    fun `start of another workout while running is ignored`() = runTest {
+        val manager = managerWith(twoSetWorkout(1, "Ноги"), twoSetWorkout(2, "Спина"))
+        val id = manager.start(1)
+
+        val other = manager.start(2)
+
+        assertEquals(id, other)
+        val session = manager.session.value as WorkoutSession.Present
+        assertEquals(1, session.workoutId)
+        assertEquals("Ноги", session.workoutName)
+    }
+
+    @Test
+    fun `start from Finished or Error begins a new session`() = runTest {
+        val manager = managerWith(singleSetWorkout())
+        val first = manager.start(1)
+        manager.onExerciseFinished() // Finished
+
+        val second = manager.start(1)
+        assertNotEquals(first, second)
+        assertTrue(manager.phase is WorkoutExecutionState.Active)
+
+        val failing = managerWith()
+        val broken = failing.start(5) // Error
+        assertNotEquals(broken, failing.start(5))
+    }
+
+    @Test
+    fun `abandon releases everything, writes nothing and leaves no session`() = runTest {
+        val finish = mockk<FinishWorkoutSessionUseCase>(relaxed = true)
+        val manager = managerWith(twoSetWorkout(), finish = finish)
+        manager.start(1)
+        manager.onExerciseFinished() // отдых: таймер, wakelock, уведомление
+        assertTrue(manager.isRestTimerActive)
+
+        manager.abandon()
+
+        assertEquals(WorkoutSession.None, manager.session.value)
+        assertFalse(manager.isRestTimerActive)
+        assertFalse(manager.isIdleReminderJobActive)
+        assertTrue(manager.recordedSets.isEmpty())
+        assertFalse(manager.finishError.value)
+        verify { wakeLockHelper.release() }
+        verify { soundPlayer.release() }
+        coVerify(exactly = 0) { finish(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `close does nothing while the workout is in progress`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        val id = manager.start(1)
+
+        manager.close(id) // Active
+        assertTrue(manager.phase is WorkoutExecutionState.Active)
+
+        manager.onExerciseFinished()
+        manager.close(id) // Rest
+        assertTrue(manager.phase is WorkoutExecutionState.Rest)
+    }
+
+    @Test
+    fun `close ends a finished or failed session`() = runTest {
+        val manager = managerWith(singleSetWorkout())
+        val finishedId = manager.start(1)
+        manager.onExerciseFinished()
+        manager.close(finishedId)
+        assertEquals(WorkoutSession.None, manager.session.value)
+
+        val failing = managerWith()
+        val errorId = failing.start(5)
+        failing.close(errorId)
+        assertEquals(WorkoutSession.None, failing.session.value)
+    }
+
+    @Test
+    fun `close during loading cancels the load`() = runTest {
+        val gate = CompletableDeferred<Workout?>()
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } coAnswers { gate.await() }
+        val manager = buildManager(getWorkout, mockk(relaxed = true), mockk(relaxed = true))
+        val id = manager.start(1)
+
+        manager.close(id)
+        gate.complete(singleSetWorkout())
+
+        assertEquals(WorkoutSession.None, manager.session.value)
+    }
+
+    @Test
+    fun `close with a stale sessionId leaves the new session alone`() = runTest {
+        val manager = managerWith(singleSetWorkout())
+        val old = manager.start(1)
+        manager.onExerciseFinished() // Finished
+        val fresh = manager.start(1)
+
+        manager.close(old) // onCleared старой записи навигации приходит позже
+        assertEquals(fresh, (manager.session.value as WorkoutSession.Present).sessionId)
+
+        val failing = managerWith()
+        val staleError = failing.start(5)
+        val freshError = failing.start(5)
+        failing.close(staleError)
+        assertEquals(freshError, (failing.session.value as WorkoutSession.Present).sessionId)
+    }
+
+    @Test
+    fun `abandon during a slow note write cancels the write`() = runTest {
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } returns twoSetWorkout()
+        val repo = mockk<WorkoutRepository>(relaxed = true)
+        val gate = CompletableDeferred<Unit>()
+        coEvery { repo.updateExerciseNote(any(), any()) } coAnswers { gate.await() }
+        val manager = buildManager(getWorkout, repo, mockk(relaxed = true))
+        manager.start(1)
+        manager.updateExerciseNote(0, "колени наружу") // запись висит
+
+        manager.abandon()
+        manager.start(1)
+        gate.complete(Unit)
+
+        val session = manager.session.value as WorkoutSession.Present
+        assertEquals("", session.exercises[0].exercise.note)
+    }
+
+    @Test
+    fun `abandon while the finish is being written keeps the session closed`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val finish = mockk<FinishWorkoutSessionUseCase>()
+        coEvery { finish(any(), any(), any(), any(), any()) } coAnswers { gate.await() }
+        val repo = mockk<WorkoutRepository>(relaxed = true)
+        val getWorkout = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkout(1) } returns singleSetWorkout()
+        val manager = buildManager(getWorkout, repo, finish)
+        manager.start(1)
+        manager.onExerciseFinished() // запись висит, isFinishing
+
+        manager.abandon()
+        gate.complete(Unit)
+
+        assertEquals(WorkoutSession.None, manager.session.value)
+        assertFalse(manager.finishError.value)
+        coVerify(exactly = 1) { finish(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 1) { repo.updateLastUseAt(1) }
+    }
+
+    @Test
+    fun `running summary follows start and end but not rest ticks`() = runTest {
+        val manager = managerWith(twoSetWorkout(1, "Ноги"))
+        assertNull(manager.runningWorkout.value)
+
+        manager.start(1)
+        assertEquals(RunningWorkout(1, "Ноги", isLoading = false, addedExerciseIds = emptySet()), manager.runningWorkout.value)
+
+        manager.onExerciseFinished() // отдых, таймер тикает каждые 200 мс
+        val resting = manager.runningWorkout.value
+        testScheduler.advanceTimeBy(1_000)
+        assertTrue(manager.phase is WorkoutExecutionState.Rest)
+        assertSame(resting, manager.runningWorkout.value)
+
+        manager.abandon()
+        assertNull(manager.runningWorkout.value)
     }
 }
