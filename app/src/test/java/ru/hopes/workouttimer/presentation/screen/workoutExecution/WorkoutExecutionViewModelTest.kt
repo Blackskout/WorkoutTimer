@@ -95,6 +95,30 @@ class WorkoutExecutionViewModelTest {
     }
 
     @Test
+    fun `start on a finished session this screen owns does not start again`() {
+        every { manager.start(1) } returns 7L
+        val vm = viewModel()
+        vm.start(1)
+        session.value = present(7L, WorkoutExecutionState.Finished(1_000L))
+
+        vm.start(1) // пересоздание активности на «ГОТОВО»
+
+        verify(exactly = 1) { manager.start(1) }
+    }
+
+    @Test
+    fun `retry starts a new load even for an owned session`() {
+        every { manager.start(1) } returnsMany listOf(7L, 8L)
+        val vm = viewModel()
+        vm.start(1)
+        session.value = present(7L, WorkoutExecutionState.Error)
+
+        vm.retry(1)
+
+        verify(exactly = 2) { manager.start(1) }
+    }
+
+    @Test
     fun `exit without saving abandons the session`() {
         viewModel().abandon()
 
@@ -106,7 +130,7 @@ class WorkoutExecutionViewModelTest {
         every { manager.start(1) } returnsMany listOf(7L, 8L)
         val vm = viewModel()
         vm.start(1)
-        vm.start(1) // «Повторить»
+        vm.retry(1) // «Повторить»
         session.value = present(8L, WorkoutExecutionState.Error)
 
         store.clear()

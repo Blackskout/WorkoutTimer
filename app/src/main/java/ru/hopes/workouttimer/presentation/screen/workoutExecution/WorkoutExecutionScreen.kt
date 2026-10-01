@@ -221,7 +221,7 @@ fun WorkoutExecutionScreen(
                         title = stringResource(R.string.execution_load_error_title),
                         subtitle = stringResource(R.string.execution_load_error_subtitle),
                         actionText = stringResource(R.string.execution_retry),
-                        onAction = { viewModel.start(workoutId) }
+                        onAction = { viewModel.retry(workoutId) }
                     )
 
                     is WorkoutExecutionState.Active -> ActiveContent(

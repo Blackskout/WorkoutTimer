@@ -54,8 +54,19 @@ class WorkoutExecutionViewModel @Inject constructor(
     val isLastSetOfWorkout: Boolean
         get() = manager.isLastSetOfWorkout
 
-    /** «Повторить» после ошибки тоже идёт сюда — владение переходит к новой сессии. */
+    /**
+     * Идемпотентен для своей сессии в любой фазе: пересоздание активности на «ГОТОВО» не должно
+     * запускать ту же тренировку заново. Возврат из свёрнутой идущей тренировки идёт через
+     * менеджер, который отдаёт её sessionId.
+     */
     fun start(workoutId: Int) {
+        val current = (manager.session.value as? WorkoutSession.Present)?.sessionId
+        if (current != null && current == ownedSessionId) return
+        ownedSessionId = manager.start(workoutId)
+    }
+
+    /** «Повторить» после ошибки: всегда новая загрузка, владение переходит к новой сессии. */
+    fun retry(workoutId: Int) {
         ownedSessionId = manager.start(workoutId)
     }
 
