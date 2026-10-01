@@ -11,7 +11,7 @@ import ru.hopes.workouttimer.presentation.ui.theme.TextPrimary
 import ru.hopes.workouttimer.presentation.ui.theme.TextSecondary
 
 // Переопределены только роли, которые сейчас реально читает разметка виджета
-// (QuickStartWidget.kt: widgetBackground, onSurface, onSurfaceVariant) — остальные
+// (QuickStartWidget.kt: widgetBackground, primary, onSurface, onSurfaceVariant) — остальные
 // остаются на дефолтах Material3. `widgetBackground` не берётся из surface/background:
 // glance-material3 вычисляет его из secondaryContainer (см. Material3Themes.kt,
 // adjustColorToneForWidgetBackground), поэтому secondaryContainer задан явно. Если в

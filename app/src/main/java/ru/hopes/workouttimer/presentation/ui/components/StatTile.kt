@@ -4,9 +4,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,13 +34,34 @@ fun StatTile(
     onClick: (() -> Unit)? = null
 ) {
     val shape = MaterialTheme.shapes.medium
-    Column(
+    Box(
         modifier = modifier
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-            .padding(vertical = 16.dp, horizontal = 12.dp),
+    ) {
+        StatTileContent(value, unit, Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 12.dp))
+        // Плитку можно нажать — карандаш, как у заметки, иначе об этом не догадаться.
+        // Описание не нужно: плитка целиком и есть кнопка, её читает значение.
+        if (onClick != null) {
+            Icon(
+                Icons.Default.Edit,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(10.dp)
+                    .size(14.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatTileContent(value: String, unit: String, modifier: Modifier) {
+    Column(
+        modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(

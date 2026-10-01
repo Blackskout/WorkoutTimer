@@ -30,6 +30,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -263,12 +264,14 @@ fun WorkoutExecutionScreen(
             if (currentState is WorkoutExecutionState.Active ||
                 currentState is WorkoutExecutionState.Rest
             ) {
+                // 24 dp, а не плотные 10: строка музыки по тапу сразу открывает плеер, и большой
+                // палец, метящий в главную кнопку, не должен в неё попадать.
                 MusicSection(
                     isResting = currentState is WorkoutExecutionState.Rest,
                     modifier = Modifier.padding(
                         start = ScreenPadding,
                         end = ScreenPadding,
-                        bottom = 10.dp
+                        bottom = 24.dp
                     )
                 )
                 // Когда кнопка сменила смысл: подход ↔ отдых. Ключ — вид фазы, а не сама фаза:
@@ -472,13 +475,17 @@ fun WorkoutExecutionScreen(
             title = { Text(stringResource(R.string.execution_exit_title)) },
             text = { Text(stringResource(R.string.execution_exit_message)) },
             confirmButton = {
-                TextButton(onClick = {
-                    showExitDialog = false
-                    // Сначала уходим, потом сбрасываем: уходящий экран держит последний кадр
-                    // (ViewModel не отдаёт None), и onCleared застанет уже None — close() пустой.
-                    onMinimize()
-                    viewModel.abandon()
-                }) { Text(stringResource(R.string.common_exit)) }
+                TextButton(
+                    onClick = {
+                        showExitDialog = false
+                        // Сначала уходим, потом сбрасываем: уходящий экран держит последний кадр
+                        // (ViewModel не отдаёт None), и onCleared застанет уже None — close() пустой.
+                        onMinimize()
+                        viewModel.abandon()
+                    },
+                    // Выход теряет несохранённое — кнопка в цвете ошибки, «Отмена» нейтральна.
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text(stringResource(R.string.common_exit)) }
             },
             dismissButton = {
                 TextButton(onClick = { showExitDialog = false }) { Text(stringResource(R.string.common_cancel)) }
@@ -516,7 +523,7 @@ private fun ExerciseChip(
         modifier = Modifier
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically

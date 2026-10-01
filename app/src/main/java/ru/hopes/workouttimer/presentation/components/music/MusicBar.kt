@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
@@ -77,7 +76,7 @@ fun MusicBarContent(
             text = stringResource(R.string.music_grant_access),
             onClick = onGrantPermission,
             modifier = modifier,
-            icon = { Icon(Icons.Default.NotificationsActive, contentDescription = null) }
+            icon = { Icon(Icons.Default.MusicNote, contentDescription = null) }
         )
 
         MusicState.NoSession -> HintRow(

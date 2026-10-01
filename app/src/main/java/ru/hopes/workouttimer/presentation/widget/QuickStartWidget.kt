@@ -83,7 +83,8 @@ private fun WidgetContent(workouts: List<WidgetWorkout>) {
         Text(
             text = context.getString(R.string.app_name),
             style = TextStyle(
-                color = GlanceTheme.colors.onSurface,
+                // Фирменный салатовый — как акцент приложения.
+                color = GlanceTheme.colors.primary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             ),
@@ -105,9 +106,11 @@ private fun WidgetContent(workouts: List<WidgetWorkout>) {
                     .clickable(actionStartActivity<MainActivity>())
             )
         } else {
+            // Первая в очереди — «Следующая», как салатовая карточка в приложении.
+            val nextId = workouts.first().id
             LazyColumn {
                 items(workouts, itemId = { it.id.toLong() }) { workout ->
-                    WorkoutRow(workout)
+                    WorkoutRow(workout, isNext = workout.id == nextId)
                 }
             }
         }
@@ -115,7 +118,7 @@ private fun WidgetContent(workouts: List<WidgetWorkout>) {
 }
 
 @Composable
-private fun WorkoutRow(workout: WidgetWorkout) {
+private fun WorkoutRow(workout: WidgetWorkout, isNext: Boolean) {
     val context = LocalContext.current
     Column(
         modifier = GlanceModifier
@@ -127,7 +130,7 @@ private fun WorkoutRow(workout: WidgetWorkout) {
             text = workout.name,
             maxLines = 1,
             style = TextStyle(
-                color = GlanceTheme.colors.onSurface,
+                color = if (isNext) GlanceTheme.colors.primary else GlanceTheme.colors.onSurface,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium
             )
