@@ -31,6 +31,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -96,7 +99,7 @@ fun WorkoutHistoryScreen(
 @Composable
 internal fun HistoryContent(
     sessions: List<WorkoutSession>,
-    setsBySession: Map<Long, List<SessionExerciseSets>>
+    setsBySession: Map<Long, List<SessionExerciseSets>>?
 ) {
     if (sessions.isEmpty()) {
         EmptyState(
@@ -111,7 +114,7 @@ internal fun HistoryContent(
             verticalArrangement = Arrangement.spacedBy(CardSpacing)
         ) {
             items(sessions, key = { it.id }) { session ->
-                SessionCard(session, setsBySession[session.id.toLong()].orEmpty())
+                SessionCard(session, setsBySession?.get(session.id.toLong()).orEmpty(), loaded = setsBySession != null)
             }
         }
     }
@@ -122,20 +125,32 @@ internal fun HistoryContent(
  * подходов не имеет, не разворачивается и честно это подписывает.
  */
 @Composable
-private fun SessionCard(session: WorkoutSession, exercises: List<SessionExerciseSets>) {
+private fun SessionCard(session: WorkoutSession, exercises: List<SessionExerciseSets>, loaded: Boolean) {
     val hasSets = exercises.isNotEmpty()
     // rememberSaveable: развёрнутая карточка переживает прокрутку и поворот экрана.
     var expanded by rememberSaveable(session.id) { mutableStateOf(false) }
     val format = setFormat()
+    val stateText = stringResource(if (expanded) R.string.history_state_expanded else R.string.history_state_collapsed)
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surface)
-            .clickable(
-                enabled = hasSets,
-                onClickLabel = stringResource(if (expanded) R.string.history_collapse else R.string.history_expand)
-            ) { expanded = !expanded }
+            .then(
+                if (hasSets) {
+                    // Нажимаемость только у раскрываемых карточек: у остальных нет ложного клика для TalkBack.
+                    Modifier
+                        .semantics { stateDescription = stateText }
+                        .clickable(
+                            role = Role.Button,
+                            onClickLabel = stringResource(
+                                if (expanded) R.string.history_collapse else R.string.history_expand
+                            )
+                        ) { expanded = !expanded }
+                } else {
+                    Modifier
+                }
+            )
             .padding(14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -160,7 +175,7 @@ private fun SessionCard(session: WorkoutSession, exercises: List<SessionExercise
             }
         }
         if (!hasSets) {
-            Text(
+            if (loaded) Text(
                 text = stringResource(R.string.history_no_sets),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

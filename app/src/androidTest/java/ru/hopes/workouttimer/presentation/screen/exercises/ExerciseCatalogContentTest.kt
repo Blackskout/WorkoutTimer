@@ -41,6 +41,16 @@ class ExerciseCatalogContentTest {
     }
 
     @Test
+    fun лучший_подход_без_веса_подписан_повторениями() {
+        val pullUps = CatalogExercise(2L, "Подтягивания", ExerciseUnit.BODYWEIGHT)
+        showRows(
+            CatalogSummary(pullUps, SessionSet(1L, 1L, 2L, 0.0, 0.0, 8, ExerciseUnit.BODYWEIGHT), System.currentTimeMillis())
+        )
+
+        composeRule.onNodeWithText("8 повт. · сегодня").assertIsDisplayed()
+    }
+
+    @Test
     fun упражнение_без_подходов_подписано_ещё_не_делали() {
         showRows(CatalogSummary(squat, null, null))
 

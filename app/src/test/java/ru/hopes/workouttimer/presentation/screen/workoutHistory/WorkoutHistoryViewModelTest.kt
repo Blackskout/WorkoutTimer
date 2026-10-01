@@ -83,4 +83,19 @@ class WorkoutHistoryViewModelTest {
 
         assertEquals(sets, viewModel.state.value.setsBySession)
     }
+
+    @Test
+    fun `setsBySession is null until the sets flow emits`() = runTest {
+        val getWorkoutByIdUseCase = mockk<GetWorkoutByIdUseCase>()
+        coEvery { getWorkoutByIdUseCase(3) } returns null
+        val getWorkoutSessionsUseCase = mockk<GetWorkoutSessionsUseCase>()
+        every { getWorkoutSessionsUseCase(3) } returns flowOf(emptyList())
+        val getSets = mockk<GetWorkoutSessionSetsUseCase>()
+        every { getSets(3) } returns kotlinx.coroutines.flow.emptyFlow()
+
+        val viewModel = WorkoutHistoryViewModel(getWorkoutSessionsUseCase, getWorkoutByIdUseCase, getSets)
+        viewModel.loadHistory(3)
+
+        assertEquals(null, viewModel.state.value.setsBySession)
+    }
 }

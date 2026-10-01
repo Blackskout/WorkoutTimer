@@ -37,6 +37,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -260,7 +261,13 @@ private fun lastSetLine(summary: CatalogSummary, format: SetFormat): String {
     val best = summary.lastBest
     val doneAt = summary.lastDoneAt
     if (best == null || doneAt == null) return stringResource(R.string.common_never_done)
-    return stringResource(R.string.catalog_last_set, formatSet(best, format), daysAgoText(doneAt))
+    // Без веса голое «8» неясно, что это: подписываем повторения (история держит формат спеки).
+    val setText = if (best.unit == ExerciseUnit.BODYWEIGHT) {
+        stringResource(R.string.catalog_last_reps, best.reps)
+    } else {
+        formatSet(best, format)
+    }
+    return stringResource(R.string.catalog_last_set, setText, daysAgoText(doneAt))
 }
 
 /**
@@ -275,7 +282,8 @@ internal fun RenameDialog(
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var text by remember(initialName) { mutableStateOf(initialName) }
+    // rememberSaveable: набранное название переживает поворот экрана.
+    var text by rememberSaveable(initialName) { mutableStateOf(initialName) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.catalog_rename_title)) },

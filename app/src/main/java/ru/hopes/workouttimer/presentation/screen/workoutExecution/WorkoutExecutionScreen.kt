@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -492,9 +493,11 @@ private fun RestContent(
         val load = formatLoad(state.exercise.unit, state.exercise.weight, state.exercise.extraWeight, setFormat())
         Text(
             text = if (load != null) {
-                stringResource(R.string.execution_rest_weight_reps, load, state.exercise.reps)
+                pluralStringResource(
+                    R.plurals.execution_rest_weight_reps, state.exercise.reps, load, state.exercise.reps
+                )
             } else {
-                stringResource(R.string.execution_rest_reps, state.exercise.reps)
+                pluralStringResource(R.plurals.execution_rest_reps, state.exercise.reps, state.exercise.reps)
             },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

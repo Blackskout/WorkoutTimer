@@ -1,7 +1,11 @@
 package ru.hopes.workouttimer.presentation.screen.workoutHistory
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -30,7 +34,7 @@ class HistoryContentTest {
     private fun set(id: Long, weight: Double, reps: Int) =
         SessionSet(id, 1L, 7L, weight, 0.0, reps, ExerciseUnit.KG)
 
-    private fun show(setsBySession: Map<Long, List<SessionExerciseSets>>) = composeRule.setContent {
+    private fun show(setsBySession: Map<Long, List<SessionExerciseSets>>?) = composeRule.setContent {
         WorkoutTimerTheme { HistoryContent(sessions = listOf(session), setsBySession = setsBySession) }
     }
 
@@ -58,7 +62,26 @@ class HistoryContentTest {
         show(emptyMap())
 
         composeRule.onNodeWithText("подходы не записывались").assertIsDisplayed()
-        // clickable(enabled = false) оставляет узел неактивным: тап ничего не раскроет.
-        composeRule.onNodeWithText("подходы не записывались").assertIsNotEnabled()
+        // Без подходов clickable не вешается вовсе: у карточки нет ложного действия для TalkBack.
+        composeRule.onNodeWithText("подходы не записывались").assertHasNoClickAction()
+    }
+
+    @Test
+    fun пока_подходы_не_загрузились_нет_подписи_и_нажатия() {
+        show(null)
+
+        composeRule.onNodeWithText("подходы не записывались").assertDoesNotExist()
+        composeRule.onNodeWithText(DateFormatter.formatSessionDateTime(session.finishedAt)).assertHasNoClickAction()
+    }
+
+    @Test
+    fun карточка_с_подходами_сообщает_состояние_и_нажимается() {
+        show(mapOf(1L to listOf(SessionExerciseSets(7L, "Присед", listOf(set(1, 60.0, 8))))))
+        val card = composeRule.onNodeWithText(DateFormatter.formatSessionDateTime(session.finishedAt))
+
+        card.assertHasClickAction()
+        card.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Свёрнуто"))
+        card.performClick()
+        card.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Развёрнуто"))
     }
 }

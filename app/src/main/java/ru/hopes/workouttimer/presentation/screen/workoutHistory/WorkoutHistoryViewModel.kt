@@ -55,5 +55,6 @@ class WorkoutHistoryViewModel @Inject constructor(
 data class WorkoutHistoryState(
     val workoutName: String = "",
     val sessions: List<WorkoutSession> = emptyList(),
-    val setsBySession: Map<Long, List<SessionExerciseSets>> = emptyMap()
+    // null — подходы ещё не загрузились: карточки не должны врать «подходы не записывались».
+    val setsBySession: Map<Long, List<SessionExerciseSets>>? = null
 )
