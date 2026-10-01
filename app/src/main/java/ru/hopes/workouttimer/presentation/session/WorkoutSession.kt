@@ -25,7 +25,9 @@ sealed interface WorkoutSession {
         val exerciseIndex: Int,
         val phase: WorkoutExecutionState,
         /** Идёт запись завершённой сессии: второй тап по последнему подходу ничего не делает. */
-        val isFinishing: Boolean = false
+        val isFinishing: Boolean = false,
+        /** Active наступил сам по истечении отдыха: плашка пишет «Пора: подход N». */
+        val restOver: Boolean = false
     ) : WorkoutSession
 }
 

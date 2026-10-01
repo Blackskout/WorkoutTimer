@@ -1060,4 +1060,52 @@ class WorkoutSessionManagerTest {
         manager.abandon()
         assertNull(manager.runningWorkout.value)
     }
+
+    // --- «Пора: подход N» на плашке ---
+
+    private val WorkoutSessionManager.restOver: Boolean
+        get() = (session.value as WorkoutSession.Present).restOver
+
+    @Test
+    fun `rest that runs out by itself raises restOver`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        manager.start(1)
+        manager.onExerciseFinished() // отдых
+        assertFalse(manager.restOver)
+
+        manager.onRestFinished()
+
+        assertTrue(manager.phase is WorkoutExecutionState.Active)
+        assertTrue(manager.restOver)
+    }
+
+    @Test
+    fun `skipping rest does not raise restOver`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        manager.start(1)
+        manager.onExerciseFinished()
+
+        manager.skipRest()
+
+        assertFalse(manager.restOver)
+    }
+
+    @Test
+    fun `finishing a set or jumping to an exercise lowers restOver`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        manager.start(1)
+        manager.onExerciseFinished()
+        manager.onRestFinished()
+        assertTrue(manager.restOver)
+
+        manager.onExerciseFinished() // последний подход → Finished
+        assertFalse(manager.restOver)
+
+        val other = managerWith(twoSetWorkout())
+        other.start(1)
+        other.onExerciseFinished()
+        other.onRestFinished()
+        other.moveToExercise(0)
+        assertFalse(other.restOver)
+    }
 }

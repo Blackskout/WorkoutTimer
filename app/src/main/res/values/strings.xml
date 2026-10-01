@@ -93,6 +93,13 @@
     <string name="execution_note_dialog_title">Заметка к упражнению</string>
     <string name="execution_note_placeholder" tools:ignore="TypographyEllipsis">Введите заметку...</string>
 
+    <!-- Плашка свёрнутой тренировки -->
+    <string name="minibar_rest">Отдых %1$s</string>
+    <string name="minibar_set">Подход %1$d из %2$d · %3$s</string>
+    <string name="minibar_rest_over">Пора: подход %1$d</string>
+    <string name="minibar_open">Вернуться к тренировке</string>
+    <string name="minibar_exit">Выйти из тренировки без сохранения</string>
+
     <!-- Создание и редактирование тренировки -->
     <string name="create_save_error">Не удалось сохранить тренировку</string>
     <string name="create_fab_exercise">Упражнение</string>

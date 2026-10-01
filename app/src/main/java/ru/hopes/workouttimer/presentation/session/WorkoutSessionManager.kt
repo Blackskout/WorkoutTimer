@@ -212,7 +212,8 @@ class WorkoutSessionManager @Inject constructor(
                         totalSets = phase.totalSets,
                         weight = phase.exercise.weight,
                         reps = phase.exercise.reps
-                    )
+                    ),
+                    restOver = false
                 )
             } else {
                 current
@@ -308,7 +309,8 @@ class WorkoutSessionManager @Inject constructor(
                         exercise = phase.exercise,
                         currentSet = phase.currentSet,
                         totalSets = phase.totalSets
-                    )
+                    ),
+                    restOver = true
                 )
             } else {
                 current
@@ -348,7 +350,8 @@ class WorkoutSessionManager @Inject constructor(
                         totalSets = phase.totalSets,
                         restTimeMillis = phase.exercise.timeMillis,
                         totalRestTimeMillis = phase.exercise.timeMillis
-                    )
+                    ),
+                    restOver = false
                 )
             )
             startRestTimer()
@@ -372,7 +375,8 @@ class WorkoutSessionManager @Inject constructor(
                         totalSets = next.sets,
                         restTimeMillis = next.timeMillis,
                         totalRestTimeMillis = next.timeMillis
-                    )
+                    ),
+                    restOver = false
                 )
             )
             startRestTimer()
@@ -386,7 +390,7 @@ class WorkoutSessionManager @Inject constructor(
         val sessionId = current.sessionId
         val workoutId = current.workoutId
         // isFinishing поднимается синхронно, до записи: второй тап его уже видит.
-        setSession(current.copy(isFinishing = true))
+        setSession(current.copy(isFinishing = true, restOver = false))
         finishPending = true
         val startedAt = sessionStartedAt
         val sets = _recordedSets.toList()
@@ -446,7 +450,8 @@ class WorkoutSessionManager @Inject constructor(
                     exercise = target.exercise,
                     currentSet = 1,
                     totalSets = target.exercise.sets
-                )
+                ),
+                restOver = false
             )
         )
         scheduleIdleReminderIfActive()
