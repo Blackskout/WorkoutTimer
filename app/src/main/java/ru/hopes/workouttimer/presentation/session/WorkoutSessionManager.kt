@@ -98,13 +98,13 @@ class WorkoutSessionManager @Inject constructor(
         get() = _session.value as? WorkoutSession.Present
 
     // Текущий подход закрывает всю тренировку: экран спрашивает подтверждение перед
-    // onExerciseFinished(), потому что дальше сессия уйдёт в БД. Считается по текущей
-    // длине списка: добавленное упражнение отодвигает конец тренировки.
+    // onExerciseFinished(), потому что дальше сессия уйдёт в БД. Конец — когда все остальные
+    // упражнения сделаны, а не когда дошли до конца списка: по шторке можно прыгать.
     val isLastSetOfWorkout: Boolean
         get() {
             val current = present ?: return false
             val phase = current.phase as? WorkoutExecutionState.Active ?: return false
-            return phase.currentSet == phase.totalSets && current.exerciseIndex == current.exercises.lastIndex
+            return phase.currentSet == phase.totalSets && current.nextUnfinishedIndex() == null
         }
 
     fun dismissFinishError() {
@@ -347,9 +347,10 @@ class WorkoutSessionManager @Inject constructor(
         } else {
             _recordedSets += set
         }
+        val updated = current.withSetDone(phase.currentSet)
         if (phase.currentSet < phase.totalSets) {
             setSession(
-                current.copy(
+                updated.copy(
                     phase = WorkoutExecutionState.Rest(
                         exercise = phase.exercise,
                         currentSet = phase.currentSet + 1,
@@ -363,21 +364,21 @@ class WorkoutSessionManager @Inject constructor(
             startRestTimer()
             scheduleIdleReminderIfActive()
         } else {
-            moveToNextExercise()
+            moveToNextExercise(updated)
         }
     }
 
-    private fun moveToNextExercise() {
-        val current = present ?: return
-        if (current.exerciseIndex < current.exercises.lastIndex) {
-            val nextIndex = current.exerciseIndex + 1
-            val next = current.exercises[nextIndex].exercise
+    private fun moveToNextExercise(current: WorkoutSession.Present) {
+        val nextIndex = current.nextUnfinishedIndex()
+        if (nextIndex != null) {
+            val row = current.exercises[nextIndex]
+            val next = row.exercise
             setSession(
                 current.copy(
                     exerciseIndex = nextIndex,
                     phase = WorkoutExecutionState.Rest(
                         exercise = next,
-                        currentSet = 1,
+                        currentSet = row.nextSet,
                         totalSets = next.sets,
                         restTimeMillis = next.timeMillis,
                         totalRestTimeMillis = next.timeMillis
@@ -439,7 +440,7 @@ class WorkoutSessionManager @Inject constructor(
         }
     }
 
-    /** Переход по шторке выбора упражнения: с подхода 1, без отдыха. */
+    /** Переход по шторке выбора упражнения: без отдыха, с подхода, на котором остановились. */
     fun moveToExercise(index: Int) {
         val current = present ?: return
         val target = current.exercises.getOrNull(index) ?: return
@@ -454,7 +455,7 @@ class WorkoutSessionManager @Inject constructor(
                 exerciseIndex = index,
                 phase = WorkoutExecutionState.Active(
                     exercise = target.exercise,
-                    currentSet = 1,
+                    currentSet = target.nextSet,
                     totalSets = target.exercise.sets
                 ),
                 restOver = false
@@ -564,6 +565,19 @@ class WorkoutSessionManager @Inject constructor(
                 showIdleReminderNotification()
             }
         }
+    }
+
+    private fun WorkoutSession.Present.withSetDone(setNumber: Int): WorkoutSession.Present {
+        val row = exercises[exerciseIndex]
+        if (setNumber <= row.doneSets) return this
+        val list = exercises.toMutableList().apply { set(exerciseIndex, row.copy(doneSets = setNumber)) }
+        return copy(exercises = list)
+    }
+
+    /** Следующее несделанное после текущего, с переходом в начало списка; текущее не в счёт. */
+    private fun WorkoutSession.Present.nextUnfinishedIndex(): Int? {
+        val after = (exerciseIndex + 1..exercises.lastIndex) + (0 until exerciseIndex)
+        return after.firstOrNull { !exercises[it].isDone }
     }
 
     private fun setSession(value: WorkoutSession) {

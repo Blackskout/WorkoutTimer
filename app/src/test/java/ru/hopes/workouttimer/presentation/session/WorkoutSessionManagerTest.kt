@@ -506,7 +506,8 @@ class WorkoutSessionManagerTest {
         )
 
         manager.start(1)
-        manager.moveToExercise(1) // единственный подход последнего упражнения
+        manager.onExerciseFinished() // первое сделано → отдых перед последним
+        manager.skipRest()
 
         assertTrue(manager.isLastSetOfWorkout)
     }
@@ -664,9 +665,16 @@ class WorkoutSessionManagerTest {
         manager.start(1)
         manager.onExerciseFinished()            // присед, подход 1
         manager.moveToExercise(1)   // бросили присед
-        manager.onExerciseFinished()            // жим — последнее упражнение, последний подход
+        manager.onExerciseFinished()            // жим — последний в списке, но присед не доделан
+        assertFalse(setsSlot.isCaptured)
+        assertEquals(2, (manager.phase as WorkoutExecutionState.Rest).currentSet)
 
-        assertEquals(listOf("Присед", "Жим"), setsSlot.captured.map { it.exerciseName })
+        manager.skipRest()
+        manager.onExerciseFinished()            // присед, подход 2
+        manager.skipRest()
+        manager.onExerciseFinished()            // присед, подход 3 — всё сделано
+
+        assertEquals(listOf("Присед", "Жим", "Присед", "Присед"), setsSlot.captured.map { it.exerciseName })
     }
 
     @Test
@@ -765,16 +773,14 @@ class WorkoutSessionManagerTest {
 
         manager.dismissFinishError()
         manager.moveToExercise(0)       // ушли с последнего подхода
-        manager.onExerciseFinished()            // A ещё раз
-        manager.skipRest()
-        manager.onExerciseFinished()            // B — запись проходит
+        manager.onExerciseFinished()            // A ещё раз; B уже сделан — запись проходит
 
         val setA = RecordedSet(10L, "Присед", 50.0, 0.0, 8, ExerciseUnit.KG)
         val setB = RecordedSet(20L, "Жим", 50.0, 0.0, 8, ExerciseUnit.KG)
         assertEquals(2, attempts.size)
         assertEquals(listOf(setA, setB), attempts.first())
         // Неудавшийся подход B остаётся в истории: он был сделан, а не потерян.
-        assertEquals(listOf(setA, setB, setA, setB), attempts.last())
+        assertEquals(listOf(setA, setB, setA), attempts.last())
         assertTrue(manager.phase is WorkoutExecutionState.Finished)
     }
 
@@ -1347,5 +1353,136 @@ class WorkoutSessionManagerTest {
         manager.abandon()
 
         verify { workoutAlerts.dismiss() }
+    }
+
+    // --- Прогресс по упражнениям: переходы по шторке не путают сделанное с пропущенным ---
+
+    private val WorkoutSessionManager.doneSets: List<Int>
+        get() = snapshot.exercises.map { it.doneSets }
+
+    private val WorkoutSessionManager.active: WorkoutExecutionState.Active
+        get() = phase as WorkoutExecutionState.Active
+
+    @Test
+    fun `finished sets are counted per exercise`() = runTest {
+        val manager = managerWith(workoutOf(ex(1, "Присед", sets = 3), ex(2, "Жим", sets = 2)))
+        manager.start(1)
+
+        manager.onExerciseFinished()
+        manager.skipRest()
+        manager.onExerciseFinished()
+
+        assertEquals(listOf(2, 0), manager.doneSets)
+    }
+
+    @Test
+    fun `jumping ahead leaves skipped exercises unstarted`() = runTest {
+        val manager = managerWith(workoutOf(ex(1, "A", sets = 1), ex(2, "B", sets = 1), ex(3, "C", sets = 1)))
+        manager.start(1)
+
+        manager.moveToExercise(2)
+
+        assertEquals(listOf(0, 0, 0), manager.doneSets)
+    }
+
+    @Test
+    fun `returning to a started exercise continues from the next set`() = runTest {
+        val manager = managerWith(workoutOf(ex(1, "Присед", sets = 4), ex(2, "Жим", sets = 1)))
+        manager.start(1)
+        manager.onExerciseFinished()
+        manager.skipRest()
+        manager.onExerciseFinished() // присед: 2 из 4
+
+        manager.moveToExercise(1)
+        manager.moveToExercise(0)
+
+        assertEquals("Присед", manager.active.exercise.name)
+        assertEquals(3, manager.active.currentSet)
+    }
+
+    @Test
+    fun `returning to a finished exercise starts a repeat round from set 1`() = runTest {
+        val manager = managerWith(workoutOf(ex(1, "Присед", sets = 1), ex(2, "Жим", sets = 2)))
+        manager.start(1)
+        manager.onExerciseFinished() // присед сделан → отдых перед жимом
+
+        manager.moveToExercise(0)
+
+        assertEquals(1, manager.active.currentSet)
+        manager.onExerciseFinished() // повтор не превращает счётчик в «2 из 1»
+        assertEquals(listOf(1, 0), manager.doneSets)
+    }
+
+    @Test
+    fun `after an exercise the next unfinished one below comes next`() = runTest {
+        val manager = managerWith(
+            workoutOf(ex(1, "A", sets = 1), ex(2, "B", sets = 1), ex(3, "C", sets = 1), ex(4, "D", sets = 1))
+        )
+        manager.start(1)
+        manager.moveToExercise(2)
+        manager.onExerciseFinished() // C → D
+        assertEquals("D", (manager.phase as WorkoutExecutionState.Rest).exercise.name)
+        assertEquals(3, manager.snapshot.exerciseIndex)
+    }
+
+    @Test
+    fun `after the last exercise in the list the first skipped one comes next`() = runTest {
+        val finish = mockk<FinishWorkoutSessionUseCase>(relaxed = true)
+        val manager = managerWith(workoutOf(ex(1, "A", sets = 1), ex(2, "B", sets = 1), ex(3, "C", sets = 1)), finish = finish)
+        manager.start(1)
+
+        manager.moveToExercise(2)
+        assertFalse(manager.isLastSetOfWorkout)
+        manager.onExerciseFinished() // C — последнее в списке, но A и B не сделаны
+
+        val rest = manager.phase as WorkoutExecutionState.Rest
+        assertEquals("A", rest.exercise.name)
+        assertEquals(0, manager.snapshot.exerciseIndex)
+        coVerify(exactly = 0) { finish(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `the next exercise resumes where it was left`() = runTest {
+        val manager = managerWith(workoutOf(ex(1, "A", sets = 1), ex(2, "B", sets = 3)))
+        manager.start(1)
+        manager.moveToExercise(1)
+        manager.onExerciseFinished() // B: 1 из 3
+        manager.moveToExercise(0)
+
+        manager.onExerciseFinished() // A сделано → B, подход 2
+
+        val rest = manager.phase as WorkoutExecutionState.Rest
+        assertEquals("B", rest.exercise.name)
+        assertEquals(2, rest.currentSet)
+    }
+
+    @Test
+    fun `the workout ends only when every exercise is done`() = runTest {
+        val finish = mockk<FinishWorkoutSessionUseCase>(relaxed = true)
+        val manager = managerWith(workoutOf(ex(1, "A", sets = 1), ex(2, "B", sets = 1)), finish = finish)
+        manager.start(1)
+        manager.moveToExercise(1)
+        manager.onExerciseFinished() // B → A
+        manager.skipRest()
+
+        assertTrue(manager.isLastSetOfWorkout)
+        manager.onExerciseFinished()
+
+        assertTrue(manager.phase is WorkoutExecutionState.Finished)
+        coVerify(exactly = 1) { finish(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `a repeat round of the only unfinished exercise is not the end`() = runTest {
+        // A сделано, B нет: повтор A на последнем подходе ведёт к B, а не к записи.
+        val manager = managerWith(workoutOf(ex(1, "A", sets = 1), ex(2, "B", sets = 1)))
+        manager.start(1)
+        manager.onExerciseFinished()
+        manager.moveToExercise(0)
+
+        assertFalse(manager.isLastSetOfWorkout)
+        manager.onExerciseFinished()
+
+        assertEquals("B", (manager.phase as WorkoutExecutionState.Rest).exercise.name)
     }
 }
