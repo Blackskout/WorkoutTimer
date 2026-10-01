@@ -8,12 +8,14 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import jakarta.inject.Singleton
+import ru.hopes.workouttimer.data.ExerciseCatalogRepositoryImpl
 import ru.hopes.workouttimer.data.ExportImportRepositoryImpl
 import ru.hopes.workouttimer.data.MusicControlRepositoryImpl
 import ru.hopes.workouttimer.data.WorkoutRepositoryImpl
 import ru.hopes.workouttimer.data.dao.ALL_MIGRATIONS
 import ru.hopes.workouttimer.data.dao.AppDatabase
 import ru.hopes.workouttimer.data.dao.WorkoutDao
+import ru.hopes.workouttimer.domain.repository.ExerciseCatalogRepository
 import ru.hopes.workouttimer.domain.repository.ExportImportRepository
 import ru.hopes.workouttimer.domain.repository.MusicControlRepository
 import ru.hopes.workouttimer.domain.repository.WidgetUpdater
@@ -58,6 +60,12 @@ object AppModule {
         widgetUpdater: WidgetUpdater
     ): WorkoutRepository {
         return WorkoutRepositoryImpl(dao, widgetUpdater)
+    }
+
+    @Provides
+    @Singleton
+    fun provideExerciseCatalogRepository(dao: WorkoutDao): ExerciseCatalogRepository {
+        return ExerciseCatalogRepositoryImpl(dao)
     }
 
     @Provides

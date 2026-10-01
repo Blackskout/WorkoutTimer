@@ -12,6 +12,8 @@ import ru.hopes.workouttimer.data.entity.SessionSetEntity
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
 import ru.hopes.workouttimer.data.entity.WorkoutSessionEntity
 import ru.hopes.workouttimer.domain.model.ExerciseUnit
+import ru.hopes.workouttimer.domain.model.RenameResult
+import ru.hopes.workouttimer.domain.model.convertLoadToUnit
 import ru.hopes.workouttimer.domain.model.exerciseNameKey
 import ru.hopes.workouttimer.domain.model.exerciseUnitOf
 import ru.hopes.workouttimer.domain.model.fitLoadToUnit
@@ -191,6 +193,94 @@ interface WorkoutDao {
             )
         }
         return sessionId
+    }
+
+    // Порядок задаёт Kotlin (по ключу названия): ORDER BY name в SQLite сравнивает байты
+    // и поставил бы «Ёлочку» перед «А», а заглавные — перед строчными.
+    @Query("SELECT * FROM exercise_catalog")
+    fun observeCatalog(): Flow<List<ExerciseCatalogEntity>>
+
+    @Query("UPDATE exercise_catalog SET name = :name, nameKey = :nameKey WHERE id = :id")
+    suspend fun updateCatalogName(id: Long, name: String, nameKey: String)
+
+    @Query("UPDATE exercises SET name = :name WHERE catalogId = :catalogId")
+    suspend fun updateExerciseNamesOfCatalog(catalogId: Long, name: String)
+
+    @Query("UPDATE exercise_catalog SET unit = :unit WHERE id = :id")
+    suspend fun updateCatalogUnit(id: Long, unit: String)
+
+    @Query("SELECT * FROM exercises WHERE catalogId = :catalogId")
+    suspend fun getExercisesOfCatalog(catalogId: Long): List<ExerciseEntity>
+
+    @Query("UPDATE exercises SET weight = :weight, extraWeight = :extraWeight WHERE id = :id")
+    suspend fun updateExerciseLoad(id: Int, weight: Double, extraWeight: Double)
+
+    // Название — текущее из справочника: после переименования история показывает новое.
+    @Query(
+        """
+        SELECT s.id, s.sessionId, s.catalogId, c.name AS exerciseName, s.weight, s.extraWeight,
+               s.reps, s.unit, ws.finishedAt
+        FROM session_sets s
+        JOIN workout_sessions ws ON ws.id = s.sessionId
+        JOIN exercise_catalog c ON c.id = s.catalogId
+        WHERE ws.workoutId = :workoutId
+        ORDER BY s.id
+        """
+    )
+    fun observeSetsForWorkout(workoutId: Long): Flow<List<LoggedSetRow>>
+
+    // Для каждой записи справочника — её подходы из последней по времени завершения
+    // сессии (id — тай-брейк при одинаковом finishedAt).
+    @Query(
+        """
+        SELECT s.id, s.sessionId, s.catalogId, c.name AS exerciseName, s.weight, s.extraWeight,
+               s.reps, s.unit, ws.finishedAt
+        FROM session_sets s
+        JOIN workout_sessions ws ON ws.id = s.sessionId
+        JOIN exercise_catalog c ON c.id = s.catalogId
+        WHERE s.sessionId = (
+            SELECT s2.sessionId FROM session_sets s2
+            JOIN workout_sessions w2 ON w2.id = s2.sessionId
+            WHERE s2.catalogId = s.catalogId
+            ORDER BY w2.finishedAt DESC, w2.id DESC
+            LIMIT 1
+        )
+        ORDER BY s.id
+        """
+    )
+    fun observeLastSessionSets(): Flow<List<LoggedSetRow>>
+
+    /**
+     * Переименование записи и всех её упражнений одной транзакцией: поиск тренировок
+     * читает exercises.name. Ключ, занятый этой же записью («присед» → «Присед»),
+     * занятым не считается.
+     */
+    @Transaction
+    suspend fun renameCatalog(id: Long, rawName: String): RenameResult {
+        if (rawName.isBlank()) return RenameResult.BLANK
+        val name = normalizedExerciseName(rawName)
+        val key = exerciseNameKey(name)
+        val holder = findCatalogByKey(key)
+        if (holder != null && holder.id != id) return RenameResult.NAME_TAKEN
+        updateCatalogName(id, name, key)
+        updateExerciseNamesOfCatalog(id, name)
+        return RenameResult.RENAMED
+    }
+
+    /**
+     * Смена единицы: шаблоны приводятся к новой, прошлые подходы сохраняют свою.
+     * Повторный выбор той же единицы ничего не делает — иначе convertLoadToUnit
+     * обнулил бы добавку к плите.
+     */
+    @Transaction
+    suspend fun changeCatalogUnit(id: Long, unit: ExerciseUnit) {
+        val entry = findCatalogById(id) ?: return
+        if (entry.unit == unit.name) return
+        updateCatalogUnit(id, unit.name)
+        for (exercise in getExercisesOfCatalog(id)) {
+            val load = convertLoadToUnit(exercise.weight, exercise.extraWeight, unit)
+            updateExerciseLoad(exercise.id, load.weight, load.extraWeight)
+        }
     }
 
     @Query("SELECT * FROM workout_sessions WHERE workoutId = :workoutId ORDER BY finishedAt DESC")
