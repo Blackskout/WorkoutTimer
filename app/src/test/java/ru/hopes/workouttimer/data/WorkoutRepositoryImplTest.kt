@@ -199,9 +199,9 @@ class WorkoutRepositoryImplTest {
         val dao = mockk<WorkoutDao>(relaxed = true)
         val repo = WorkoutRepositoryImpl(dao, mockk(relaxed = true))
 
-        repo.updateExerciseWeightAndReps(exerciseId = 3, weight = 82.5, reps = 6)
+        repo.updateExerciseWeightAndReps(exerciseId = 3, weight = 5.0, extraWeight = 2.5, reps = 6)
 
-        coVerify(exactly = 1) { dao.updateExerciseWeightAndReps(id = 3, weight = 82.5, reps = 6) }
+        coVerify(exactly = 1) { dao.updateExerciseWeightAndReps(id = 3, weight = 5.0, extraWeight = 2.5, reps = 6) }
     }
 
     private val plateExercise = Exercise(

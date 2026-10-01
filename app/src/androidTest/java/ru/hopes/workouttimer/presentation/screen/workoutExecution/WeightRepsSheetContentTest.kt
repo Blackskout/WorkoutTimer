@@ -8,6 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import ru.hopes.workouttimer.domain.model.ExerciseUnit
 import ru.hopes.workouttimer.presentation.ui.theme.WorkoutTimerTheme
 
 /**
@@ -29,9 +30,11 @@ class WeightRepsSheetContentTest {
             WorkoutTimerTheme {
                 WeightRepsSheetContent(
                     exerciseName = "Жим лёжа",
+                    unit = ExerciseUnit.KG,
                     weight = 80.0,
+                    extraWeight = 0.0,
                     reps = 8,
-                    onApply = { newWeight, newReps -> applied = newWeight to newReps }
+                    onApply = { newWeight, _, newReps -> applied = newWeight to newReps }
                 )
             }
         }
@@ -54,9 +57,11 @@ class WeightRepsSheetContentTest {
             WorkoutTimerTheme {
                 WeightRepsSheetContent(
                     exerciseName = "Жим лёжа",
+                    unit = ExerciseUnit.KG,
                     weight = 78.7,
+                    extraWeight = 0.0,
                     reps = 8,
-                    onApply = { newWeight, newReps -> applied = newWeight to newReps }
+                    onApply = { newWeight, _, newReps -> applied = newWeight to newReps }
                 )
             }
         }
@@ -64,5 +69,71 @@ class WeightRepsSheetContentTest {
         composeRule.onNodeWithText("Готово", ignoreCase = true).performClick()
 
         assertEquals(78.75 to 8, applied)
+    }
+
+    @Test
+    fun плита_с_добавкой_без_прокрутки_возвращает_текущие_значения() {
+        var applied: Triple<Double, Double, Int>? = null
+        composeRule.setContent {
+            WorkoutTimerTheme {
+                WeightRepsSheetContent(
+                    exerciseName = "Тяга блока",
+                    unit = ExerciseUnit.PLATE,
+                    weight = 5.0,
+                    extraWeight = 2.0,
+                    reps = 12,
+                    onApply = { w, e, r -> applied = Triple(w, e, r) }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("ПЛИТА").assertExists()
+        composeRule.onNodeWithText("+КГ").assertExists()
+        composeRule.onNodeWithText("Готово", ignoreCase = true).performClick()
+
+        assertEquals(Triple(5.0, 2.0, 12), applied)
+    }
+
+    @Test
+    fun плита_вне_сетки_прилипает_к_ближайшим_значениям() {
+        var applied: Triple<Double, Double, Int>? = null
+        composeRule.setContent {
+            WorkoutTimerTheme {
+                WeightRepsSheetContent(
+                    exerciseName = "Тяга блока",
+                    unit = ExerciseUnit.PLATE,
+                    weight = 4.6,
+                    extraWeight = 2.3,
+                    reps = 12,
+                    onApply = { w, e, r -> applied = Triple(w, e, r) }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Готово", ignoreCase = true).performClick()
+
+        assertEquals(Triple(5.0, 2.5, 12), applied)
+    }
+
+    @Test
+    fun без_веса_только_повторы_и_нулевая_нагрузка() {
+        var applied: Triple<Double, Double, Int>? = null
+        composeRule.setContent {
+            WorkoutTimerTheme {
+                WeightRepsSheetContent(
+                    exerciseName = "Подтягивания",
+                    unit = ExerciseUnit.BODYWEIGHT,
+                    weight = 7.0,
+                    extraWeight = 0.0,
+                    reps = 8,
+                    onApply = { w, e, r -> applied = Triple(w, e, r) }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("КГ").assertDoesNotExist()
+        composeRule.onNodeWithText("Готово", ignoreCase = true).performClick()
+
+        assertEquals(Triple(0.0, 0.0, 8), applied)
     }
 }

@@ -114,9 +114,9 @@ class WorkoutRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun updateExerciseWeightAndReps(exerciseId: Int, weight: Double, reps: Int) {
+    override suspend fun updateExerciseWeightAndReps(exerciseId: Int, weight: Double, extraWeight: Double, reps: Int) {
         withContext(Dispatchers.IO) {
-            dao.updateExerciseWeightAndReps(exerciseId, weight, reps)
+            dao.updateExerciseWeightAndReps(exerciseId, weight, extraWeight, reps)
         }
     }
 

@@ -448,21 +448,21 @@ class WorkoutExecutionViewModel @Inject constructor(
         }
     }
 
-    fun updateExerciseWeightAndReps(exerciseId: Int, weight: Double, reps: Int) {
+    fun updateExerciseWeightAndReps(exerciseId: Int, weight: Double, extraWeight: Double, reps: Int) {
         registerInteraction()
         val index = exercises.indexOfFirst { it.id == exerciseId }
         if (index == -1) return
-        val updatedExercise = exercises[index].copy(weight = weight, reps = reps)
+        val updatedExercise = exercises[index].copy(weight = weight, extraWeight = extraWeight, reps = reps)
         exercises = exercises.toMutableList().apply { set(index, updatedExercise) }
 
         // Сначала экран, потом база: «Закончить подход» сразу после правки
         // должен записать новые значения, а не ждать окончания записи.
-        // Плитки в Active берут числа из state.weight и state.reps, а не из
+        // Плитки в Active берут числа из state.weight/extraWeight/reps, а не из
         // state.exercise, поэтому одного обновления упражнения им мало.
         _uiState.update { state ->
             when {
                 state is WorkoutExecutionState.Active && state.exercise.id == exerciseId ->
-                    state.copy(exercise = updatedExercise, weight = weight, reps = reps)
+                    state.copy(exercise = updatedExercise, weight = weight, extraWeight = extraWeight, reps = reps)
 
                 state is WorkoutExecutionState.Rest && state.exercise.id == exerciseId ->
                     state.copy(exercise = updatedExercise)
@@ -471,7 +471,7 @@ class WorkoutExecutionViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            workoutRepository.updateExerciseWeightAndReps(exerciseId, weight, reps)
+            workoutRepository.updateExerciseWeightAndReps(exerciseId, weight, extraWeight, reps)
         }
     }
 

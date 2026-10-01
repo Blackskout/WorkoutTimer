@@ -19,7 +19,7 @@ interface WorkoutRepository {
         suspend fun setLastUseAt(workoutId: Int, timestamp: Long)
         suspend fun getLastUseAt(workoutId: Int): Long?
         suspend fun updateExerciseNote(exerciseId: Int, note: String)
-        suspend fun updateExerciseWeightAndReps(exerciseId: Int, weight: Double, reps: Int)
+        suspend fun updateExerciseWeightAndReps(exerciseId: Int, weight: Double, extraWeight: Double, reps: Int)
         suspend fun finishWorkoutSession(
             workoutId: Int,
             startedAt: Long,
