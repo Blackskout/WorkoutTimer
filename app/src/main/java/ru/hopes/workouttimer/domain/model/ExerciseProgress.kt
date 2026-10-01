@@ -76,12 +76,17 @@ fun progressPoints(sessions: List<ProgressSession>, unit: ExerciseUnit): List<Pr
         }
     }
 
-/** Начало периода: календарные месяцы назад от [now] в поясе устройства; null — всё время. */
+/** Начало периода: календарные месяцы назад от [now] в поясе устройства, с полуночи; null — всё время. */
 fun periodStart(period: ProgressPeriod, now: Long, zone: TimeZone): Long? {
     val months = period.months ?: return null
     return Calendar.getInstance(zone).apply {
         timeInMillis = now
         add(Calendar.MONTH, -months)
+        // С полуночи: тренировка утром первого дня периода не выпадает.
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
     }.timeInMillis
 }
 

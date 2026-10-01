@@ -35,6 +35,17 @@ class ChartGeometryTest {
     }
 
     @Test
+    fun `ровная нецелая линия — посередине оси, не у нижнего края`() {
+        for (level in listOf(5.0 + 2.0 / 11, 61.25)) {
+            val axis = yAxisFor(listOf(level, level))
+            val fraction = levelFraction(level, axis)
+
+            assertTrue("$axis $fraction", axis.min <= level && level <= axis.max)
+            assertTrue("$axis $fraction", fraction > 0.3f && fraction < 0.7f)
+        }
+    }
+
+    @Test
     fun `плита с добавкой лежит между делениями своей плиты и следующей`() {
         val level = 5.0 + 2.0 / 11
         val axis = yAxisFor(listOf(level, 5.0 + 4.0 / 11))

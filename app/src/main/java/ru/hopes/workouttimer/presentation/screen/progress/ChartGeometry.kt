@@ -25,9 +25,9 @@ fun yAxisFor(levels: List<Double>): YAxis {
     val rawLo = floor(levels.min()).toInt()
     val rawHi = ceil(levels.max()).toInt()
     // Ровная линия рисуется посередине, а не прижатой к краю.
-    val flat = rawHi == rawLo
+    val flat = levels.min() == levels.max()
     val lo0 = if (flat) (rawLo - 1).coerceAtLeast(0) else rawLo
-    val hi0 = if (flat) rawLo + 1 else rawHi
+    val hi0 = if (flat) rawHi + 1 else rawHi
     val stride = niceStep(hi0 - lo0)
     val lo = Math.floorDiv(lo0, stride) * stride
     val hi = -Math.floorDiv(-hi0, stride) * stride

@@ -19,6 +19,12 @@ class ExerciseProgressTest {
             set(year, month - 1, dayOfMonth, 12, 0)
         }.timeInMillis
 
+    private fun midnight(year: Int, month: Int, dayOfMonth: Int): Long =
+        Calendar.getInstance(utc).apply {
+            clear()
+            set(year, month - 1, dayOfMonth, 0, 0)
+        }.timeInMillis
+
     private fun kg(id: Long, sessionId: Long, weight: Double, reps: Int) =
         SessionSet(id, sessionId, 1L, weight, 0.0, reps, ExerciseUnit.KG)
 
@@ -78,9 +84,17 @@ class ExerciseProgressTest {
     @Test
     fun `начало периода считается календарными месяцами`() {
         // 31 марта минус месяц — 28 февраля, а не 3 марта.
-        assertEquals(at(2026, 2, 28), periodStart(ProgressPeriod.MONTH, at(2026, 3, 31), utc))
-        assertEquals(at(2026, 7, 1), periodStart(ProgressPeriod.QUARTER, at(2026, 10, 1), utc))
+        assertEquals(midnight(2026, 2, 28), periodStart(ProgressPeriod.MONTH, at(2026, 3, 31), utc))
+        assertEquals(midnight(2026, 7, 1), periodStart(ProgressPeriod.QUARTER, at(2026, 10, 1), utc))
         assertNull(periodStart(ProgressPeriod.ALL, at(2026, 10, 1), utc))
+    }
+
+    @Test
+    fun `начало периода — полночь, утренняя тренировка первого дня входит`() {
+        val start = periodStart(ProgressPeriod.MONTH, at(2026, 10, 1) + 3 * 3_600_000L, utc)!!
+
+        assertEquals(midnight(2026, 9, 1), start)
+        assertTrue(at(2026, 9, 1) - 2 * 3_600_000L >= start)
     }
 
     @Test
