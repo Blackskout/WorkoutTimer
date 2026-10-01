@@ -510,7 +510,8 @@ private fun previewWorkout(
             sets = 3,
             reps = 10,
             restTimeMillis = 60_000,
-            orderInWorkout = index
+            orderInWorkout = index,
+            catalogId = index.toLong() + 1
         )
     }
 )

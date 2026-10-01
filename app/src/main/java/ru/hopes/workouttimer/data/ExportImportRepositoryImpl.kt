@@ -6,7 +6,6 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -14,6 +13,7 @@ import kotlinx.serialization.json.Json
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.data.dao.WorkoutDao
 import ru.hopes.workouttimer.data.entity.ExerciseEntity
+import ru.hopes.workouttimer.data.entity.WorkoutEntity
 import ru.hopes.workouttimer.data.mapper.toDomain
 import ru.hopes.workouttimer.data.mapper.toExport
 import ru.hopes.workouttimer.domain.model.export.ExportData
@@ -89,40 +89,43 @@ class ExportImportRepositoryImpl @Inject constructor(
                     )
                 }
 
-                val existingNames = dao.getAllWorkouts()
-                    .map { list -> list.map { it.name }.toSet() }
-                    .first()
-                    .toMutableSet()
+                val existingNames = dao.getAllWorkoutNames().toMutableSet()
 
-                var importedCount = 0
-                var skippedCount = 0
+                // Тренировка без единого названного упражнения открылась бы экраном ошибки — пропускаем целиком.
+                val kept = exportData.workouts.filter { w -> w.exercises.any { it.name.isNotBlank() } }
+                // Пустые названия редактор не пропускает, импорт — тоже; считаем их пропущенными,
+                // в том числе у отброшенных целиком тренировок, иначе они не попадут ни в какой счётчик.
+                val skippedCount = exportData.workouts.sumOf { w -> w.exercises.count { it.name.isBlank() } }
 
-                exportData.workouts.forEach { exportWorkout ->
+                val prepared = kept.map { exportWorkout ->
                     val uniqueName = getUniqueName(exportWorkout.name, existingNames)
                     existingNames.add(uniqueName)
-
-                    val exerciseEntities = exportWorkout.exercises.map { ex ->
-                        ExerciseEntity(
-                            workoutId = 0,
-                            name = ex.name,
-                            weight = ex.weight,
-                            sets = ex.sets,
-                            reps = ex.reps,
-                            restTimeMillis = ex.restTimeMillis,
-                            orderInWorkout = ex.order,
-                            note = ex.note
-                        )
-                    }
-
-                    dao.insertWorkoutWithExercises(
-                        ru.hopes.workouttimer.data.entity.WorkoutEntity(
-                            name = uniqueName,
-                            lastUseAt = exportWorkout.lastUseAt
-                        ),
-                        exerciseEntities
-                    )
-                    importedCount++
+                    WorkoutEntity(name = uniqueName, lastUseAt = exportWorkout.lastUseAt) to
+                        exportWorkout.exercises.filter { it.name.isNotBlank() }.map { ex ->
+                            ExerciseEntity(
+                                workoutId = 0,
+                                name = ex.name,
+                                weight = ex.weight,
+                                sets = ex.sets,
+                                reps = ex.reps,
+                                restTimeMillis = ex.restTimeMillis,
+                                orderInWorkout = ex.order,
+                                note = ex.note,
+                                catalogId = 0L // проставит транзакция DAO
+                            )
+                        }
                 }
+
+                if (prepared.isEmpty()) {
+                    return@withContext ImportResult(
+                        success = false,
+                        importedCount = 0,
+                        skippedCount = skippedCount,
+                        error = ImportError.NoWorkouts
+                    )
+                }
+
+                val importedCount = dao.importWorkouts(prepared)
 
                 if (importedCount > 0) {
                     // Вызов внутри try/catch (e: Exception) ниже: исключение отсюда вернуло бы

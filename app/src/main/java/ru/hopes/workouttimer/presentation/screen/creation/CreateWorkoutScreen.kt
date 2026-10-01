@@ -30,6 +30,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -100,6 +102,15 @@ fun CreateWorkoutScreen(
     // Перетаскивание можно потерять одним тапом «назад» — подтверждаем выход.
     BackHandler(enabled = state.hasUnsavedChanges) { showExitDialog = true }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val saveErrorText = stringResource(R.string.create_save_error)
+    LaunchedEffect(state.saveFailed) {
+        if (state.saveFailed) {
+            snackbarHostState.showSnackbar(saveErrorText)
+            viewModel.processCommand(CreateWorkoutCommand.DismissSaveError)
+        }
+    }
+
     val listState = rememberLazyListState()
     val reorderState = rememberReorderableLazyListState(listState) { from, to ->
         viewModel.processCommand(
@@ -113,6 +124,7 @@ fun CreateWorkoutScreen(
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {

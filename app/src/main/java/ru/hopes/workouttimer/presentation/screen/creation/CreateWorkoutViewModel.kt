@@ -1,8 +1,10 @@
 package ru.hopes.workouttimer.presentation.screen.creation
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -26,6 +28,10 @@ class CreateWorkoutViewModel @Inject constructor(
 
     private var editingWorkoutId: Int? = null
     private var editingLastUseAt: Long? = null
+
+    private companion object {
+        const val TAG = "CreateWorkoutVM"
+    }
 
     /** Слепок состояния после загрузки — с ним сравнивается текущее при выходе. */
     private var savedSnapshot: CreateWorkoutState = CreateWorkoutState()
@@ -121,14 +127,24 @@ class CreateWorkoutViewModel @Inject constructor(
                             lastUseAt = editingLastUseAt ?: 0L
                         )
 
-                        if (editingWorkoutId != null) {
-                            updateWorkoutUseCase(workout)
-                        } else {
-                            addWorkoutUseCase(workout)
+                        // Транзакция может упасть (например, гонка за UNIQUE справочника):
+                        // редактор остаётся открытым, пользователь видит снекбар.
+                        try {
+                            if (editingWorkoutId != null) updateWorkoutUseCase(workout) else addWorkoutUseCase(workout)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Не удалось сохранить тренировку", e)
+                            _state.update { it.copy(saveFailed = true) }
+                            return@launch
                         }
                         _state.update { it.copy(isFinished = true) }
                     }
                 }
+            }
+
+            CreateWorkoutCommand.DismissSaveError -> {
+                _state.update { it.copy(saveFailed = false) }
             }
 
             CreateWorkoutCommand.Back -> {
@@ -182,6 +198,7 @@ sealed interface CreateWorkoutCommand {
     data class MoveExercise(val from: Int, val to: Int) : CreateWorkoutCommand
     data class UpdateExerciseNote(val id: Int, val note: String) : CreateWorkoutCommand
     data object Save : CreateWorkoutCommand
+    data object DismissSaveError : CreateWorkoutCommand
     data object Back : CreateWorkoutCommand
 }
 
@@ -199,7 +216,8 @@ data class CreateWorkoutState(
     val workoutName: String = "",
     val exercises: List<ExerciseItem> = emptyList(),
     val isFinished: Boolean = false,
-    val hasUnsavedChanges: Boolean = false
+    val hasUnsavedChanges: Boolean = false,
+    val saveFailed: Boolean = false
 ) {
     val isSaveEnabled: Boolean
         get() = workoutName.isNotBlank() && exercises.any { it.name.isNotBlank() }

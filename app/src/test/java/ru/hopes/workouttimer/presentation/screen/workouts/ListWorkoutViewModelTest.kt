@@ -55,7 +55,8 @@ class ListWorkoutViewModelTest {
                 reps = 12,
                 restTimeMillis = 120_000L,
                 orderInWorkout = 1,
-                note = ""
+                note = "",
+                catalogId = 1L
             )
         )
     )

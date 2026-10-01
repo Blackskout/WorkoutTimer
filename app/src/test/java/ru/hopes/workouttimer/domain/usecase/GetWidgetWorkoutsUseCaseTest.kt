@@ -32,7 +32,8 @@ class GetWidgetWorkoutsUseCaseTest {
                 reps = 12,
                 restTimeMillis = 120_000L,
                 orderInWorkout = index,
-                note = ""
+                note = "",
+                catalogId = index.toLong() + 1
             )
         }
     )

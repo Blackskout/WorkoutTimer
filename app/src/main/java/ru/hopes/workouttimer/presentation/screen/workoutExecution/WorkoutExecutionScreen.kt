@@ -27,6 +27,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -87,6 +89,16 @@ fun WorkoutExecutionScreen(
 
     BackHandler(enabled = hasUnsavedProgress) { showExitDialog = true }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val finishError by viewModel.finishError.collectAsState()
+    val finishErrorText = stringResource(R.string.execution_finish_error)
+    LaunchedEffect(finishError) {
+        if (finishError) {
+            snackbarHostState.showSnackbar(finishErrorText)
+            viewModel.dismissFinishError()
+        }
+    }
+
     val finishedState = uiState as? WorkoutExecutionState.Finished
     if (finishedState != null) {
         FinishedContent(
@@ -98,6 +110,7 @@ fun WorkoutExecutionScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(

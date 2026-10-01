@@ -36,7 +36,7 @@ class SkipWorkoutUseCaseTest {
         SkipWorkoutUseCase(repo)(workoutId = 3)
 
         coVerify(exactly = 0) {
-            repo.addWorkoutSession(any(), any(), any(), any())
+            repo.finishWorkoutSession(any(), any(), any(), any(), any())
         }
     }
 

@@ -3,7 +3,6 @@ package ru.hopes.workouttimer.data
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.flow.first
@@ -13,9 +12,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 import ru.hopes.workouttimer.data.dao.LastSessionDuration
+import ru.hopes.workouttimer.data.dao.SessionSetDraft
 import ru.hopes.workouttimer.data.dao.WorkoutDao
 import ru.hopes.workouttimer.data.entity.WorkoutEntity
 import ru.hopes.workouttimer.data.entity.WorkoutSessionEntity
+import ru.hopes.workouttimer.domain.model.ExerciseUnit
+import ru.hopes.workouttimer.domain.model.RecordedSet
 import ru.hopes.workouttimer.domain.model.Workout
 import ru.hopes.workouttimer.domain.repository.WidgetUpdater
 
@@ -31,18 +33,23 @@ class WorkoutRepositoryImplTest {
     }
 
     @Test
-    fun `addWorkoutSession stores the provided duration and inserts entity with converted workoutId`() = runTest {
-        val dao = mockk<WorkoutDao>()
-        val entitySlot = slot<WorkoutSessionEntity>()
-        coEvery { dao.insertSession(capture(entitySlot)) } just io.mockk.Runs
+    fun `finishWorkoutSession hands session and drafts to the dao in one call`() = runTest {
+        val dao = mockk<WorkoutDao>(relaxed = true)
+        val sessionSlot = slot<WorkoutSessionEntity>()
+        val draftsSlot = slot<List<SessionSetDraft>>()
+        coEvery { dao.finishSession(capture(sessionSlot), capture(draftsSlot)) } returns 1L
         val repo = WorkoutRepositoryImpl(dao, RecordingWidgetUpdater())
 
-        repo.addWorkoutSession(workoutId = 7, startedAt = 1_000L, finishedAt = 6_500L, durationMillis = 4_000L)
+        repo.finishWorkoutSession(
+            workoutId = 7, startedAt = 100, finishedAt = 400, durationMillis = 250,
+            sets = listOf(RecordedSet(3L, "Присед", 60.0, 0.0, 8, ExerciseUnit.KG))
+        )
 
-        assertEquals(7L, entitySlot.captured.workoutId)
-        assertEquals(1_000L, entitySlot.captured.startedAt)
-        assertEquals(6_500L, entitySlot.captured.finishedAt)
-        assertEquals(4_000L, entitySlot.captured.durationMillis)
+        assertEquals(7L, sessionSlot.captured.workoutId)
+        assertEquals(100L, sessionSlot.captured.startedAt)
+        assertEquals(400L, sessionSlot.captured.finishedAt)
+        assertEquals(250L, sessionSlot.captured.durationMillis)
+        assertEquals(listOf(SessionSetDraft(3L, "Присед", 60.0, 0.0, 8, "KG")), draftsSlot.captured)
     }
 
     @Test
@@ -87,7 +94,8 @@ class WorkoutRepositoryImplTest {
             Workout(id = 3, name = "Ноги", exercises = emptyList(), lastUseAt = 999L)
         )
 
-        coVerify { dao.updateWorkout(id = 3, name = "Ноги") }
+        coVerify { dao.updateWorkoutResolvingCatalog(3, "Ноги", any()) }
+        coVerify(exactly = 0) { dao.updateLastUseAt(any(), any()) }
     }
 
     @Test
@@ -109,6 +117,7 @@ class WorkoutRepositoryImplTest {
 
         repo.addWorkout(Workout(id = 0, name = "Ноги", exercises = emptyList(), lastUseAt = 1L))
 
+        coVerify { dao.insertWorkoutResolvingCatalog(any(), any()) }
         assertEquals(1, updater.updateCount)
     }
 
@@ -118,8 +127,10 @@ class WorkoutRepositoryImplTest {
         val updater = RecordingWidgetUpdater()
         val repo = WorkoutRepositoryImpl(dao, updater)
 
-        repo.deleteWorkout(WorkoutEntity(id = 3, name = "Ноги", lastUseAt = 1L))
+        val workout = WorkoutEntity(id = 3, name = "Ноги", lastUseAt = 1L)
+        repo.deleteWorkout(workout)
 
+        coVerify { dao.deleteWorkoutWithExercises(workout) }
         assertEquals(1, updater.updateCount)
     }
 
@@ -131,16 +142,17 @@ class WorkoutRepositoryImplTest {
 
         repo.updateWorkout(Workout(id = 3, name = "Ноги", exercises = emptyList(), lastUseAt = 1L))
 
+        coVerify { dao.updateWorkoutResolvingCatalog(3, "Ноги", any()) }
         assertEquals(1, updater.updateCount)
     }
 
     @Test
-    fun `addWorkoutSession does not request a widget update`() = runTest {
+    fun `finishWorkoutSession does not request a widget update`() = runTest {
         val dao = mockk<WorkoutDao>(relaxed = true)
         val updater = RecordingWidgetUpdater()
         val repo = WorkoutRepositoryImpl(dao, updater)
 
-        repo.addWorkoutSession(workoutId = 7, startedAt = 1L, finishedAt = 2L, durationMillis = 1L)
+        repo.finishWorkoutSession(workoutId = 7, startedAt = 1L, finishedAt = 2L, durationMillis = 1L, sets = emptyList())
 
         // Сессия всегда пишется в паре с updateLastUseAt(), второй пуш был бы лишним
         assertEquals(0, updater.updateCount)

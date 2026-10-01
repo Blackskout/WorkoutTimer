@@ -108,6 +108,89 @@ class MigrationTest {
             )
             assertEquals(listOf("", ""), textColumn(db, "SELECT note FROM exercises ORDER BY id"))
             assertEquals(listOf("0"), textColumn(db, "SELECT COUNT(*) FROM workout_sessions"))
+            assertEquals(listOf("Жим", "Подтягивания"), textColumn(db, "SELECT name FROM exercise_catalog ORDER BY name"))
+        }
+    }
+
+    @Test
+    fun `7 to 8 builds catalog merging cyrillic names by key`() {
+        helper.createDatabase(7).use { db ->
+            insertWorkoutV5(db, id = 1, name = "Ноги", lastUseAt = 1L)
+            insertWorkoutV5(db, id = 2, name = "Ноги Б", lastUseAt = 2L)
+            db.execSQL(
+                "INSERT INTO exercises (id, workoutId, name, weight, sets, reps, restTimeMillis, orderInWorkout, note) VALUES " +
+                    "(1, 1, 'Присед', 60.0, 4, 8, 120000, 0, ''), " +
+                    "(2, 2, '  присед ', 50.0, 4, 8, 120000, 0, ''), " +
+                    "(3, 2, 'Жим лёжа', 40.0, 3, 10, 90000, 1, ''), " +
+                    "(4, 1, 'ЖИМ ЛЕЖА', 45.0, 3, 10, 90000, 1, ''), " +
+                    "(5, 1, 'Жим\u00A0лёжа', 45.0, 3, 10, 90000, 2, '')"
+            )
+            db.execSQL("INSERT INTO workout_sessions (id, workoutId, startedAt, finishedAt, durationMillis) VALUES (1, 1, 10, 20, 10)")
+        }
+
+        helper.runMigrationsAndValidate(8, listOf(MIGRATION_7_8)).use { db ->
+            assertEquals(listOf("Жим лёжа", "Присед"), textColumn(db, "SELECT name FROM exercise_catalog ORDER BY name"))
+            assertEquals(listOf("KG", "KG"), textColumn(db, "SELECT unit FROM exercise_catalog"))
+            // одинаковый ключ — одна запись справочника
+            assertEquals(listOf("1"), textColumn(db, "SELECT COUNT(DISTINCT catalogId) FROM exercises WHERE id IN (1, 2)"))
+            assertEquals(listOf("1"), textColumn(db, "SELECT COUNT(DISTINCT catalogId) FROM exercises WHERE id IN (3, 4, 5)"))
+            // упражнения носят название своей записи справочника
+            assertEquals(listOf("Жим лёжа", "Жим лёжа", "Жим лёжа"), textColumn(db, "SELECT name FROM exercises WHERE id IN (3, 4, 5) ORDER BY id"))
+            assertEquals(listOf("0"), textColumn(db, "SELECT COUNT(*) FROM exercises WHERE catalogId = 0"))
+            // слияние в справочнике не схлопывает строки тренировки: ни одно упражнение не потеряно,
+            // а два с одним ключом в тренировке 1 (id 4 и 5) остаются отдельными строками
+            assertEquals(listOf("5"), textColumn(db, "SELECT COUNT(*) FROM exercises"))
+            assertEquals(listOf("2"), textColumn(db, "SELECT COUNT(*) FROM exercises WHERE workoutId = 1 AND id IN (4, 5)"))
+            // новая колонка extraWeight у старых строк — 0
+            assertEquals(listOf("0"), textColumn(db, "SELECT COUNT(*) FROM exercises WHERE extraWeight != 0"))
+            // сессии не тронуты, FK чистые
+            assertEquals(listOf("1"), textColumn(db, "SELECT COUNT(*) FROM workout_sessions"))
+            assertEquals(emptyList<String>(), textColumn(db, "PRAGMA foreign_key_check"))
+        }
+    }
+
+    @Test
+    fun `7 to 8 removes ghost exercises of deleted workouts`() {
+        helper.createDatabase(7).use { db ->
+            insertWorkoutV5(db, id = 1, name = "Ноги", lastUseAt = 1L)
+            db.execSQL(
+                "INSERT INTO exercises (id, workoutId, name, weight, sets, reps, restTimeMillis, orderInWorkout, note) VALUES " +
+                    "(1, 1, 'Присед', 60.0, 4, 8, 120000, 0, ''), " +
+                    "(2, 99, 'Призрак', 10.0, 1, 1, 1000, 0, '')"
+            )
+        }
+
+        helper.runMigrationsAndValidate(8, listOf(MIGRATION_7_8)).use { db ->
+            assertEquals(listOf("1"), textColumn(db, "SELECT id FROM exercises"))
+            assertEquals(listOf("Присед"), textColumn(db, "SELECT name FROM exercise_catalog"))
+        }
+    }
+
+    @Test
+    fun `7 to 8 turns blank names into untitled without clashing with existing untitled`() {
+        helper.createDatabase(7).use { db ->
+            insertWorkoutV5(db, id = 1, name = "Импорт", lastUseAt = 1L)
+            db.execSQL(
+                "INSERT INTO exercises (id, workoutId, name, weight, sets, reps, restTimeMillis, orderInWorkout, note) VALUES " +
+                    "(1, 1, '   ', 0.0, 1, 1, 1000, 0, ''), " +
+                    "(2, 1, 'Без названия', 0.0, 1, 1, 1000, 1, '')"
+            )
+        }
+
+        helper.runMigrationsAndValidate(8, listOf(MIGRATION_7_8)).use { db ->
+            assertEquals(listOf("Без названия"), textColumn(db, "SELECT name FROM exercise_catalog"))
+            assertEquals(listOf("Без названия", "Без названия"), textColumn(db, "SELECT name FROM exercises ORDER BY id"))
+        }
+    }
+
+    @Test
+    fun `7 to 8 accepts a database without exercises`() {
+        helper.createDatabase(7).use { db ->
+            insertWorkoutV5(db, id = 1, name = "Пустая", lastUseAt = 1L)
+        }
+
+        helper.runMigrationsAndValidate(8, listOf(MIGRATION_7_8)).use { db ->
+            assertEquals(listOf("0"), textColumn(db, "SELECT COUNT(*) FROM exercise_catalog"))
         }
     }
 
