@@ -3207,11 +3207,12 @@ Expected: PASS — `MiniBarStateTest` 5, `MiniWorkoutBarViewModelTest` 5, ост
 package ru.hopes.workouttimer.presentation.session
 
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
-import androidx.compose.ui.test.assertTouchHeightIsAtLeast
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -3219,6 +3220,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -3241,6 +3243,13 @@ class MiniWorkoutBarContentTest {
                 onExit = { exited++ }
             )
         }
+    }
+
+    // В compose-ui-test есть только assertTouchHeightIsEqualTo; «не меньше» — по границам
+    // зоны нажатия узла (они уже учитывают минимальный размер касания).
+    private fun SemanticsNodeInteraction.assertTouchHeightAtLeast48() {
+        val height = with(composeRule.density) { fetchSemanticsNode().touchBoundsInRoot.height.toDp() }
+        assertTrue("высота зоны нажатия $height < 48.dp", height >= 48.dp)
     }
 
     @Test
@@ -3279,9 +3288,9 @@ class MiniWorkoutBarContentTest {
     fun зоны_нажатия_не_меньше_48_dp() {
         show(MiniBarStatus.Resting(78_000L, 120_000L))
 
-        composeRule.onNodeWithText("Ноги").assertTouchHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithText("Ноги").assertTouchHeightAtLeast48()
         composeRule.onNodeWithContentDescription("Выйти из тренировки без сохранения")
-            .assertTouchHeightIsAtLeast(48.dp)
+            .assertTouchHeightAtLeast48()
     }
 
     @Test
@@ -6254,6 +6263,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 package ru.hopes.workouttimer.presentation.screen.workoutPreview
 
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
@@ -6335,11 +6345,12 @@ class WorkoutPreviewContentTest {
         composeRule.onNodeWithText("2 упр · 52:00", useUnmergedTree = true).assertIsDisplayed()
     }
 
+    // PrimaryButton пишет текст прописными: «Начать» на экране — «НАЧАТЬ».
     @Test
     fun без_сессии_кнопка_начать() {
         show(loaded(PreviewBottom.Start))
 
-        composeRule.onNodeWithText("Начать").performClick()
+        composeRule.onNodeWithText("НАЧАТЬ").performClick()
         composeRule.onNodeWithText("В сегодняшнюю").assertDoesNotExist()
 
         composeRule.runOnIdle { assertEquals(1, started) }
@@ -6349,8 +6360,8 @@ class WorkoutPreviewContentTest {
     fun идёт_эта_тренировка_вернуться() {
         show(loaded(PreviewBottom.Return))
 
-        composeRule.onNodeWithText("Начать").assertDoesNotExist()
-        composeRule.onNodeWithText("Вернуться к тренировке").performClick()
+        composeRule.onNodeWithText("НАЧАТЬ").assertDoesNotExist()
+        composeRule.onNodeWithText("ВЕРНУТЬСЯ К ТРЕНИРОВКЕ").performClick()
 
         composeRule.runOnIdle { assertEquals(1, returned) }
     }
@@ -6360,7 +6371,7 @@ class WorkoutPreviewContentTest {
         show(loaded(PreviewBottom.RunningOther("Ноги")))
 
         composeRule.onNodeWithText("Идёт «Ноги» — упражнение можно добавить в неё").assertIsDisplayed()
-        composeRule.onNodeWithText("Начать").assertDoesNotExist()
+        composeRule.onNodeWithText("НАЧАТЬ").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Добавить «Жим лёжа» в сегодняшнюю тренировку").performClick()
 
         composeRule.runOnIdle { assertEquals(listOf(press), added) }
@@ -6394,7 +6405,7 @@ class WorkoutPreviewContentTest {
         show(WorkoutPreviewState(isLoaded = true, workout = back.copy(exercises = emptyList()), bottom = PreviewBottom.None))
 
         composeRule.onNodeWithText("В тренировке нет упражнений").assertIsDisplayed()
-        composeRule.onNodeWithText("Начать").assertDoesNotExist()
+        composeRule.onNodeWithText("НАЧАТЬ").assertDoesNotExist()
     }
 
     @Test
