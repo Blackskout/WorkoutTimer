@@ -11,6 +11,14 @@ private val AppColorScheme = darkColorScheme(
     onSecondary = OnAccent,
     tertiary = Accent,
     onTertiary = OnAccent,
+    // Контейнеры читают стандартные компоненты (ползунок, чипы, индикаторы); не заданные,
+    // они остались бы фиолетовыми из базовой тёмной схемы Material.
+    primaryContainer = AccentContainer,
+    onPrimaryContainer = Accent,
+    secondaryContainer = AccentContainer,
+    onSecondaryContainer = Accent,
+    tertiaryContainer = AccentContainer,
+    onTertiaryContainer = Accent,
     background = Background,
     onBackground = TextPrimary,
     surface = SurfaceDark,
@@ -26,6 +34,8 @@ private val AppColorScheme = darkColorScheme(
     outlineVariant = OutlineDark,
     error = Destructive,
     onError = TextPrimary,
+    errorContainer = DestructiveContainer,
+    onErrorContainer = Destructive,
     inverseSurface = SurfaceElevated,
     inverseOnSurface = TextPrimary,
     inversePrimary = Accent

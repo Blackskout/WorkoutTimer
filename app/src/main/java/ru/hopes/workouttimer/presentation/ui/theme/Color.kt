@@ -18,4 +18,8 @@ val Accent = Color(0xFFC6FF3D)
 /** Тёмный край лаймового градиента герой-карты на главном экране. */
 val AccentDark = Color(0xFF9BE01E)
 val OnAccent = Color(0xFF0B0B0F)
+/** Тёмный оливковый тон акцента — контейнеры Material (выделения, дорожки), а не фиолетовый по умолчанию. */
+val AccentContainer = Color(0xFF2A3A0E)
+/** Тёмный тон ошибки для errorContainer. */
+val DestructiveContainer = Color(0xFF4A1416)
 val Destructive = Color(0xFFFF5C5C)

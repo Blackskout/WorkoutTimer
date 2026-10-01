@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -53,6 +53,7 @@ import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.domain.model.MusicState
 import ru.hopes.workouttimer.domain.model.TrackInfo
 
+// Минимум, а не точная высота: при крупном системном шрифте текст переносится, и строка растёт.
 private val BarHeight = 56.dp
 
 /**
@@ -111,11 +112,11 @@ private fun HintRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(BarHeight)
+            .heightIn(min = BarHeight)
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -143,7 +144,7 @@ private fun PlayerRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(BarHeight)
+            .heightIn(min = BarHeight)
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = 8.dp),
