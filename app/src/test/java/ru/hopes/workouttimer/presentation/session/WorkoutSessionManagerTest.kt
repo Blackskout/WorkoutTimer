@@ -1485,4 +1485,183 @@ class WorkoutSessionManagerTest {
 
         assertEquals("B", (manager.phase as WorkoutExecutionState.Rest).exercise.name)
     }
+
+    // --- Суперсеты: пара на сегодня, A → переход → B → отдых → A ---
+
+    private val WorkoutSessionManager.rest: WorkoutExecutionState.Rest
+        get() = phase as WorkoutExecutionState.Rest
+
+    /** Бицепс 3 подхода (отдых 90 с) и икры (отдых 60 с), ещё одно упражнение в конце. */
+    private fun supersetWorkout(calvesSets: Int = 3, bicepsSets: Int = 3) = workoutOf(
+        ex(1, "Бицепс", sets = bicepsSets).copy(timeMillis = 90_000),
+        ex(2, "Икры", sets = calvesSets).copy(timeMillis = 60_000),
+        ex(3, "Пресс", sets = 1)
+    )
+
+    @Test
+    fun `pairing keeps the current phase and position`() = runTest {
+        val manager = managerWith(supersetWorkout())
+        manager.start(1)
+
+        assertTrue(manager.pairWith(1))
+
+        assertEquals(listOf(Superset(lead = 0, second = 1)), manager.snapshot.supersets)
+        assertEquals(0, manager.snapshot.exerciseIndex)
+        assertEquals(1, manager.active.currentSet)
+    }
+
+    @Test
+    fun `a lead set is followed by a short transition to the same set of the second`() = runTest {
+        val manager = managerWith(supersetWorkout())
+        manager.start(1)
+        manager.pairWith(1)
+
+        manager.onExerciseFinished()
+
+        val rest = manager.rest
+        assertTrue(rest.isTransition)
+        assertEquals("Икры", rest.exercise.name)
+        assertEquals(1, rest.currentSet)
+        assertEquals(WorkoutSessionManager.TRANSITION_MILLIS, rest.totalRestTimeMillis)
+        assertEquals(1, manager.snapshot.exerciseIndex)
+    }
+
+    @Test
+    fun `a second set is followed by the longer of both rests back to the lead`() = runTest {
+        val manager = managerWith(supersetWorkout())
+        manager.start(1)
+        manager.pairWith(1)
+        manager.onExerciseFinished() // бицепс 1
+        manager.skipRest()
+
+        manager.onExerciseFinished() // икры 1
+
+        val rest = manager.rest
+        assertFalse(rest.isTransition)
+        assertEquals("Бицепс", rest.exercise.name)
+        assertEquals(2, rest.currentSet)
+        assertEquals(90_000L, rest.totalRestTimeMillis)
+        assertEquals(0, manager.snapshot.exerciseIndex)
+    }
+
+    @Test
+    fun `when the lead runs out the second goes on alone with its own rest`() = runTest {
+        val manager = managerWith(supersetWorkout(calvesSets = 3, bicepsSets = 1))
+        manager.start(1)
+        manager.pairWith(1)
+        manager.onExerciseFinished() // бицепс 1 — бицепс сделан
+        assertTrue(manager.rest.isTransition)
+        manager.skipRest()
+
+        manager.onExerciseFinished() // икры 1
+
+        val rest = manager.rest
+        assertFalse(rest.isTransition)
+        assertEquals("Икры", rest.exercise.name)
+        assertEquals(2, rest.currentSet)
+        assertEquals(60_000L, rest.totalRestTimeMillis)
+    }
+
+    @Test
+    fun `when the second runs out the lead goes on alone with its own rest`() = runTest {
+        val manager = managerWith(supersetWorkout(calvesSets = 1, bicepsSets = 3))
+        manager.start(1)
+        manager.pairWith(1)
+        manager.onExerciseFinished() // бицепс 1
+        manager.skipRest()
+        manager.onExerciseFinished() // икры 1 — икры сделаны → отдых → бицепс 2
+        manager.skipRest()
+
+        manager.onExerciseFinished() // бицепс 2
+
+        val rest = manager.rest
+        assertFalse(rest.isTransition)
+        assertEquals("Бицепс", rest.exercise.name)
+        assertEquals(3, rest.currentSet)
+        assertEquals(90_000L, rest.totalRestTimeMillis)
+    }
+
+    @Test
+    fun `after the pair is done the workout moves on and records every set`() = runTest {
+        val finish = mockk<FinishWorkoutSessionUseCase>()
+        val setsSlot = slot<List<RecordedSet>>()
+        coEvery { finish(any(), any(), any(), any(), capture(setsSlot)) } returns Unit
+        val manager = managerWith(supersetWorkout(calvesSets = 1, bicepsSets = 1), finish = finish)
+        manager.start(1)
+        manager.pairWith(1)
+
+        manager.onExerciseFinished() // бицепс
+        manager.skipRest()
+        manager.onExerciseFinished() // икры — пара сделана
+        assertEquals("Пресс", manager.rest.exercise.name)
+        manager.skipRest()
+        manager.onExerciseFinished()
+
+        assertEquals(listOf("Бицепс", "Икры", "Пресс"), setsSlot.captured.map { it.exerciseName })
+    }
+
+    @Test
+    fun `pairing is refused for itself, a finished or an already paired exercise`() = runTest {
+        val manager = managerWith(
+            workoutOf(ex(1, "A", sets = 2), ex(2, "B", sets = 1), ex(3, "C", sets = 1), ex(4, "D", sets = 1))
+        )
+        manager.start(1)
+        manager.moveToExercise(1)
+        manager.onExerciseFinished() // B сделано → отдых перед C
+        manager.moveToExercise(0)
+
+        assertFalse(manager.pairWith(0))   // само с собой
+        assertFalse(manager.pairWith(1))   // B сделано
+        assertTrue(manager.pairWith(2))
+        manager.moveToExercise(3)
+        assertFalse(manager.pairWith(2))   // C уже в паре
+        assertFalse(manager.pairWith(0))   // A уже в паре
+        assertEquals(listOf(Superset(lead = 0, second = 2)), manager.snapshot.supersets)
+    }
+
+    @Test
+    fun `nothing is paired without a workout in progress`() = runTest {
+        val manager = managerWith(supersetWorkout())
+
+        assertFalse(manager.pairWith(1))
+    }
+
+    @Test
+    fun `unpairing brings back the plain order`() = runTest {
+        val manager = managerWith(supersetWorkout())
+        manager.start(1)
+        manager.pairWith(1)
+
+        manager.unpair()
+        manager.onExerciseFinished()
+
+        assertTrue(manager.snapshot.supersets.isEmpty())
+        val rest = manager.rest
+        assertFalse(rest.isTransition)
+        assertEquals("Бицепс", rest.exercise.name)
+    }
+
+    @Test
+    fun `unpairing works from either exercise of the pair`() = runTest {
+        val manager = managerWith(supersetWorkout())
+        manager.start(1)
+        manager.pairWith(1)
+        manager.moveToExercise(1)
+
+        manager.unpair()
+
+        assertTrue(manager.snapshot.supersets.isEmpty())
+    }
+
+    @Test
+    fun `pairing registers an interaction`() = runTest {
+        val manager = managerWith(supersetWorkout())
+        manager.start(1)
+        val farFuture = System.currentTimeMillis() + 10_000_000L
+        manager.registerInteraction(now = farFuture)
+
+        manager.pairWith(1)
+
+        assertTrue(manager.lastInteractionAt < farFuture)
+    }
 }

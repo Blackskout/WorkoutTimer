@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.stateIn
 import ru.hopes.workouttimer.presentation.session.SessionExercise
+import ru.hopes.workouttimer.presentation.session.Superset
 import ru.hopes.workouttimer.presentation.session.WorkoutExecutionState
 import ru.hopes.workouttimer.presentation.session.WorkoutSession
 import ru.hopes.workouttimer.presentation.session.WorkoutSessionManager
@@ -76,6 +77,10 @@ class WorkoutExecutionViewModel @Inject constructor(
 
     fun moveToExercise(index: Int) = manager.moveToExercise(index)
 
+    fun pairWith(index: Int) = manager.pairWith(index)
+
+    fun unpair() = manager.unpair()
+
     fun updateExerciseNote(index: Int, note: String) = manager.updateExerciseNote(index, note)
 
     fun updateExerciseWeightAndReps(index: Int, weight: Double, extraWeight: Double, reps: Int) =
@@ -99,15 +104,28 @@ data class ExecutionChrome(
     val workoutName: String = "",
     val exercises: List<SessionExercise> = emptyList(),
     val exerciseIndex: Int = 0,
-    val isFinishing: Boolean = false
+    val isFinishing: Boolean = false,
+    val supersets: List<Superset> = emptyList()
 ) {
     val currentExerciseNumber: Int get() = exerciseIndex + 1
     val totalExercises: Int get() = exercises.size
+
+    fun partnerOf(index: Int): Int? = supersets.firstOrNull { it.contains(index) }
+        ?.let { if (it.lead == index) it.second else it.lead }
+
+    /** С чем текущее можно связать в суперсет: несделанное и ещё без пары. Пусто, если текущее занято. */
+    val supersetCandidates: List<Int>
+        get() {
+            val current = exercises.getOrNull(exerciseIndex) ?: return emptyList()
+            if (current.isDone || partnerOf(exerciseIndex) != null) return emptyList()
+            return exercises.indices.filter { it != exerciseIndex && !exercises[it].isDone && partnerOf(it) == null }
+        }
 }
 
 private fun WorkoutSession.Present.toChrome() = ExecutionChrome(
     workoutName = workoutName,
     exercises = exercises,
     exerciseIndex = exerciseIndex,
-    isFinishing = isFinishing
+    isFinishing = isFinishing,
+    supersets = supersets
 )
