@@ -50,8 +50,12 @@ internal fun WeightRepsSheetContent(
     weight: Double,
     extraWeight: Double,
     reps: Int,
+    /** С какой плитки открыта шторка: её барабаны ярче, остальные приглушены. */
+    focus: WeightRepsFocus = WeightRepsFocus.WEIGHT,
     onApply: (weight: Double, extraWeight: Double, reps: Int) -> Unit
 ) {
+    val dimWeight = focus == WeightRepsFocus.REPS
+    val dimReps = focus == WeightRepsFocus.WEIGHT && unit != ExerciseUnit.BODYWEIGHT
     var weightWheels by remember(weight) { mutableStateOf(weightWheelsOf(weight)) }
     var plateIndex by remember(weight) {
         mutableIntStateOf(wheelIndexOfNearest(PlateValues, weight))
@@ -73,7 +77,7 @@ internal fun WeightRepsSheetContent(
         WheelRow(
             modifier = Modifier.padding(vertical = 12.dp),
             // Целые и доли кг — одно число «40.25» с общей точкой и одной подписью.
-            decimalPoint = if (unit == ExerciseUnit.KG) DecimalPoint(0, stringResource(R.string.common_unit_kg)) else null
+            decimalPoint = if (unit == ExerciseUnit.KG) DecimalPoint(0, stringResource(R.string.common_unit_kg), dimmed = dimWeight) else null
         ) {
             when (unit) {
                 ExerciseUnit.KG -> {
@@ -83,6 +87,7 @@ internal fun WeightRepsSheetContent(
                         onSelected = { weightWheels = weightWheels.copy(wholeIndex = it) },
                         label = "",
                         itemAlignment = Alignment.End,
+                        dimmed = dimWeight,
                         format = { it.toString() }
                     )
                     WheelPicker(
@@ -91,6 +96,7 @@ internal fun WeightRepsSheetContent(
                         onSelected = { weightWheels = weightWheels.copy(fractionIndex = it) },
                         label = "",
                         itemAlignment = Alignment.Start,
+                        dimmed = dimWeight,
                         format = { formatWeightFraction(it) }
                     )
                 }
@@ -101,6 +107,7 @@ internal fun WeightRepsSheetContent(
                         selectedIndex = plateIndex,
                         onSelected = { plateIndex = it },
                         label = stringResource(R.string.unit_name_plate),
+                        dimmed = dimWeight,
                         format = { it.toCorrectNum() }
                     )
                     WheelPicker(
@@ -108,6 +115,7 @@ internal fun WeightRepsSheetContent(
                         selectedIndex = extraIndex,
                         onSelected = { extraIndex = it },
                         label = stringResource(R.string.unit_plate_extra),
+                        dimmed = dimWeight,
                         format = { it.toCorrectNum() }
                     )
                 }
@@ -119,6 +127,7 @@ internal fun WeightRepsSheetContent(
                 selectedIndex = repsIndex,
                 onSelected = { repsIndex = it },
                 label = stringResource(R.string.common_unit_reps),
+                dimmed = dimReps,
                 format = { it.toString() }
             )
         }
@@ -165,3 +174,6 @@ private fun WeightRepsSheetContentPlatePreview() {
         )
     }
 }
+
+/** Плитка, с которой открыли шторку веса и повторов. */
+enum class WeightRepsFocus { WEIGHT, REPS }

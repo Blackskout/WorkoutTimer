@@ -91,6 +91,7 @@ fun WorkoutExecutionScreen(
     // текущего упражнения (в Rest — упражнения следующего подхода).
     var noteIndex by remember { mutableStateOf<Int?>(null) }
     var weightSheetIndex by remember { mutableStateOf<Int?>(null) }
+    var weightSheetFocus by remember { mutableStateOf(WeightRepsFocus.WEIGHT) }
     var showExitDialog by remember { mutableStateOf(false) }
     var showFinishDialog by remember { mutableStateOf(false) }
     var showExercisePicker by remember { mutableStateOf(false) }
@@ -250,13 +251,19 @@ fun WorkoutExecutionScreen(
                     is WorkoutExecutionState.Active -> ActiveContent(
                         state = currentState,
                         onEditNote = { noteIndex = chrome.exerciseIndex },
-                        onEditWeightAndReps = { weightSheetIndex = chrome.exerciseIndex }
+                        onEditWeightAndReps = { focus ->
+                            weightSheetFocus = focus
+                            weightSheetIndex = chrome.exerciseIndex
+                        }
                     )
 
                     is WorkoutExecutionState.Rest -> RestContent(
                         state = currentState,
                         onEditNote = { noteIndex = chrome.exerciseIndex },
-                        onEditWeightAndReps = { weightSheetIndex = chrome.exerciseIndex }
+                        onEditWeightAndReps = { focus ->
+                            weightSheetFocus = focus
+                            weightSheetIndex = chrome.exerciseIndex
+                        }
                     )
 
                     is WorkoutExecutionState.Finished -> Unit
@@ -450,6 +457,7 @@ fun WorkoutExecutionScreen(
                 weight = weightSheetExercise.weight,
                 extraWeight = weightSheetExercise.extraWeight,
                 reps = weightSheetExercise.reps,
+                focus = weightSheetFocus,
                 onApply = { weight, extraWeight, reps ->
                     viewModel.updateExerciseWeightAndReps(index, weight, extraWeight, reps)
                     weightSheetIndex = null
@@ -556,7 +564,8 @@ private fun ExerciseChip(
 internal fun ActiveContent(
     state: WorkoutExecutionState.Active,
     onEditNote: (Exercise) -> Unit,
-    onEditWeightAndReps: (Exercise) -> Unit
+    /** Тап по плитке веса или повторов: шторка подсвечивает свои барабаны. */
+    onEditWeightAndReps: (WeightRepsFocus) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -587,7 +596,7 @@ internal fun ActiveContent(
                     value = state.weight.toCorrectNum(),
                     unit = stringResource(R.string.common_unit_kg),
                     modifier = Modifier.weight(1f),
-                    onClick = { onEditWeightAndReps(state.exercise) }
+                    onClick = { onEditWeightAndReps(WeightRepsFocus.WEIGHT) }
                 )
 
                 ExerciseUnit.PLATE -> StatTile(
@@ -598,7 +607,7 @@ internal fun ActiveContent(
                         stringResource(R.string.unit_name_plate)
                     },
                     modifier = Modifier.weight(1f),
-                    onClick = { onEditWeightAndReps(state.exercise) }
+                    onClick = { onEditWeightAndReps(WeightRepsFocus.WEIGHT) }
                 )
 
                 // Без веса плитки нагрузки нет: повторы занимают всю ширину.
@@ -608,7 +617,7 @@ internal fun ActiveContent(
                 value = state.reps.toString(),
                 unit = stringResource(R.string.common_unit_reps),
                 modifier = Modifier.weight(1f),
-                onClick = { onEditWeightAndReps(state.exercise) }
+                onClick = { onEditWeightAndReps(WeightRepsFocus.REPS) }
             )
         }
         NoteBlock(
@@ -623,7 +632,8 @@ internal fun ActiveContent(
 private fun RestContent(
     state: WorkoutExecutionState.Rest,
     onEditNote: (Exercise) -> Unit,
-    onEditWeightAndReps: (Exercise) -> Unit
+    /** Тап по плитке веса или повторов: шторка подсвечивает свои барабаны. */
+    onEditWeightAndReps: (WeightRepsFocus) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -667,7 +677,7 @@ private fun RestContent(
             modifier = Modifier
                 .padding(top = 6.dp)
                 .clip(MaterialTheme.shapes.small)
-                .clickable { onEditWeightAndReps(state.exercise) }
+                .clickable { onEditWeightAndReps(WeightRepsFocus.WEIGHT) }
                 .padding(horizontal = 8.dp, vertical = 4.dp)
         )
         NoteBlock(

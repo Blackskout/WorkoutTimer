@@ -23,6 +23,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.layout.Layout
@@ -82,10 +83,13 @@ fun formatWeightFraction(fraction: Double): String = (fraction * 100).toInt().to
  * Общая точка между барабанами [afterIndex] и [afterIndex] + 1 и одна подпись над парой:
  * целые и доли читаются как одно число «40.25».
  */
-data class DecimalPoint(val afterIndex: Int, val label: String)
+data class DecimalPoint(val afterIndex: Int, val label: String, val dimmed: Boolean = false)
 
 /** Отступ значений от общей точки, когда барабан к ней прижат. */
 private val DecimalGap = 20.dp
+
+/** Прозрачность приглушённого барабана: виден и крутится, но взгляд идёт на главный. */
+private const val DimmedAlpha = 0.4f
 
 /** Доля на 300 обрезается: выше максимума сетки вес не поднимается. */
 fun weightOf(wheels: WeightWheels): Double =
@@ -126,6 +130,8 @@ fun <T> WheelPicker(
     modifier: Modifier = Modifier,
     /** Center — обычный барабан; End/Start — прижат к общей точке слева/справа от неё. */
     itemAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
+    /** Приглушён: шторка открыта с другой плитки, этот барабан сейчас не главный. */
+    dimmed: Boolean = false,
     format: (T) -> String
 ) {
     val state = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex)
@@ -163,7 +169,7 @@ fun <T> WheelPicker(
     }
 
     Column(
-        modifier = modifier,
+        modifier = modifier.alpha(if (dimmed) DimmedAlpha else 1f),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
@@ -257,14 +263,17 @@ fun WheelRow(
                 { EqualWidthRowScope.content() },
                 {
                     if (decimalPoint != null) {
+                        val decorationAlpha = Modifier.alpha(if (decimalPoint.dimmed) DimmedAlpha else 1f)
                         // Точка — тем же шрифтом, что выбранное значение (26.sp, ExtraBold).
                         Text(
+                            modifier = decorationAlpha,
                             text = ".",
                             fontSize = 26.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         BasicText(
+                            modifier = decorationAlpha,
                             text = decimalPoint.label.uppercase(),
                             style = labelStyle.copy(color = MaterialTheme.colorScheme.primary),
                             maxLines = 1
