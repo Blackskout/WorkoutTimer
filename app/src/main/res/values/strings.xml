@@ -20,7 +20,6 @@
     <string name="unit_name_plate">плита</string>
     <string name="unit_name_bodyweight">без веса</string>
     <string name="unit_plate_extra">+кг</string>
-    <string name="unit_weight_fraction">доли</string>
     <string name="unit_plate_with_extra">плита +%1$s кг</string>
     <string name="unit_load_kg">%1$s кг</string>
     <string name="unit_load_plate">плита %1$s</string>

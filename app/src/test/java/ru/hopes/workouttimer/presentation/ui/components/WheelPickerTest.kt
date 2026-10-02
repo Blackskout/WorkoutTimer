@@ -85,7 +85,7 @@ class WheelPickerTest {
     }
 
     @Test
-    fun `доли подписаны одинаковой ширины`() {
-        assertEquals(listOf(",00", ",25", ",50", ",75"), WeightFractionValues.map(::formatWeightFraction))
+    fun `доли — две цифры после общей точки`() {
+        assertEquals(listOf("00", "25", "50", "75"), WeightFractionValues.map(::formatWeightFraction))
     }
 }

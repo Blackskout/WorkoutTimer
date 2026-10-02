@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -20,6 +21,7 @@ import ru.hopes.workouttimer.presentation.ui.components.PlateExtraValues
 import ru.hopes.workouttimer.presentation.ui.components.PlateValues
 import ru.hopes.workouttimer.presentation.ui.components.PrimaryButton
 import ru.hopes.workouttimer.presentation.ui.components.RepsValues
+import ru.hopes.workouttimer.presentation.ui.components.DecimalPoint
 import ru.hopes.workouttimer.presentation.ui.components.WeightFractionValues
 import ru.hopes.workouttimer.presentation.ui.components.WeightWholeValues
 import ru.hopes.workouttimer.presentation.ui.components.formatWeightFraction
@@ -68,21 +70,27 @@ internal fun WeightRepsSheetContent(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(top = 8.dp)
         )
-        WheelRow(modifier = Modifier.padding(vertical = 12.dp)) {
+        WheelRow(
+            modifier = Modifier.padding(vertical = 12.dp),
+            // Целые и доли кг — одно число «40.25» с общей точкой и одной подписью.
+            decimalPoint = if (unit == ExerciseUnit.KG) DecimalPoint(0, stringResource(R.string.common_unit_kg)) else null
+        ) {
             when (unit) {
                 ExerciseUnit.KG -> {
                     WheelPicker(
                         items = WeightWholeValues,
                         selectedIndex = weightWheels.wholeIndex,
                         onSelected = { weightWheels = weightWheels.copy(wholeIndex = it) },
-                        label = stringResource(R.string.common_unit_kg),
+                        label = "",
+                        itemAlignment = Alignment.End,
                         format = { it.toString() }
                     )
                     WheelPicker(
                         items = WeightFractionValues,
                         selectedIndex = weightWheels.fractionIndex,
                         onSelected = { weightWheels = weightWheels.copy(fractionIndex = it) },
-                        label = stringResource(R.string.unit_weight_fraction),
+                        label = "",
+                        itemAlignment = Alignment.Start,
                         format = { formatWeightFraction(it) }
                     )
                 }

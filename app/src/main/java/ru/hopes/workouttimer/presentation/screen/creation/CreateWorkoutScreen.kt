@@ -66,6 +66,7 @@ import ru.hopes.workouttimer.presentation.ui.components.PlateValues
 import ru.hopes.workouttimer.presentation.ui.components.PrimaryButton
 import ru.hopes.workouttimer.presentation.ui.components.RepsValues
 import ru.hopes.workouttimer.presentation.ui.components.SectionHeader
+import ru.hopes.workouttimer.presentation.ui.components.DecimalPoint
 import ru.hopes.workouttimer.presentation.ui.components.WeightFractionValues
 import ru.hopes.workouttimer.presentation.ui.components.WeightWholeValues
 import ru.hopes.workouttimer.presentation.ui.components.WheelPicker
@@ -450,7 +451,11 @@ internal fun ExerciseEditSheetContent(
         // WheelPicker запоминает позицию при первом показе, поэтому смена единицы
         // пересоздаёт ряд барабанов целиком. Единицу редактор показывает, но не меняет.
         key(unit) {
-            WheelRow(modifier = Modifier.padding(vertical = 12.dp)) {
+            WheelRow(
+                modifier = Modifier.padding(vertical = 12.dp),
+                // Целые и доли кг — одно число «40.25» с общей точкой и одной подписью.
+                decimalPoint = if (unit == ExerciseUnit.KG) DecimalPoint(0, stringResource(R.string.common_unit_kg)) else null
+            ) {
                 when (unit) {
                     ExerciseUnit.KG -> {
                         WheelPicker(
@@ -460,7 +465,8 @@ internal fun ExerciseEditSheetContent(
                                 weightWheels = weightWheels.copy(wholeIndex = it)
                                 onChange(item.copy(weight = weightOf(weightWheels)))
                             },
-                            label = stringResource(R.string.common_unit_kg),
+                            label = "",
+                            itemAlignment = Alignment.End,
                             format = { it.toString() }
                         )
                         WheelPicker(
@@ -470,7 +476,8 @@ internal fun ExerciseEditSheetContent(
                                 weightWheels = weightWheels.copy(fractionIndex = it)
                                 onChange(item.copy(weight = weightOf(weightWheels)))
                             },
-                            label = stringResource(R.string.unit_weight_fraction),
+                            label = "",
+                            itemAlignment = Alignment.Start,
                             format = { formatWeightFraction(it) }
                         )
                     }

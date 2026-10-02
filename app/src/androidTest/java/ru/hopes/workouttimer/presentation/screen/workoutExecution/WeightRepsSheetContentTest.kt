@@ -44,9 +44,9 @@ class WeightRepsSheetContentTest {
         assertEquals(80.0 to 8, applied)
     }
 
-    /** Вес в кг — два барабана: целые килограммы и доли, чтобы блин 2,5 не крутить десятью шагами. */
+    /** Вес в кг — два барабана с общей точкой: «61 . 75», чтобы блин 2,5 не крутить десятью шагами. */
     @Test
-    fun у_веса_в_кг_барабаны_целых_и_долей() {
+    fun у_веса_в_кг_барабаны_целых_и_долей_с_общей_точкой() {
         composeRule.setContent {
             WorkoutTimerTheme {
                 WeightRepsSheetContent(
@@ -61,8 +61,9 @@ class WeightRepsSheetContentTest {
         }
 
         composeRule.onNodeWithText("КГ").assertExists()
-        composeRule.onNodeWithText("ДОЛИ").assertExists()
-        composeRule.onNodeWithText(",75").assertExists()
+        composeRule.onNodeWithText(".").assertExists()
+        composeRule.onNodeWithText("61").assertExists()
+        composeRule.onNodeWithText("75").assertExists()
     }
 
     /**

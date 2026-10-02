@@ -75,8 +75,17 @@ fun weightWheelsOf(weight: Double): WeightWheels {
     return WeightWheels(whole, WeightFractionValues.indexOf(snapped - whole))
 }
 
-/** Подпись доли на барабане: «,00», «,25», «,50», «,75» — одинаковой ширины. */
-fun formatWeightFraction(fraction: Double): String = "," + (fraction * 100).toInt().toString().padStart(2, '0')
+/** Доля на барабане — цифры после общей точки: «00», «25», «50», «75». */
+fun formatWeightFraction(fraction: Double): String = (fraction * 100).toInt().toString().padStart(2, '0')
+
+/**
+ * Общая точка между барабанами [afterIndex] и [afterIndex] + 1 и одна подпись над парой:
+ * целые и доли читаются как одно число «40.25».
+ */
+data class DecimalPoint(val afterIndex: Int, val label: String)
+
+/** Отступ значений от общей точки, когда барабан к ней прижат. */
+private val DecimalGap = 20.dp
 
 /** Доля на 300 обрезается: выше максимума сетки вес не поднимается. */
 fun weightOf(wheels: WeightWheels): Double =
@@ -115,9 +124,16 @@ fun <T> WheelPicker(
     onSelected: (Int) -> Unit,
     label: String,
     modifier: Modifier = Modifier,
+    /** Center — обычный барабан; End/Start — прижат к общей точке слева/справа от неё. */
+    itemAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
     format: (T) -> String
 ) {
     val state = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex)
+    val itemPadding = when (itemAlignment) {
+        Alignment.End -> Modifier.padding(end = DecimalGap)
+        Alignment.Start -> Modifier.padding(start = DecimalGap)
+        else -> Modifier
+    }
     val fling = rememberSnapFlingBehavior(lazyListState = state)
 
     val centeredIndex by remember {
@@ -177,8 +193,13 @@ fun <T> WheelPicker(
                 Box(
                     modifier = Modifier
                         .height(ItemHeight)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .then(itemPadding),
+                    contentAlignment = when (itemAlignment) {
+                        Alignment.End -> Alignment.CenterEnd
+                        Alignment.Start -> Alignment.CenterStart
+                        else -> Alignment.Center
+                    }
                 ) {
                     Text(
                         text = format(items[index]),
@@ -214,6 +235,7 @@ fun <T> WheelPicker(
 @Composable
 fun WheelRow(
     modifier: Modifier = Modifier,
+    decimalPoint: DecimalPoint? = null,
     content: @Composable RowScope.() -> Unit
 ) {
     Box(modifier = modifier.fillMaxWidth()) {
@@ -229,10 +251,29 @@ fun WheelRow(
                 .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         )
+        val labelStyle = MaterialTheme.typography.labelSmall
         Layout(
-            content = { EqualWidthRowScope.content() },
+            contents = listOf(
+                { EqualWidthRowScope.content() },
+                {
+                    if (decimalPoint != null) {
+                        // Точка — тем же шрифтом, что выбранное значение (26.sp, ExtraBold).
+                        Text(
+                            text = ".",
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        BasicText(
+                            text = decimalPoint.label.uppercase(),
+                            style = labelStyle.copy(color = MaterialTheme.colorScheme.primary),
+                            maxLines = 1
+                        )
+                    }
+                }
+            ),
             modifier = Modifier.fillMaxWidth()
-        ) { measurables, constraints ->
+        ) { (measurables, decorations), constraints ->
             if (measurables.isEmpty()) {
                 return@Layout layout(constraints.minWidth, constraints.minHeight) {}
             }
@@ -245,11 +286,25 @@ fun WheelRow(
             )
             val placeables = measurables.map { it.measure(childConstraints) }
             val rowHeight = placeables.maxOf { it.height }
+            val decorationPlaceables = decorations.map { it.measure(Constraints()) }
             layout(constraints.maxWidth, rowHeight) {
                 var x = 0
                 placeables.forEach { placeable ->
                     placeable.placeRelative(x, 0)
                     x += childWidth
+                }
+                if (decimalPoint != null && decorationPlaceables.size == 2) {
+                    val (dot, label) = decorationPlaceables
+                    val boundary = childWidth * (decimalPoint.afterIndex + 1)
+                    val bandTop = (LabelHeight + ItemHeight * EDGE_ITEMS).roundToPx()
+                    dot.placeRelative(
+                        boundary - dot.width / 2,
+                        bandTop + (ItemHeight.roundToPx() - dot.height) / 2
+                    )
+                    label.placeRelative(
+                        boundary - label.width / 2,
+                        (LabelHeight.roundToPx() - label.height) / 2
+                    )
                 }
             }
         }
