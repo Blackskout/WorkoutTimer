@@ -7,8 +7,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -19,7 +21,12 @@ import ru.hopes.workouttimer.presentation.ui.components.PlateExtraValues
 import ru.hopes.workouttimer.presentation.ui.components.PlateValues
 import ru.hopes.workouttimer.presentation.ui.components.PrimaryButton
 import ru.hopes.workouttimer.presentation.ui.components.RepsValues
-import ru.hopes.workouttimer.presentation.ui.components.WeightValues
+import ru.hopes.workouttimer.presentation.ui.components.DecimalPoint
+import ru.hopes.workouttimer.presentation.ui.components.WeightFractionValues
+import ru.hopes.workouttimer.presentation.ui.components.WeightWholeValues
+import ru.hopes.workouttimer.presentation.ui.components.formatWeightFraction
+import ru.hopes.workouttimer.presentation.ui.components.weightOf
+import ru.hopes.workouttimer.presentation.ui.components.weightWheelsOf
 import ru.hopes.workouttimer.presentation.ui.components.WheelPicker
 import ru.hopes.workouttimer.presentation.ui.components.WheelRow
 import ru.hopes.workouttimer.presentation.ui.components.wheelIndexOfNearest
@@ -43,11 +50,13 @@ internal fun WeightRepsSheetContent(
     weight: Double,
     extraWeight: Double,
     reps: Int,
+    /** С какой плитки открыта шторка: её барабаны ярче, остальные приглушены. */
+    focus: WeightRepsFocus = WeightRepsFocus.WEIGHT,
     onApply: (weight: Double, extraWeight: Double, reps: Int) -> Unit
 ) {
-    var weightIndex by remember(weight) {
-        mutableIntStateOf(wheelIndexOfNearest(WeightValues, weight))
-    }
+    val dimWeight = focus == WeightRepsFocus.REPS
+    val dimReps = focus == WeightRepsFocus.WEIGHT && unit != ExerciseUnit.BODYWEIGHT
+    var weightWheels by remember(weight) { mutableStateOf(weightWheelsOf(weight)) }
     var plateIndex by remember(weight) {
         mutableIntStateOf(wheelIndexOfNearest(PlateValues, weight))
     }
@@ -65,15 +74,32 @@ internal fun WeightRepsSheetContent(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(top = 8.dp)
         )
-        WheelRow(modifier = Modifier.padding(vertical = 12.dp)) {
+        WheelRow(
+            modifier = Modifier.padding(vertical = 12.dp),
+            // Целые и доли кг — одно число «40.25» с общей точкой и одной подписью.
+            decimalPoint = if (unit == ExerciseUnit.KG) DecimalPoint(0, stringResource(R.string.common_unit_kg), dimmed = dimWeight) else null
+        ) {
             when (unit) {
-                ExerciseUnit.KG -> WheelPicker(
-                    items = WeightValues,
-                    selectedIndex = weightIndex,
-                    onSelected = { weightIndex = it },
-                    label = stringResource(R.string.common_unit_kg),
-                    format = { it.toCorrectNum() }
-                )
+                ExerciseUnit.KG -> {
+                    WheelPicker(
+                        items = WeightWholeValues,
+                        selectedIndex = weightWheels.wholeIndex,
+                        onSelected = { weightWheels = weightWheels.copy(wholeIndex = it) },
+                        label = "",
+                        itemAlignment = Alignment.End,
+                        dimmed = dimWeight,
+                        format = { it.toString() }
+                    )
+                    WheelPicker(
+                        items = WeightFractionValues,
+                        selectedIndex = weightWheels.fractionIndex,
+                        onSelected = { weightWheels = weightWheels.copy(fractionIndex = it) },
+                        label = "",
+                        itemAlignment = Alignment.Start,
+                        dimmed = dimWeight,
+                        format = { formatWeightFraction(it) }
+                    )
+                }
 
                 ExerciseUnit.PLATE -> {
                     WheelPicker(
@@ -81,6 +107,7 @@ internal fun WeightRepsSheetContent(
                         selectedIndex = plateIndex,
                         onSelected = { plateIndex = it },
                         label = stringResource(R.string.unit_name_plate),
+                        dimmed = dimWeight,
                         format = { it.toCorrectNum() }
                     )
                     WheelPicker(
@@ -88,6 +115,7 @@ internal fun WeightRepsSheetContent(
                         selectedIndex = extraIndex,
                         onSelected = { extraIndex = it },
                         label = stringResource(R.string.unit_plate_extra),
+                        dimmed = dimWeight,
                         format = { it.toCorrectNum() }
                     )
                 }
@@ -99,6 +127,7 @@ internal fun WeightRepsSheetContent(
                 selectedIndex = repsIndex,
                 onSelected = { repsIndex = it },
                 label = stringResource(R.string.common_unit_reps),
+                dimmed = dimReps,
                 format = { it.toString() }
             )
         }
@@ -107,7 +136,7 @@ internal fun WeightRepsSheetContent(
             onClick = {
                 val newReps = RepsValues[repsIndex]
                 when (unit) {
-                    ExerciseUnit.KG -> onApply(WeightValues[weightIndex], 0.0, newReps)
+                    ExerciseUnit.KG -> onApply(weightOf(weightWheels), 0.0, newReps)
                     ExerciseUnit.PLATE -> onApply(PlateValues[plateIndex], PlateExtraValues[extraIndex], newReps)
                     ExerciseUnit.BODYWEIGHT -> onApply(0.0, 0.0, newReps)
                 }
@@ -145,3 +174,6 @@ private fun WeightRepsSheetContentPlatePreview() {
         )
     }
 }
+
+/** Плитка, с которой открыли шторку веса и повторов. */
+enum class WeightRepsFocus { WEIGHT, REPS }

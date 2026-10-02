@@ -4,6 +4,8 @@ import ru.hopes.workouttimer.presentation.session.WorkoutExecutionState
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import org.junit.Assert.assertEquals
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
 import org.junit.Test
@@ -19,6 +21,8 @@ class ActiveContentTilesTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    private val focuses = mutableListOf<WeightRepsFocus>()
+
     private fun show(unit: ExerciseUnit, weight: Double, extra: Double = 0.0) {
         val exercise = Exercise(
             id = 1, name = "Тяга блока", weight = weight, sets = 3, reps = 12, order = 1,
@@ -29,7 +33,7 @@ class ActiveContentTilesTest {
                 ActiveContent(
                     state = WorkoutExecutionState.Active(exercise = exercise, currentSet = 1),
                     onEditNote = {},
-                    onEditWeightAndReps = {}
+                    onEditWeightAndReps = { focuses += it }
                 )
             }
         }
@@ -57,5 +61,15 @@ class ActiveContentTilesTest {
         composeRule.onNodeWithText("КГ").assertDoesNotExist()
         composeRule.onNodeWithText("ПЛИТА").assertDoesNotExist()
         composeRule.onNodeWithText("ПОВТ").assertIsDisplayed()
+    }
+
+    @Test
+    fun плитки_сообщают_с_какой_открыта_шторка() {
+        show(ExerciseUnit.KG, weight = 40.0)
+
+        composeRule.onNodeWithText("КГ").performClick()
+        composeRule.onNodeWithText("ПОВТ").performClick()
+
+        assertEquals(listOf(WeightRepsFocus.WEIGHT, WeightRepsFocus.REPS), focuses)
     }
 }

@@ -66,9 +66,14 @@ import ru.hopes.workouttimer.presentation.ui.components.PlateValues
 import ru.hopes.workouttimer.presentation.ui.components.PrimaryButton
 import ru.hopes.workouttimer.presentation.ui.components.RepsValues
 import ru.hopes.workouttimer.presentation.ui.components.SectionHeader
-import ru.hopes.workouttimer.presentation.ui.components.WeightValues
+import ru.hopes.workouttimer.presentation.ui.components.DecimalPoint
+import ru.hopes.workouttimer.presentation.ui.components.WeightFractionValues
+import ru.hopes.workouttimer.presentation.ui.components.WeightWholeValues
 import ru.hopes.workouttimer.presentation.ui.components.WheelPicker
 import ru.hopes.workouttimer.presentation.ui.components.WheelRow
+import ru.hopes.workouttimer.presentation.ui.components.formatWeightFraction
+import ru.hopes.workouttimer.presentation.ui.components.weightOf
+import ru.hopes.workouttimer.presentation.ui.components.weightWheelsOf
 import ru.hopes.workouttimer.presentation.ui.components.wheelIndexOfNearest
 import ru.hopes.workouttimer.presentation.ui.theme.CardSpacing
 import ru.hopes.workouttimer.presentation.ui.theme.ScreenPadding
@@ -401,9 +406,7 @@ internal fun ExerciseEditSheetContent(
     // Ключ включает единицу: подсказка с другой единицей меняет набор барабанов,
     // и индексы прежнего набора к новому не относятся.
     val load = fitLoadToUnit(item.weight, item.extraWeight, unit)
-    var weightIndex by remember(item.id, unit) {
-        mutableIntStateOf(wheelIndexOfNearest(WeightValues, load.weight))
-    }
+    var weightWheels by remember(item.id, unit) { mutableStateOf(weightWheelsOf(load.weight)) }
     var plateIndex by remember(item.id, unit) {
         mutableIntStateOf(wheelIndexOfNearest(PlateValues, load.weight))
     }
@@ -448,18 +451,36 @@ internal fun ExerciseEditSheetContent(
         // WheelPicker запоминает позицию при первом показе, поэтому смена единицы
         // пересоздаёт ряд барабанов целиком. Единицу редактор показывает, но не меняет.
         key(unit) {
-            WheelRow(modifier = Modifier.padding(vertical = 12.dp)) {
+            WheelRow(
+                modifier = Modifier.padding(vertical = 12.dp),
+                // Целые и доли кг — одно число «40.25» с общей точкой и одной подписью.
+                decimalPoint = if (unit == ExerciseUnit.KG) DecimalPoint(0, stringResource(R.string.common_unit_kg)) else null
+            ) {
                 when (unit) {
-                    ExerciseUnit.KG -> WheelPicker(
-                        items = WeightValues,
-                        selectedIndex = weightIndex,
-                        onSelected = {
-                            weightIndex = it
-                            onChange(item.copy(weight = WeightValues[it]))
-                        },
-                        label = stringResource(R.string.common_unit_kg),
-                        format = { it.toCorrectNum() }
-                    )
+                    ExerciseUnit.KG -> {
+                        WheelPicker(
+                            items = WeightWholeValues,
+                            selectedIndex = weightWheels.wholeIndex,
+                            onSelected = {
+                                weightWheels = weightWheels.copy(wholeIndex = it)
+                                onChange(item.copy(weight = weightOf(weightWheels)))
+                            },
+                            label = "",
+                            itemAlignment = Alignment.End,
+                            format = { it.toString() }
+                        )
+                        WheelPicker(
+                            items = WeightFractionValues,
+                            selectedIndex = weightWheels.fractionIndex,
+                            onSelected = {
+                                weightWheels = weightWheels.copy(fractionIndex = it)
+                                onChange(item.copy(weight = weightOf(weightWheels)))
+                            },
+                            label = "",
+                            itemAlignment = Alignment.Start,
+                            format = { formatWeightFraction(it) }
+                        )
+                    }
 
                     ExerciseUnit.PLATE -> {
                         WheelPicker(
