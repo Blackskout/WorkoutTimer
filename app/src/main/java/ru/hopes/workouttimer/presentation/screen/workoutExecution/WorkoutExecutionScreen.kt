@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,6 +51,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -121,6 +125,7 @@ fun WorkoutExecutionScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val snackbarScope = rememberCoroutineScope()
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val finishError by viewModel.finishError.collectAsState()
     val finishErrorText = stringResource(R.string.execution_finish_error)
     LaunchedEffect(finishError) {
@@ -242,7 +247,31 @@ fun WorkoutExecutionScreen(
                 )
             }
 
-            Box(modifier = Modifier.weight(1f)) {
+            // Долгое нажатие на свободное место (и на кольцо отдыха) — сколько прошло и осталось.
+            // Плитки и заметка ловят нажатие сами: их down уже поглощён, сюда оно не доходит.
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .pointerInput(Unit) {
+                        detectTapGestures(onLongPress = {
+                            val eta = viewModel.workoutEta() ?: return@detectTapGestures
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            // Остаток округляется до минуты: «≈ 0 мин» на последнем подходе бессмысленно.
+                            val text = context.getString(
+                                R.string.execution_eta,
+                                DateFormatter.formatDurationToString(context, eta.elapsedMillis),
+                                DateFormatter.formatDurationToString(context, eta.remainingMillis.roundUpToMinute()),
+                                context.resources.getQuantityString(
+                                    R.plurals.preview_sets, eta.remainingSets, eta.remainingSets
+                                )
+                            )
+                            snackbarScope.launch {
+                                snackbarHostState.currentSnackbarData?.dismiss()
+                                snackbarHostState.showSnackbar(text)
+                            }
+                        })
+                    }
+            ) {
                 when (currentState) {
                     is WorkoutExecutionState.Loading -> LoadingContent()
 
@@ -551,6 +580,8 @@ fun WorkoutExecutionScreen(
         )
     }
 }
+
+private fun Long.roundUpToMinute(): Long = (this + 59_999L) / 60_000L * 60_000L
 
 @Composable
 private fun ExerciseChip(
