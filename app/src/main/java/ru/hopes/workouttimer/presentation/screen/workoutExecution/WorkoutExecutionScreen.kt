@@ -50,7 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -120,7 +120,7 @@ fun WorkoutExecutionScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val snackbarScope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val finishError by viewModel.finishError.collectAsState()
     val finishErrorText = stringResource(R.string.execution_finish_error)
     LaunchedEffect(finishError) {
@@ -310,7 +310,7 @@ fun WorkoutExecutionScreen(
                                     snackbarScope.launch {
                                         snackbarHostState.currentSnackbarData?.dismiss()
                                         snackbarHostState.showSnackbar(
-                                            context.getString(R.string.execution_undo_set_done, undoSet)
+                                            resources.getString(R.string.execution_undo_set_done, undoSet)
                                         )
                                     }
                                 }
