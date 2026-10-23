@@ -52,6 +52,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -300,6 +301,8 @@ internal fun QueueContent(
     onMenuClick: (WorkoutEntity) -> Unit,
     onAddWorkoutClick: () -> Unit
 ) {
+    // Пока БД не ответила, экран пуст: иначе на холодном старте мелькает «тренировок нет».
+    if (!state.isLoaded) return
     if (state.workouts.isEmpty()) {
         EmptyState(
             icon = Icons.Default.FitnessCenter,
@@ -391,7 +394,7 @@ private fun NextWorkoutCard(
         ) {
             Icon(
                 Icons.Default.MoreVert,
-                contentDescription = stringResource(R.string.list_actions),
+                contentDescription = stringResource(R.string.list_actions, item.workout.name),
                 tint = OnAccent,
                 modifier = Modifier.size(28.dp)
             )
@@ -404,7 +407,8 @@ private fun NextWorkoutCard(
                 color = OnAccent,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 4.dp)
+                // Справа место под «⋮»: длинное название не уходит под кнопку.
+                modifier = Modifier.padding(top = 4.dp, end = 36.dp)
             )
             Text(
                 text = "${metaLine(item, durationMillis)} · ${daysAgoText(item.workout.lastUseAt)}",
@@ -422,7 +426,7 @@ private fun NextWorkoutCard(
                         .height(48.dp)
                         .clip(MaterialTheme.shapes.small)
                         .background(MaterialTheme.colorScheme.background)
-                        .combinedClickable(onClick = onAction),
+                        .combinedClickable(role = Role.Button, onClick = onAction),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -507,7 +511,7 @@ private fun WorkoutRow(
         IconButton(onClick = onMenu) {
             Icon(
                 Icons.Default.MoreVert,
-                contentDescription = stringResource(R.string.list_actions),
+                contentDescription = stringResource(R.string.list_actions, item.workout.name),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
             )

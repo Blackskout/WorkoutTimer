@@ -41,7 +41,7 @@
     <string name="list_action_skip_subtitle">в конец очереди</string>
     <string name="list_action_edit">Редактировать</string>
     <string name="list_action_history">История</string>
-    <string name="list_actions">Действия</string>
+    <string name="list_actions">Действия: %1$s</string>
     <string name="list_search_empty_title">Ничего не найдено</string>
     <string name="list_search_empty_subtitle">Попробуйте другой запрос</string>
     <string name="list_empty_title">Нет тренировок</string>
@@ -171,9 +171,8 @@
     <string name="export_busy" tools:ignore="TypographyEllipsis">Обработка...</string>
     <string name="export_done">Экспорт завершен</string>
     <string name="export_imported_count">Импортировано тренировок: %1$d</string>
-    <string name="export_error_export">Ошибка экспорта</string>
-    <string name="export_error_import">Ошибка импорта</string>
-    <string name="export_error_import_detail">Ошибка импорта: %1$s</string>
+    <string name="export_error_export">Не удалось сохранить тренировки в файл. Попробуйте ещё раз</string>
+    <string name="export_error_import">Не удалось загрузить тренировки: файл повреждён или не из WorkoutTimer</string>
     <string name="export_error_read">Не удалось прочитать файл</string>
     <string name="export_error_empty">Файл не содержит тренировок</string>
     <string name="export_share_title">Поделиться тренировками</string>
@@ -292,10 +291,12 @@
     <string name="notification_channel_rest_finished_description">Уведомление о завершении отдыха между подходами</string>
     <string name="notification_channel_idle">Напоминание о тренировке</string>
     <string name="notification_channel_idle_description">Напоминание вернуться в приложение, если подход давно не завершён</string>
-    <string name="notification_rest_title">Отдых: %1$s</string>
+    <string name="notification_rest_title">Отдых</string>
     <string name="notification_set_content">%1$s — Подход %2$d из %3$d</string>
     <string name="notification_rest_finished_title">Отдых завершён!</string>
-    <string name="notification_transition_title">Переход: %1$s</string>
+    <string name="notification_transition_title">Переход</string>
+    <string name="notification_action_skip">Пропустить</string>
+    <string name="notification_action_add_rest">+30 с</string>
     <string name="notification_transition_finished_title">Пора: следующее упражнение суперсета</string>
     <string name="notification_idle_title">Вы всё ещё тренируетесь?</string>
     <string name="notification_idle_content">%1$s — Подход %2$d из %3$d. Не забудьте закончить подход.</string>

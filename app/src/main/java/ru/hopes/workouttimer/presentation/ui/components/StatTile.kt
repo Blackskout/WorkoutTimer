@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -39,7 +40,7 @@ fun StatTile(
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button) { onClick() } else Modifier)
     ) {
         StatTileContent(value, unit, Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 12.dp))
         // Плитку можно нажать — карандаш, как у заметки, иначе об этом не догадаться.

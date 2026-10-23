@@ -2,6 +2,7 @@ package ru.hopes.workouttimer.presentation.screen.exportImport
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.annotation.StringRes
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +24,8 @@ import ru.hopes.workouttimer.domain.repository.ImportResult
 import ru.hopes.workouttimer.domain.usecase.ExportAllWorkoutsUseCase
 import ru.hopes.workouttimer.domain.usecase.ImportWorkoutsUseCase
 import javax.inject.Inject
+
+private const val TAG = "ExportImportVM"
 
 @HiltViewModel
 class ExportImportViewModel @Inject constructor(
@@ -53,6 +56,7 @@ class ExportImportViewModel @Inject constructor(
                 
                 _uiState.value = ExportImportUiState.ExportSuccess
             } catch (e: Exception) {
+                Log.e(TAG, "Экспорт не удался", e)
                 _uiState.value = ExportImportUiState.Error(e.message, R.string.export_error_export)
             }
         }
@@ -66,6 +70,7 @@ class ExportImportViewModel @Inject constructor(
                 val result = importUseCase(uri)
                 _uiState.value = ExportImportUiState.ImportSuccess(result)
             } catch (e: Exception) {
+                Log.e(TAG, "Импорт не удался", e)
                 _uiState.value = ExportImportUiState.Error(e.message, R.string.export_error_import)
             }
         }
@@ -85,6 +90,6 @@ sealed class ExportImportUiState {
     object Loading : ExportImportUiState()
     object ExportSuccess : ExportImportUiState()
     data class ImportSuccess(val result: ImportResult) : ExportImportUiState()
-    /** [detail] — текст исключения, если он есть; иначе экран показывает [fallback]. */
+    /** [detail] — текст исключения, только для лога; экран показывает [fallback]. */
     data class Error(val detail: String?, @StringRes val fallback: Int) : ExportImportUiState()
 }

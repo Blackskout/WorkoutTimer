@@ -40,7 +40,12 @@ class WorkoutHistoryViewModel @Inject constructor(
 
         getWorkoutSessionsUseCase(workoutId)
             .onEach { sessions ->
-                _state.update { it.copy(sessions = sessions) }
+                _state.update { it.copy(sessions = sessions, sessionsLoaded = true) }
+            }
+            // Сбой чтения — честное «истории нет», а не вечно пустой экран.
+            .catch { e ->
+                Log.e(TAG, "Сессии истории не прочитаны", e)
+                _state.update { it.copy(sessionsLoaded = true) }
             }
             .launchIn(viewModelScope)
 
@@ -55,6 +60,8 @@ class WorkoutHistoryViewModel @Inject constructor(
 data class WorkoutHistoryState(
     val workoutName: String = "",
     val sessions: List<WorkoutSession> = emptyList(),
+    // false — сессии ещё читаются: пустой список не значит «тренировок не было».
+    val sessionsLoaded: Boolean = false,
     // null — подходы ещё не загрузились: карточки не должны врать «подходы не записывались».
     val setsBySession: Map<Long, List<SessionExerciseSets>>? = null
 )

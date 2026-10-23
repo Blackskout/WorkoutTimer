@@ -79,17 +79,15 @@ fun ExportImportScreen(
                         when (val error = result.error) {
                             ImportError.ReadFailed -> resources.getString(R.string.export_error_read)
                             ImportError.NoWorkouts -> resources.getString(R.string.export_error_empty)
-                            is ImportError.Failed -> error.detail
-                                ?.let { resources.getString(R.string.export_error_import_detail, it) }
-                                ?: resources.getString(R.string.export_error_import)
-                            null -> resources.getString(R.string.export_error_import)
+                            // Текст исключения (английский, технический) человеку не показываем.
+                            is ImportError.Failed, null -> resources.getString(R.string.export_error_import)
                         }
                     )
                 }
                 viewModel.resetState()
             }
             is ExportImportUiState.Error -> {
-                snackbarHostState.showSnackbar(state.detail ?: resources.getString(state.fallback))
+                snackbarHostState.showSnackbar(resources.getString(state.fallback))
                 viewModel.resetState()
             }
             else -> {}
