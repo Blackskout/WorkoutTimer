@@ -1816,8 +1816,8 @@ class WorkoutSessionManagerTest {
         manager.skipRest()
         manager.onExerciseFinished() // подход 2
 
-        manager.undoLastSet()
-        manager.undoLastSet() // второй откат ничего не делает
+        assertTrue(manager.undoLastSet())
+        assertFalse(manager.undoLastSet()) // второй откат ничего не делает
 
         assertEquals(2, manager.active.currentSet)
         assertEquals(1, manager.recordedSets.size)

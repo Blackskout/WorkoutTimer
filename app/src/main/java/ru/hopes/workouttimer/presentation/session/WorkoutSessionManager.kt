@@ -493,12 +493,13 @@ class WorkoutSessionManager @Inject constructor(
      * отдых снят, подход вычеркнут из памяти. Список упражнений, заметки, веса и пары,
      * изменённые за отдых, остаются: меняются только позиция, счётчик упражнения и фаза.
      * Доступно, пока не закрыли следующий подход и не перешли по шторке.
+     * Возвращает false, если откатывать нечего (тогда «Подход возвращён» не показывается).
      */
-    fun undoLastSet() {
-        val current = present ?: return
-        if (current.isFinishing || !current.phase.isInProgress) return
-        val undo = current.undo ?: return
-        val row = current.exercises.getOrNull(undo.exerciseIndex) ?: return
+    fun undoLastSet(): Boolean {
+        val current = present ?: return false
+        if (current.isFinishing || !current.phase.isInProgress) return false
+        val undo = current.undo ?: return false
+        val row = current.exercises.getOrNull(undo.exerciseIndex) ?: return false
         registerInteraction()
         timerJob?.cancel()
         wakeLockHelper.release()
@@ -520,6 +521,7 @@ class WorkoutSessionManager @Inject constructor(
             )
         )
         scheduleIdleReminderIfActive()
+        return true
     }
 
     /** Переход по шторке выбора упражнения: без отдыха, с подхода, на котором остановились. */
