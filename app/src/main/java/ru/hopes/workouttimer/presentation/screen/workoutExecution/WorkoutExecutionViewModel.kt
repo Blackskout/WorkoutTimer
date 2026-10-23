@@ -77,6 +77,8 @@ class WorkoutExecutionViewModel @Inject constructor(
 
     fun undoLastSet() = manager.undoLastSet()
 
+    fun workoutEta() = manager.workoutEta()
+
     fun moveToExercise(index: Int) = manager.moveToExercise(index)
 
     fun pairWith(index: Int) = manager.pairWith(index)

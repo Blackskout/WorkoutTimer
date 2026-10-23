@@ -1855,4 +1855,44 @@ class WorkoutSessionManagerTest {
         manager.onExerciseFinished()
         assertEquals(1, manager.recordedSets.size)
     }
+
+    // --- Долгое нажатие: прошло и осталось ---
+
+    @Test
+    fun `eta elapsed excludes idle the same way as the saved duration`() = runTest {
+        val manager = managerWith(workoutOf(ex(1, "Присед", sets = 3)))
+        manager.start(1)
+        val startedAt = manager.lastInteractionAt
+        manager.registerInteraction(now = startedAt + 60_000L)
+        manager.onExerciseFinished()
+        manager.registerInteraction(now = startedAt + 120_000L)
+
+        // Текущий промежуток длиннее порога на минуту — она не в счёт.
+        val now = startedAt + 120_000L + WorkoutSessionManager.IDLE_EXCLUSION_THRESHOLD_MILLIS + 60_000L
+        val eta = manager.workoutEta(now = now)!!
+
+        assertEquals(now - startedAt - 60_000L, eta.elapsedMillis)
+        assertEquals(2, eta.remainingSets)
+    }
+
+    @Test
+    fun `eta is not an interaction`() = runTest {
+        val manager = managerWith(workoutOf(ex(1, "Присед", sets = 3)))
+        manager.start(1)
+        val before = manager.lastInteractionAt
+
+        manager.workoutEta(now = before + 1_000_000L)
+
+        assertEquals(before, manager.lastInteractionAt)
+    }
+
+    @Test
+    fun `there is no eta without a running workout`() = runTest {
+        val manager = managerWith(workoutOf(ex(1, "Присед", sets = 1)))
+        assertNull(manager.workoutEta())
+        manager.start(1)
+        manager.onExerciseFinished() // единственный подход — тренировка записана
+
+        assertNull(manager.workoutEta())
+    }
 }

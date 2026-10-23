@@ -1,5 +1,6 @@
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
+import android.content.res.Resources
 import android.os.SystemClock
 import ru.hopes.workouttimer.presentation.session.WorkoutExecutionState
 import ru.hopes.workouttimer.presentation.session.WorkoutSessionManager
@@ -7,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,6 +52,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -121,6 +126,7 @@ fun WorkoutExecutionScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val snackbarScope = rememberCoroutineScope()
     val resources = LocalResources.current
+    val haptic = LocalHapticFeedback.current
     val finishError by viewModel.finishError.collectAsState()
     val finishErrorText = stringResource(R.string.execution_finish_error)
     LaunchedEffect(finishError) {
@@ -262,7 +268,31 @@ fun WorkoutExecutionScreen(
                     )
                 }
 
-                Box(modifier = Modifier.weight(1f)) {
+                // Долгое нажатие на свободное место (и на кольцо отдыха) — сколько прошло и осталось.
+                // Плитки и заметка ловят нажатие сами: их down уже поглощён, сюда оно не доходит.
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .pointerInput(Unit) {
+                            detectTapGestures(onLongPress = {
+                                val eta = viewModel.workoutEta() ?: return@detectTapGestures
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                // Остаток округляется до минуты: «≈ 0 мин» на последнем подходе бессмысленно.
+                                val text = resources.getString(
+                                    R.string.execution_eta,
+                                    resources.durationText(eta.elapsedMillis),
+                                    resources.durationText(eta.remainingMillis.roundUpToMinute()),
+                                    resources.getQuantityString(
+                                        R.plurals.preview_sets, eta.remainingSets, eta.remainingSets
+                                    )
+                                )
+                                snackbarScope.launch {
+                                    snackbarHostState.currentSnackbarData?.dismiss()
+                                    snackbarHostState.showSnackbar(text)
+                                }
+                            })
+                        }
+                ) {
                     when (currentState) {
                         is WorkoutExecutionState.Loading -> LoadingContent()
 
@@ -552,6 +582,18 @@ fun WorkoutExecutionScreen(
                 TextButton(onClick = { showFinishDialog = false }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
+    }
+}
+
+private fun Long.roundUpToMinute(): Long = (this + 59_999L) / 60_000L * 60_000L
+
+/** «1 ч 5 мин» или «42 мин» — как [DateFormatter.formatDurationToString], но из Resources. */
+private fun Resources.durationText(millis: Long): String {
+    val (hours, minutes) = DateFormatter.hoursMinutesOf(millis)
+    return if (hours > 0) {
+        getString(R.string.duration_hours_minutes, hours, minutes)
+    } else {
+        getString(R.string.duration_minutes, minutes)
     }
 }
 

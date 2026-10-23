@@ -655,6 +655,19 @@ class WorkoutSessionManager @Inject constructor(
         }
     }
 
+    /**
+     * Прошло и примерно осталось — для долгого нажатия на экране. Прошедшее считается как
+     * сохраняемая длительность: без простоя, включая текущий незакрытый промежуток сверх порога.
+     * Само нажатие действием не считается. null — тренировка не идёт.
+     */
+    fun workoutEta(now: Long = System.currentTimeMillis()): WorkoutEta? {
+        val current = present ?: return null
+        if (!current.phase.isInProgress || sessionStartedAt == 0L) return null
+        val gapExcess = (now - lastInteractionAt - IDLE_EXCLUSION_THRESHOLD_MILLIS).coerceAtLeast(0L)
+        val elapsed = (now - sessionStartedAt - excludedIdleMillis - gapExcess).coerceAtLeast(0L)
+        return workoutEtaOf(current.exercises, current.exerciseIndex, current.phase, elapsed, _recordedSets.size)
+    }
+
     /** Действие сессии для учёта простоя. Без аргумента — «сейчас»; [now] задают тесты. */
     fun registerInteraction(now: Long = System.currentTimeMillis()) {
         if (lastInteractionAt != 0L) {
