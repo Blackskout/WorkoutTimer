@@ -91,7 +91,12 @@ fun WorkoutHistoryScreen(
                 )
             }
 
-            HistoryContent(sessions = state.sessions, setsBySession = state.setsBySession, onExerciseClick = onExerciseClick)
+            HistoryContent(
+                sessions = state.sessions,
+                setsBySession = state.setsBySession,
+                onExerciseClick = onExerciseClick,
+                loaded = state.sessionsLoaded
+            )
         }
     }
 }
@@ -104,8 +109,11 @@ fun WorkoutHistoryScreen(
 internal fun HistoryContent(
     sessions: List<WorkoutSession>,
     setsBySession: Map<Long, List<SessionExerciseSets>>?,
-    onExerciseClick: (Long) -> Unit
+    onExerciseClick: (Long) -> Unit,
+    /** Сессии прочитаны; до этого экран пуст, без мелькания «истории нет». */
+    loaded: Boolean = true
 ) {
+    if (!loaded) return
     if (sessions.isEmpty()) {
         EmptyState(
             icon = Icons.Default.History,

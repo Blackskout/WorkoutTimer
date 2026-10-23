@@ -938,6 +938,33 @@ class WorkoutSessionManagerTest {
     }
 
     @Test
+    fun `addRestTime extends the running rest and its ring total`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        manager.start(1)
+        manager.onExerciseFinished() // отдых 60 с
+        val before = manager.phase as WorkoutExecutionState.Rest
+
+        manager.addRestTime()
+
+        val after = manager.phase as WorkoutExecutionState.Rest
+        assertEquals(before.totalRestTimeMillis + WorkoutSessionManager.EXTRA_REST_MILLIS, after.totalRestTimeMillis)
+        assertTrue(after.restTimeMillis > before.restTimeMillis)
+        assertTrue(manager.isRestTimerActive)
+    }
+
+    @Test
+    fun `addRestTime outside rest changes nothing`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        manager.start(1)
+        val before = manager.phase
+
+        manager.addRestTime()
+
+        assertEquals(before, manager.phase)
+        assertFalse(manager.isRestTimerActive)
+    }
+
+    @Test
     fun `abandon releases everything, writes nothing and leaves no session`() = runTest {
         val finish = mockk<FinishWorkoutSessionUseCase>(relaxed = true)
         val manager = managerWith(twoSetWorkout(), finish = finish)

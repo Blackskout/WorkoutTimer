@@ -1,5 +1,6 @@
 package ru.hopes.workouttimer.presentation.screen.workouts
 
+import android.util.Log
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,6 +9,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
@@ -26,6 +28,8 @@ import ru.hopes.workouttimer.domain.usecase.UndoSkipWorkoutUseCase
 import ru.hopes.workouttimer.presentation.session.WorkoutSessionManager
 import javax.inject.Inject
 
+private const val TAG = "ListWorkoutVM"
+
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ListWorkoutViewModel @Inject constructor(
@@ -40,7 +44,7 @@ class ListWorkoutViewModel @Inject constructor(
 
     private val query = MutableStateFlow("")
 
-    private val _state = MutableStateFlow(ListWorkoutState())
+    private val _state = MutableStateFlow(ListWorkoutState(isLoaded = false))
     val state = _state.asStateFlow()
 
     init {
@@ -63,7 +67,12 @@ class ListWorkoutViewModel @Inject constructor(
                 }
             }
             .onEach { (workouts, durations) ->
-                _state.update { it.copy(workouts = workouts, lastSessionDurations = durations) }
+                _state.update { it.copy(workouts = workouts, lastSessionDurations = durations, isLoaded = true) }
+            }
+            // Сбой чтения — пустой список вместо вечно пустого экрана.
+            .catch { e ->
+                Log.e(TAG, "Тренировки не прочитаны", e)
+                _state.update { it.copy(isLoaded = true) }
             }
             .launchIn(viewModelScope)
 
@@ -156,7 +165,9 @@ data class ListWorkoutState(
     /** Сбой операции с БД; показывается снекбаром и гасится `dismissError()`. */
     @StringRes val errorMessage: Int? = null,
     /** Тренировка идущей сессии (в том числе свёрнутой); null — сессии нет. */
-    val runningWorkoutId: Int? = null
+    val runningWorkoutId: Int? = null,
+    /** Список уже прочитан из БД. До этого пустой список — не «тренировок нет». */
+    val isLoaded: Boolean = true
 ) {
     /** Первая в очереди — та, которую не делали дольше всех. */
     val nextWorkout: WorkoutWithExercises? get() = workouts.firstOrNull()

@@ -86,6 +86,7 @@ class WorkoutSessionManager @Inject constructor(
     private var finishPending = false
 
     private var timerJob: Job? = null
+    private var restFinishAt = 0L
     private var idleReminderJob: Job? = null
 
     internal val isIdleReminderJobActive: Boolean
@@ -228,28 +229,43 @@ class WorkoutSessionManager @Inject constructor(
 
     private fun startRestTimer() {
         val rest = present?.phase as? WorkoutExecutionState.Rest ?: return
-        timerJob?.cancel()
+        runRestTimer(rest, System.currentTimeMillis() + rest.restTimeMillis, isExtension = false)
+    }
 
-        wakeLockHelper.acquire(rest.restTimeMillis)
-
-        val finishTime = System.currentTimeMillis() + rest.restTimeMillis
-
-        startNotification(
-            exerciseName = rest.exercise.name,
-            currentSet = rest.currentSet,
-            totalSets = rest.totalSets,
-            timeLeftMillis = rest.restTimeMillis,
-            isTransition = rest.isTransition
+    /** Кнопка «+30 с» в уведомлении: продлевает идущий отдых. */
+    fun addRestTime(extraMillis: Long = EXTRA_REST_MILLIS) {
+        if (!isRestTimerActive) return
+        val rest = present?.phase as? WorkoutExecutionState.Rest ?: return
+        registerInteraction()
+        val finishTime = restFinishAt + extraMillis
+        val extended = rest.copy(
+            restTimeMillis = finishTime - System.currentTimeMillis(),
+            totalRestTimeMillis = rest.totalRestTimeMillis + extraMillis
         )
+        updatePresent { it.copy(phase = extended) }
+        runRestTimer(extended, finishTime, isExtension = true)
+    }
+
+    // Уведомление считает само (хронометр до finishTime), поэтому его трогают только при
+    // старте и продлении, а не каждую секунду.
+    private fun runRestTimer(rest: WorkoutExecutionState.Rest, finishTime: Long, isExtension: Boolean) {
+        timerJob?.cancel()
+        restFinishAt = finishTime
+        wakeLockHelper.acquire(finishTime - System.currentTimeMillis())
+
+        if (isExtension) {
+            updateNotification(rest.exercise.name, rest.currentSet, rest.totalSets, finishTime, rest.isTransition)
+        } else {
+            startNotification(rest.exercise.name, rest.currentSet, rest.totalSets, finishTime, rest.isTransition)
+        }
 
         timerJob = sessionScope.launch {
-            var lastNotificationSecond = -1L
-
             countdownFlow(finishTime)
                 .onCompletion { cause ->
                     if (cause == null) {
                         onRestFinished()
-                    } else {
+                    } else if (timerJob?.isActive != true) {
+                        // Продление уже запустило новый отсчёт со своим локом — его не трогаем.
                         wakeLockHelper.release()
                     }
                 }
@@ -261,19 +277,6 @@ class WorkoutSessionManager @Inject constructor(
                         } else {
                             current
                         }
-                    }
-
-                    // Уведомление обновляется не чаще раза в секунду.
-                    val currentSecond = timeLeft / 1000
-                    if (currentSecond != lastNotificationSecond) {
-                        lastNotificationSecond = currentSecond
-                        updateNotification(
-                            exerciseName = rest.exercise.name,
-                            currentSet = rest.currentSet,
-                            totalSets = rest.totalSets,
-                            timeLeftMillis = timeLeft,
-                            isTransition = rest.isTransition
-                        )
                     }
                 }
         }
@@ -721,7 +724,7 @@ class WorkoutSessionManager @Inject constructor(
         exerciseName: String,
         currentSet: Int,
         totalSets: Int,
-        timeLeftMillis: Long,
+        finishAtMillis: Long,
         isTransition: Boolean
     ) {
         val intent = Intent(context, TimerNotificationService::class.java).apply {
@@ -729,7 +732,7 @@ class WorkoutSessionManager @Inject constructor(
             putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
             putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
             putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
-            putExtra(TimerNotificationService.EXTRA_TIME_LEFT, timeLeftMillis)
+            putExtra(TimerNotificationService.EXTRA_FINISH_AT, finishAtMillis)
             putExtra(TimerNotificationService.EXTRA_TRANSITION, isTransition)
         }
         context.startService(intent)
@@ -739,7 +742,7 @@ class WorkoutSessionManager @Inject constructor(
         exerciseName: String,
         currentSet: Int,
         totalSets: Int,
-        timeLeftMillis: Long,
+        finishAtMillis: Long,
         isTransition: Boolean
     ) {
         val intent = Intent(context, TimerNotificationService::class.java).apply {
@@ -747,7 +750,7 @@ class WorkoutSessionManager @Inject constructor(
             putExtra(TimerNotificationService.EXTRA_EXERCISE_NAME, exerciseName)
             putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
             putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
-            putExtra(TimerNotificationService.EXTRA_TIME_LEFT, timeLeftMillis)
+            putExtra(TimerNotificationService.EXTRA_FINISH_AT, finishAtMillis)
             putExtra(TimerNotificationService.EXTRA_TRANSITION, isTransition)
         }
         context.startService(intent)
@@ -801,5 +804,8 @@ class WorkoutSessionManager @Inject constructor(
 
         /** Переход внутри суперсета: дойти до второго тренажёра. */
         internal const val TRANSITION_MILLIS = 20_000L
+
+        /** Шаг кнопки «+30 с» в уведомлении. */
+        internal const val EXTRA_REST_MILLIS = 30_000L
     }
 }

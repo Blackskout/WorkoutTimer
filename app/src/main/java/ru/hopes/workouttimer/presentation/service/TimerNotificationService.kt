@@ -9,11 +9,17 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import dagger.hilt.android.AndroidEntryPoint
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.presentation.MainActivity
-import java.util.Locale
+import ru.hopes.workouttimer.presentation.session.WorkoutSessionManager
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class TimerNotificationService : Service() {
+
+    @Inject
+    lateinit var sessionManager: WorkoutSessionManager
 
     private val channelId = "timer_notification_channel"
     private val notificationId = 1
@@ -37,23 +43,34 @@ class TimerNotificationService : Service() {
                 val exerciseName = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: getString(R.string.create_fab_exercise)
                 val currentSet = intent.getIntExtra(EXTRA_CURRENT_SET, 1)
                 val totalSets = intent.getIntExtra(EXTRA_TOTAL_SETS, 1)
-                val timeLeft = intent.getLongExtra(EXTRA_TIME_LEFT, 0L)
+                val finishAt = intent.getLongExtra(EXTRA_FINISH_AT, 0L)
                 val isTransition = intent.getBooleanExtra(EXTRA_TRANSITION, false)
                 startForeground(
                     notificationId,
-                    createNotification(exerciseName, currentSet, totalSets, timeLeft, isTransition)
+                    createNotification(exerciseName, currentSet, totalSets, finishAt, isTransition)
                 )
             }
             ACTION_UPDATE -> {
                 val exerciseName = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: getString(R.string.create_fab_exercise)
                 val currentSet = intent.getIntExtra(EXTRA_CURRENT_SET, 1)
                 val totalSets = intent.getIntExtra(EXTRA_TOTAL_SETS, 1)
-                val timeLeft = intent.getLongExtra(EXTRA_TIME_LEFT, 0L)
+                val finishAt = intent.getLongExtra(EXTRA_FINISH_AT, 0L)
                 val isTransition = intent.getBooleanExtra(EXTRA_TRANSITION, false)
                 notificationManager.notify(
                     notificationId,
-                    createNotification(exerciseName, currentSet, totalSets, timeLeft, isTransition)
+                    createNotification(exerciseName, currentSet, totalSets, finishAt, isTransition)
                 )
+            }
+            // Кнопки уведомления: менеджер сам остановит или продлит отсчёт и уведомление.
+            // Запоздалое нажатие (отдых уже кончился) сервис заново поднимает — тогда гасим его.
+            ACTION_SKIP_REST, ACTION_ADD_REST -> {
+                if (!sessionManager.isRestTimerActive) {
+                    stopSelf()
+                } else if (intent.action == ACTION_SKIP_REST) {
+                    sessionManager.skipRest()
+                } else {
+                    sessionManager.addRestTime()
+                }
             }
             ACTION_STOP -> {
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -120,7 +137,7 @@ class TimerNotificationService : Service() {
         exerciseName: String,
         currentSet: Int,
         totalSets: Int,
-        timeLeftMillis: Long,
+        finishAtMillis: Long,
         isTransition: Boolean
     ): android.app.Notification {
         val intent = Intent(this, MainActivity::class.java).apply {
@@ -136,20 +153,33 @@ class TimerNotificationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val timeText = formatTime(timeLeftMillis)
         val title = getString(
-            if (isTransition) R.string.notification_transition_title else R.string.notification_rest_title,
-            timeText
+            if (isTransition) R.string.notification_transition_title else R.string.notification_rest_title
         )
         val content = getString(R.string.notification_set_content, exerciseName, currentSet, totalSets)
 
+        // Обратный отсчёт ведёт сама система (хронометр до finishAt): уведомление не
+        // перевыкладывается каждую секунду.
         return NotificationCompat.Builder(this, channelId)
             .setContentTitle(title)
             .setContentText(content)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
-            .setShowWhen(false)
+            .setWhen(finishAtMillis)
+            .setShowWhen(true)
+            .setUsesChronometer(true)
+            .setChronometerCountDown(true)
+            // Если менеджер не успел снять уведомление, отрицательного отсчёта не будет.
+            .setTimeoutAfter((finishAtMillis - System.currentTimeMillis()).coerceAtLeast(0L) + 1_000L)
+            .addAction(
+                0,
+                getString(if (isTransition) R.string.execution_skip_transition else R.string.notification_action_skip),
+                actionIntent(ACTION_SKIP_REST)
+            )
+            .apply {
+                if (!isTransition) addAction(0, getString(R.string.notification_action_add_rest), actionIntent(ACTION_ADD_REST))
+            }
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
@@ -245,12 +275,12 @@ class TimerNotificationService : Service() {
             .build()
     }
 
-    private fun formatTime(millis: Long): String {
-        val totalSeconds = millis / 1000
-        val minutes = totalSeconds / 60
-        val seconds = totalSeconds % 60
-        return String.format(Locale.US, "%02d:%02d", minutes, seconds)
-    }
+    private fun actionIntent(action: String): PendingIntent = PendingIntent.getService(
+        this,
+        action.hashCode(),
+        Intent(this, TimerNotificationService::class.java).setAction(action),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
 
     private val notificationManager: NotificationManager
         get() = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
@@ -263,11 +293,13 @@ class TimerNotificationService : Service() {
         const val ACTION_STOP = "STOP"
         const val ACTION_SHOW_FINISHED = "SHOW_FINISHED"
         const val ACTION_SHOW_IDLE_REMINDER = "SHOW_IDLE_REMINDER"
+        const val ACTION_SKIP_REST = "SKIP_REST"
+        const val ACTION_ADD_REST = "ADD_REST"
 
         const val EXTRA_EXERCISE_NAME = "exercise_name"
         const val EXTRA_CURRENT_SET = "current_set"
         const val EXTRA_TOTAL_SETS = "total_sets"
-        const val EXTRA_TIME_LEFT = "time_left"
+        const val EXTRA_FINISH_AT = "finish_at"
         const val EXTRA_TRANSITION = "transition"
 
         // Снимаются вне сервиса (WorkoutAlerts), поэтому видны снаружи.

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -42,6 +43,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -56,7 +58,9 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -115,6 +119,14 @@ fun WorkoutExecutionScreen(
     // тренировку сессия не сбрасывается.
     LaunchedEffect(workoutId) {
         viewModel.start(workoutId)
+    }
+
+    // Пока тренировка идёт и экран открыт, он не гаснет: телефон лежит на скамье, а
+    // таймер отдыха и кнопка подхода должны быть видны без разблокировки.
+    val view = LocalView.current
+    DisposableEffect(view, isLive) {
+        view.keepScreenOn = isLive
+        onDispose { view.keepScreenOn = false }
     }
 
     // Обычное сворачивание — pop, его делает навигация (с анимацией жеста). Перехват — только
@@ -610,8 +622,9 @@ private fun ExerciseChip(
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 48.dp)
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -740,22 +753,37 @@ private fun RestContent(
         // Отдых — самый удобный момент, чтобы поправить вес на следующий подход,
         // поэтому строка ведёт в тот же лист, что и плитки в Active.
         val load = formatLoad(state.exercise.unit, state.exercise.weight, state.exercise.extraWeight, setFormat())
-        Text(
-            text = if (load != null) {
-                pluralStringResource(
-                    R.plurals.execution_rest_weight_reps, state.exercise.reps, load, state.exercise.reps
-                )
-            } else {
-                pluralStringResource(R.plurals.execution_rest_reps, state.exercise.reps, state.exercise.reps)
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // Кнопка не ниже 48 dp и с карандашом, как у плиток: строку легко нажать и видно,
+        // что она нажимается.
+        Row(
             modifier = Modifier
-                .padding(top = 6.dp)
+                .padding(top = 2.dp)
+                .heightIn(min = 48.dp)
                 .clip(MaterialTheme.shapes.small)
-                .clickable { onEditWeightAndReps(WeightRepsFocus.WEIGHT) }
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-        )
+                .clickable(role = Role.Button) { onEditWeightAndReps(WeightRepsFocus.WEIGHT) }
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (load != null) {
+                    pluralStringResource(
+                        R.plurals.execution_rest_weight_reps, state.exercise.reps, load, state.exercise.reps
+                    )
+                } else {
+                    pluralStringResource(R.plurals.execution_rest_reps, state.exercise.reps, state.exercise.reps)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Icon(
+                Icons.Default.Edit,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .padding(start = 6.dp)
+                    .size(14.dp)
+            )
+        }
         NoteBlock(
             note = state.exercise.note,
             onEdit = { onEditNote(state.exercise) },
