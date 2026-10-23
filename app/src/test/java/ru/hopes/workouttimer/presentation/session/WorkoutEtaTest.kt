@@ -61,4 +61,16 @@ class WorkoutEtaTest {
 
         assertEquals(2, workoutEtaOf(rows, 1, active(rows[1], 1), 60_000L, closedSets = 1).remainingSets)
     }
+
+    @Test
+    fun `during rest the pace includes the rest that is still running`() {
+        // Подход 50 с, идёт отдых 90 с (осталось 85): темп ≈ 135 с, а не 50.
+        val rows = listOf(row(1, sets = 12, done = 1, restMillis = 90_000L))
+        val rest = WorkoutExecutionState.Rest(exercise = rows[0].exercise, currentSet = 2, restTimeMillis = 85_000L)
+
+        val eta = workoutEtaOf(rows, 0, rest, elapsedMillis = 50_000L, closedSets = 1)
+
+        assertEquals(11 * 135_000L, eta.remainingMillis)
+        assertEquals(50_000L, eta.elapsedMillis)
+    }
 }

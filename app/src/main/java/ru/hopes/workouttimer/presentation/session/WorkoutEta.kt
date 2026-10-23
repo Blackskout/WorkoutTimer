@@ -40,7 +40,10 @@ internal fun workoutEtaOf(
     val left = setsLeftOf(exercises, currentIndex, phase)
     val remainingSets = left.sum()
     val remainingMillis = if (closedSets > 0) {
-        elapsedMillis / closedSets * remainingSets
+        // В отдыхе последний закрытый подход ещё без своего отдыха — темп считается так,
+        // будто отдых уже прошёл, иначе он выходит заниженным.
+        val restLeft = (phase as? WorkoutExecutionState.Rest)?.restTimeMillis ?: 0L
+        (elapsedMillis + restLeft) / closedSets * remainingSets
     } else {
         exercises.indices.sumOf { left[it] * (exercises[it].exercise.timeMillis + SET_WORK_MILLIS) }
     }
