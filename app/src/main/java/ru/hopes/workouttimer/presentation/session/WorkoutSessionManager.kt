@@ -341,6 +341,13 @@ class WorkoutSessionManager @Inject constructor(
             reps = phase.reps,
             unit = phase.exercise.unit
         )
+        val undo = UndoSet(
+            exerciseIndex = current.exerciseIndex,
+            doneSetsBefore = current.exercises[current.exerciseIndex].doneSets,
+            phase = phase,
+            recordedSetsBefore = _recordedSets.toList(),
+            finishPendingBefore = finishPending
+        )
         // Повтор после сбоя записи: последний подход уже в списке — заменяем
         // его текущими значениями (плитку могли поправить), а не дублируем. Флаг снимается
         // сразу: если после сбоя добавили упражнение, его подходы должны дописываться.
@@ -350,7 +357,7 @@ class WorkoutSessionManager @Inject constructor(
         } else {
             _recordedSets += set
         }
-        val updated = current.withSetDone(phase.currentSet)
+        val updated = current.withSetDone(phase.currentSet).copy(undo = undo)
         if (moveWithinSuperset(updated)) return
         if (phase.currentSet < phase.totalSets) {
             setSession(
@@ -437,7 +444,8 @@ class WorkoutSessionManager @Inject constructor(
         val sessionId = current.sessionId
         val workoutId = current.workoutId
         // isFinishing поднимается синхронно, до записи: второй тап его уже видит.
-        setSession(current.copy(isFinishing = true, restOver = false))
+        // Сессия уходит в БД — вернуть подход уже нельзя (экран спрашивал подтверждение).
+        setSession(current.copy(isFinishing = true, restOver = false, undo = null))
         finishPending = true
         val startedAt = sessionStartedAt
         val sets = _recordedSets.toList()
@@ -480,6 +488,40 @@ class WorkoutSessionManager @Inject constructor(
         }
     }
 
+    /**
+     * «Вернуть подход»: случайное «Закончить подход» отменяется — тот же подход снова Active,
+     * отдых снят, подход вычеркнут из памяти. Список упражнений, заметки, веса и пары,
+     * изменённые за отдых, остаются: меняются только позиция, счётчик упражнения и фаза.
+     * Доступно, пока не закрыли следующий подход и не перешли по шторке.
+     */
+    fun undoLastSet() {
+        val current = present ?: return
+        if (current.isFinishing || !current.phase.isInProgress) return
+        val undo = current.undo ?: return
+        val row = current.exercises.getOrNull(undo.exerciseIndex) ?: return
+        registerInteraction()
+        timerJob?.cancel()
+        wakeLockHelper.release()
+        stopNotification()
+        _recordedSets.clear()
+        _recordedSets += undo.recordedSetsBefore
+        finishPending = undo.finishPendingBefore
+        val exercises = current.exercises.toMutableList().apply {
+            set(undo.exerciseIndex, row.copy(doneSets = undo.doneSetsBefore))
+        }
+        setSession(
+            current.copy(
+                exercises = exercises,
+                exerciseIndex = undo.exerciseIndex,
+                // Числа плиток — те, что были на экране у этого подхода.
+                phase = undo.phase.copy(exercise = row.exercise, totalSets = row.exercise.sets),
+                restOver = false,
+                undo = null
+            )
+        )
+        scheduleIdleReminderIfActive()
+    }
+
     /** Переход по шторке выбора упражнения: без отдыха, с подхода, на котором остановились. */
     fun moveToExercise(index: Int) {
         val current = present ?: return
@@ -498,7 +540,9 @@ class WorkoutSessionManager @Inject constructor(
                     currentSet = target.nextSet,
                     totalSets = target.exercise.sets
                 ),
-                restOver = false
+                restOver = false,
+                // Позиция выбрана руками — откат к прошлому подходу её бы молча перебил.
+                undo = null
             )
         )
         scheduleIdleReminderIfActive()

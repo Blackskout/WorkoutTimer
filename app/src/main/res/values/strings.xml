@@ -68,6 +68,8 @@
     <string name="execution_retry">Повторить</string>
     <string name="execution_finish_set">Закончить подход</string>
     <string name="execution_skip_rest">Пропустить отдых</string>
+    <string name="execution_undo_set">Вернуть подход %1$d</string>
+    <string name="execution_undo_set_done">Подход %1$d возвращён</string>
     <string name="execution_skip_transition">Пропустить переход</string>
     <string name="execution_exercises">Упражнения</string>
     <string name="execution_exit_title">Выйти из тренировки?</string>

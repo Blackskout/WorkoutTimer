@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -44,16 +45,19 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.domain.model.Exercise
@@ -115,6 +119,8 @@ fun WorkoutExecutionScreen(
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarScope = rememberCoroutineScope()
+    val context = LocalContext.current
     val finishError by viewModel.finishError.collectAsState()
     val finishErrorText = stringResource(R.string.execution_finish_error)
     LaunchedEffect(finishError) {
@@ -293,6 +299,31 @@ fun WorkoutExecutionScreen(
                         .padding(start = ScreenPadding, end = ScreenPadding, bottom = 20.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Откат случайного «Закончить подход»: слева от главной кнопки, не на её месте,
+                    // и под той же защитой от второго касания двойного тапа.
+                    val undoSet = chrome.undoSetNumber
+                    if (undoSet != null && !chrome.isFinishing) {
+                        IconButton(
+                            onClick = {
+                                if (acceptsPhaseTap(phaseShownAt, SystemClock.uptimeMillis())) {
+                                    viewModel.undoLastSet()
+                                    snackbarScope.launch {
+                                        snackbarHostState.currentSnackbarData?.dismiss()
+                                        snackbarHostState.showSnackbar(
+                                            context.getString(R.string.execution_undo_set_done, undoSet)
+                                        )
+                                    }
+                                }
+                            },
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Undo,
+                                contentDescription = stringResource(R.string.execution_undo_set, undoSet),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                     if (currentState is WorkoutExecutionState.Active) {
                         PrimaryButton(
                             text = stringResource(R.string.execution_finish_set),
