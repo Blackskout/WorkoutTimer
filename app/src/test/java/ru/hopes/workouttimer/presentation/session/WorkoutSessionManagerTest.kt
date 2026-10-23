@@ -1694,4 +1694,165 @@ class WorkoutSessionManagerTest {
 
         assertTrue(manager.lastInteractionAt < farFuture)
     }
+
+    // --- «Вернуть подход»: откат случайного «Закончить подход» ---
+
+    @Test
+    fun `undo brings back the same set and drops the rest and the recorded set`() = runTest {
+        val manager = managerWith(workoutOf(ex(1, "Присед", sets = 3)))
+        manager.start(1)
+        manager.onExerciseFinished() // подход 1 → отдых перед 2
+
+        manager.undoLastSet()
+
+        val active = manager.active
+        assertEquals(1, active.currentSet)
+        assertEquals(0, manager.snapshot.exercises[0].doneSets)
+        assertTrue(manager.recordedSets.isEmpty())
+        assertFalse(manager.isRestTimerActive)
+        assertNull(manager.snapshot.undo)
+    }
+
+    @Test
+    fun `undo works after the rest is over too`() = runTest {
+        val manager = managerWith(workoutOf(ex(1, "Присед", sets = 3)))
+        manager.start(1)
+        manager.onExerciseFinished()
+        manager.skipRest() // уже Active подхода 2
+
+        manager.undoLastSet()
+
+        assertEquals(1, manager.active.currentSet)
+        assertTrue(manager.recordedSets.isEmpty())
+    }
+
+    @Test
+    fun `undo after moving to the next exercise returns to the previous one`() = runTest {
+        val manager = managerWith(workoutOf(ex(1, "A", sets = 1), ex(2, "B", sets = 2)))
+        manager.start(1)
+        manager.onExerciseFinished() // A сделано → отдых перед B
+
+        manager.undoLastSet()
+
+        assertEquals(0, manager.snapshot.exerciseIndex)
+        assertEquals("A", manager.active.exercise.name)
+        assertFalse(manager.snapshot.exercises[0].isDone)
+    }
+
+    @Test
+    fun `undo inside a superset returns to the lead`() = runTest {
+        val manager = managerWith(supersetWorkout())
+        manager.start(1)
+        manager.pairWith(1)
+        manager.onExerciseFinished() // бицепс 1 → переход к икрам
+
+        manager.undoLastSet()
+
+        assertEquals(0, manager.snapshot.exerciseIndex)
+        assertEquals("Бицепс", manager.active.exercise.name)
+        assertEquals(1, manager.active.currentSet)
+        assertEquals(listOf(Superset(lead = 0, second = 1)), manager.snapshot.supersets)
+    }
+
+    @Test
+    fun `undo of a repeat round keeps the exercise done`() = runTest {
+        // Повтор сделанного не растит doneSets — откат его и не уменьшает.
+        val manager = managerWith(workoutOf(ex(1, "A", sets = 1), ex(2, "B", sets = 1)))
+        manager.start(1)
+        manager.onExerciseFinished() // A сделано
+        manager.moveToExercise(0) // повтор A
+        manager.onExerciseFinished()
+
+        manager.undoLastSet()
+
+        assertTrue(manager.snapshot.exercises[0].isDone)
+        assertEquals(1, manager.recordedSets.size)
+    }
+
+    @Test
+    fun `undo keeps exercises added during the rest`() = runTest {
+        val manager = managerWith(twoSetWorkout())
+        manager.start(1)
+        manager.onExerciseFinished()
+        manager.addExerciseToday(ex(99, "Пресс", sets = 1))
+
+        manager.undoLastSet()
+
+        assertEquals(2, manager.snapshot.exercises.size)
+        assertEquals(1, manager.active.currentSet)
+    }
+
+    @Test
+    fun `undo keeps the values that were on the tiles`() = runTest {
+        val manager = managerWith(workoutOf(ex(1, "Присед", sets = 3, weight = 60.0, reps = 6)))
+        manager.start(1)
+        manager.updateExerciseWeightAndReps(0, weight = 70.0, extraWeight = 0.0, reps = 5)
+        manager.onExerciseFinished()
+
+        manager.undoLastSet()
+
+        assertEquals(70.0, manager.active.weight, 0.0)
+        assertEquals(5, manager.active.reps)
+    }
+
+    @Test
+    fun `there is nothing to undo after moving by the picker`() = runTest {
+        val manager = managerWith(workoutOf(ex(1, "A", sets = 2), ex(2, "B", sets = 2)))
+        manager.start(1)
+        manager.onExerciseFinished()
+        manager.moveToExercise(1)
+
+        manager.undoLastSet()
+
+        assertEquals(1, manager.snapshot.exerciseIndex)
+        assertEquals(1, manager.recordedSets.size)
+    }
+
+    @Test
+    fun `only the last set can be undone`() = runTest {
+        val manager = managerWith(workoutOf(ex(1, "Присед", sets = 3)))
+        manager.start(1)
+        manager.onExerciseFinished()
+        manager.skipRest()
+        manager.onExerciseFinished() // подход 2
+
+        assertTrue(manager.undoLastSet())
+        assertFalse(manager.undoLastSet()) // второй откат ничего не делает
+
+        assertEquals(2, manager.active.currentSet)
+        assertEquals(1, manager.recordedSets.size)
+    }
+
+    @Test
+    fun `the finishing set cannot be undone`() = runTest {
+        val finish = mockk<FinishWorkoutSessionUseCase>(relaxed = true)
+        val manager = managerWith(workoutOf(ex(1, "Присед", sets = 1)), finish = finish)
+        manager.start(1)
+        manager.onExerciseFinished()
+
+        manager.undoLastSet()
+
+        assertTrue(manager.phase is WorkoutExecutionState.Finished)
+        coVerify(exactly = 1) { finish(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `undo after a failed save restores the replaced set and the retry flag`() = runTest {
+        val finish = mockk<FinishWorkoutSessionUseCase>()
+        coEvery { finish(any(), any(), any(), any(), any()) } throws IllegalStateException("db")
+        val manager = managerWith(workoutOf(ex(1, "A", sets = 1)), finish = finish)
+        manager.start(1)
+        manager.onExerciseFinished() // запись упала, подход A в памяти
+        manager.addExerciseToday(ex(99, "Пресс", sets = 1))
+        manager.updateExerciseWeightAndReps(0, weight = 80.0, extraWeight = 0.0, reps = 3)
+        manager.onExerciseFinished() // заменил подход A → отдых перед «Пресс»
+
+        manager.undoLastSet()
+
+        assertEquals(1, manager.recordedSets.size)
+        assertEquals(50.0, manager.recordedSets[0].weight, 0.0)
+        // Флаг повтора вернулся: следующее нажатие снова заменит, а не допишет.
+        manager.onExerciseFinished()
+        assertEquals(1, manager.recordedSets.size)
+    }
 }

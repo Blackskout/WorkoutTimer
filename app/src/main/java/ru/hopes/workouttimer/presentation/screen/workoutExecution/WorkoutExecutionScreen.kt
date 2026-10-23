@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -44,16 +45,19 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.domain.model.Exercise
@@ -115,6 +119,8 @@ fun WorkoutExecutionScreen(
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarScope = rememberCoroutineScope()
+    val resources = LocalResources.current
     val finishError by viewModel.finishError.collectAsState()
     val finishErrorText = stringResource(R.string.execution_finish_error)
     LaunchedEffect(finishError) {
@@ -135,192 +141,220 @@ fun WorkoutExecutionScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            val currentState = uiState
-            val currentExercise = when (currentState) {
-                is WorkoutExecutionState.Active -> currentState.exercise
-                is WorkoutExecutionState.Rest -> currentState.exercise
-                else -> null
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = ScreenPadding, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = {
-                    when {
-                        !isLive -> onLeave()
-                        !chrome.isFinishing -> onMinimize()
-                    }
-                }) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(
-                            if (isLive) R.string.execution_minimize else R.string.common_back
-                        ),
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
+            Column(modifier = Modifier.fillMaxSize()) {
+                val currentState = uiState
+                val currentExercise = when (currentState) {
+                    is WorkoutExecutionState.Active -> currentState.exercise
+                    is WorkoutExecutionState.Rest -> currentState.exercise
+                    else -> null
                 }
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    if (currentExercise != null) {
-                        ExerciseChip(
-                            name = currentExercise.name,
-                            position = chrome.currentExerciseNumber,
-                            total = chrome.totalExercises,
-                            onClick = { showExercisePicker = true }
-                        )
-                    } else {
-                        Text(
-                            text = chrome.workoutName.ifEmpty { stringResource(R.string.execution_workout_fallback) },
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-                // «Назад» больше не выходит — выход без сохранения переехал в меню.
-                if (isLive && !chrome.isFinishing) {
-                    Box {
-                        IconButton(onClick = { menuExpanded = true }) {
-                            Icon(
-                                Icons.Default.MoreVert,
-                                contentDescription = stringResource(R.string.execution_more),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                            if (chrome.partnerOf(chrome.exerciseIndex) != null) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.execution_superset_unpair)) },
-                                    onClick = {
-                                        menuExpanded = false
-                                        viewModel.unpair()
-                                    }
-                                )
-                            } else if (chrome.supersetCandidates.isNotEmpty()) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.execution_superset_with)) },
-                                    onClick = {
-                                        menuExpanded = false
-                                        showSupersetPicker = true
-                                    }
-                                )
-                            }
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.execution_exit_without_saving)) },
-                                onClick = {
-                                    menuExpanded = false
-                                    showExitDialog = true
-                                }
-                            )
-                        }
-                    }
-                } else {
-                    Box(modifier = Modifier.size(48.dp))
-                }
-            }
 
-            if (currentExercise != null && chrome.totalExercises > 0) {
-                ProgressSegments(
-                    done = chrome.exercises.map { it.isDone },
-                    currentIndex = chrome.exerciseIndex,
-                    modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 8.dp)
-                )
-            }
-
-            Box(modifier = Modifier.weight(1f)) {
-                when (currentState) {
-                    is WorkoutExecutionState.Loading -> LoadingContent()
-
-                    is WorkoutExecutionState.Error -> EmptyState(
-                        icon = Icons.Default.ErrorOutline,
-                        title = stringResource(R.string.execution_load_error_title),
-                        subtitle = stringResource(R.string.execution_load_error_subtitle),
-                        actionText = stringResource(R.string.execution_retry),
-                        onAction = { viewModel.retry(workoutId) }
-                    )
-
-                    is WorkoutExecutionState.Active -> ActiveContent(
-                        state = currentState,
-                        onEditNote = { noteIndex = chrome.exerciseIndex },
-                        onEditWeightAndReps = { focus ->
-                            weightSheetFocus = focus
-                            weightSheetIndex = chrome.exerciseIndex
-                        }
-                    )
-
-                    is WorkoutExecutionState.Rest -> RestContent(
-                        state = currentState,
-                        onEditNote = { noteIndex = chrome.exerciseIndex },
-                        onEditWeightAndReps = { focus ->
-                            weightSheetFocus = focus
-                            weightSheetIndex = chrome.exerciseIndex
-                        }
-                    )
-
-                    is WorkoutExecutionState.Finished -> Unit
-                }
-            }
-
-            if (currentState is WorkoutExecutionState.Active ||
-                currentState is WorkoutExecutionState.Rest
-            ) {
-                // 24 dp, а не плотные 10: строка музыки по тапу сразу открывает плеер, и большой
-                // палец, метящий в главную кнопку, не должен в неё попадать.
-                MusicSection(
-                    isResting = currentState is WorkoutExecutionState.Rest,
-                    modifier = Modifier.padding(
-                        start = ScreenPadding,
-                        end = ScreenPadding,
-                        bottom = 24.dp
-                    )
-                )
-                // Когда кнопка сменила смысл: подход ↔ отдых. Ключ — вид фазы, а не сама фаза:
-                // отдых тикает каждые 200 мс, и отметка не должна сдвигаться от тиков.
-                val isActivePhase = currentState is WorkoutExecutionState.Active
-                val phaseShownAt = remember(isActivePhase) { SystemClock.uptimeMillis() }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = ScreenPadding, end = ScreenPadding, bottom = 20.dp),
+                        .padding(horizontal = ScreenPadding, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (currentState is WorkoutExecutionState.Active) {
-                        PrimaryButton(
-                            text = stringResource(R.string.execution_finish_set),
-                            onClick = {
-                                if (acceptsPhaseTap(phaseShownAt, SystemClock.uptimeMillis())) {
-                                    if (viewModel.isLastSetOfWorkout) {
-                                        showFinishDialog = true
-                                    } else {
-                                        viewModel.onExerciseFinished()
-                                    }
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                    } else {
-                        val isTransition = (currentState as? WorkoutExecutionState.Rest)?.isTransition == true
-                        PrimaryButton(
-                            text = stringResource(
-                                if (isTransition) R.string.execution_skip_transition else R.string.execution_skip_rest
+                    IconButton(onClick = {
+                        when {
+                            !isLive -> onLeave()
+                            !chrome.isFinishing -> onMinimize()
+                        }
+                    }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(
+                                if (isLive) R.string.execution_minimize else R.string.common_back
                             ),
-                            onClick = {
-                                if (acceptsPhaseTap(phaseShownAt, SystemClock.uptimeMillis())) viewModel.skipRest()
-                            },
-                            modifier = Modifier.weight(1f)
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
+                    }
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        if (currentExercise != null) {
+                            ExerciseChip(
+                                name = currentExercise.name,
+                                position = chrome.currentExerciseNumber,
+                                total = chrome.totalExercises,
+                                onClick = { showExercisePicker = true }
+                            )
+                        } else {
+                            Text(
+                                text = chrome.workoutName.ifEmpty { stringResource(R.string.execution_workout_fallback) },
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                    // «Назад» больше не выходит — выход без сохранения переехал в меню.
+                    if (isLive && !chrome.isFinishing) {
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(
+                                    Icons.Default.MoreVert,
+                                    contentDescription = stringResource(R.string.execution_more),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                                // Откат случайного «Закончить подход» — в меню, а не рядом с главной
+                                // кнопкой: там по нему легко промахнуться, целясь в «Закончить подход».
+                                val undoSet = chrome.undoSetNumber
+                                if (undoSet != null) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.execution_undo_set, undoSet)) },
+                                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null) },
+                                        onClick = {
+                                            menuExpanded = false
+                                            if (viewModel.undoLastSet()) {
+                                                snackbarScope.launch {
+                                                    snackbarHostState.currentSnackbarData?.dismiss()
+                                                    snackbarHostState.showSnackbar(
+                                                        resources.getString(R.string.execution_undo_set_done, undoSet)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                                if (chrome.partnerOf(chrome.exerciseIndex) != null) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.execution_superset_unpair)) },
+                                        onClick = {
+                                            menuExpanded = false
+                                            viewModel.unpair()
+                                        }
+                                    )
+                                } else if (chrome.supersetCandidates.isNotEmpty()) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.execution_superset_with)) },
+                                        onClick = {
+                                            menuExpanded = false
+                                            showSupersetPicker = true
+                                        }
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.execution_exit_without_saving)) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        showExitDialog = true
+                                    }
+                                )
+                            }
+                        }
+                    } else {
+                        Box(modifier = Modifier.size(48.dp))
+                    }
+                }
+
+                if (currentExercise != null && chrome.totalExercises > 0) {
+                    ProgressSegments(
+                        done = chrome.exercises.map { it.isDone },
+                        currentIndex = chrome.exerciseIndex,
+                        modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 8.dp)
+                    )
+                }
+
+                Box(modifier = Modifier.weight(1f)) {
+                    when (currentState) {
+                        is WorkoutExecutionState.Loading -> LoadingContent()
+
+                        is WorkoutExecutionState.Error -> EmptyState(
+                            icon = Icons.Default.ErrorOutline,
+                            title = stringResource(R.string.execution_load_error_title),
+                            subtitle = stringResource(R.string.execution_load_error_subtitle),
+                            actionText = stringResource(R.string.execution_retry),
+                            onAction = { viewModel.retry(workoutId) }
+                        )
+
+                        is WorkoutExecutionState.Active -> ActiveContent(
+                            state = currentState,
+                            onEditNote = { noteIndex = chrome.exerciseIndex },
+                            onEditWeightAndReps = { focus ->
+                                weightSheetFocus = focus
+                                weightSheetIndex = chrome.exerciseIndex
+                            }
+                        )
+
+                        is WorkoutExecutionState.Rest -> RestContent(
+                            state = currentState,
+                            onEditNote = { noteIndex = chrome.exerciseIndex },
+                            onEditWeightAndReps = { focus ->
+                                weightSheetFocus = focus
+                                weightSheetIndex = chrome.exerciseIndex
+                            }
+                        )
+
+                        is WorkoutExecutionState.Finished -> Unit
+                    }
+                }
+
+                if (currentState is WorkoutExecutionState.Active ||
+                    currentState is WorkoutExecutionState.Rest
+                ) {
+                    // 24 dp, а не плотные 10: строка музыки по тапу сразу открывает плеер, и большой
+                    // палец, метящий в главную кнопку, не должен в неё попадать.
+                    MusicSection(
+                        isResting = currentState is WorkoutExecutionState.Rest,
+                        modifier = Modifier.padding(
+                            start = ScreenPadding,
+                            end = ScreenPadding,
+                            bottom = 24.dp
+                        )
+                    )
+                    // Когда кнопка сменила смысл: подход ↔ отдых. Ключ — вид фазы, а не сама фаза:
+                    // отдых тикает каждые 200 мс, и отметка не должна сдвигаться от тиков.
+                    val isActivePhase = currentState is WorkoutExecutionState.Active
+                    val phaseShownAt = remember(isActivePhase) { SystemClock.uptimeMillis() }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = ScreenPadding, end = ScreenPadding, bottom = 20.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (currentState is WorkoutExecutionState.Active) {
+                            PrimaryButton(
+                                text = stringResource(R.string.execution_finish_set),
+                                onClick = {
+                                    if (acceptsPhaseTap(phaseShownAt, SystemClock.uptimeMillis())) {
+                                        if (viewModel.isLastSetOfWorkout) {
+                                            showFinishDialog = true
+                                        } else {
+                                            viewModel.onExerciseFinished()
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        } else {
+                            val isTransition = (currentState as? WorkoutExecutionState.Rest)?.isTransition == true
+                            PrimaryButton(
+                                text = stringResource(
+                                    if (isTransition) R.string.execution_skip_transition else R.string.execution_skip_rest
+                                ),
+                                onClick = {
+                                    if (acceptsPhaseTap(phaseShownAt, SystemClock.uptimeMillis())) viewModel.skipRest()
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
                 }
             }
+            // Подсказки — сверху, под строкой заголовка: снизу они закрывали главную кнопку.
+            SnackbarHost(
+                snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 56.dp)
+            )
         }
     }
 

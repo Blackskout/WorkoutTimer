@@ -75,6 +75,8 @@ class WorkoutExecutionViewModel @Inject constructor(
 
     fun onExerciseFinished() = manager.onExerciseFinished()
 
+    fun undoLastSet() = manager.undoLastSet()
+
     fun moveToExercise(index: Int) = manager.moveToExercise(index)
 
     fun pairWith(index: Int) = manager.pairWith(index)
@@ -105,7 +107,9 @@ data class ExecutionChrome(
     val exercises: List<SessionExercise> = emptyList(),
     val exerciseIndex: Int = 0,
     val isFinishing: Boolean = false,
-    val supersets: List<Superset> = emptyList()
+    val supersets: List<Superset> = emptyList(),
+    /** Номер подхода, который можно вернуть кнопкой отката; null — нечего. */
+    val undoSetNumber: Int? = null
 ) {
     val currentExerciseNumber: Int get() = exerciseIndex + 1
     val totalExercises: Int get() = exercises.size
@@ -127,5 +131,6 @@ private fun WorkoutSession.Present.toChrome() = ExecutionChrome(
     exercises = exercises,
     exerciseIndex = exerciseIndex,
     isFinishing = isFinishing,
-    supersets = supersets
+    supersets = supersets,
+    undoSetNumber = undo?.phase?.currentSet
 )

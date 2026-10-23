@@ -1,6 +1,7 @@
 package ru.hopes.workouttimer.presentation.session
 
 import ru.hopes.workouttimer.domain.model.Exercise
+import ru.hopes.workouttimer.domain.model.RecordedSet
 
 /** Упражнение сессии. Позиция в списке — ключ: список только дописывается в конец. */
 data class SessionExercise(
@@ -22,6 +23,18 @@ data class Superset(val lead: Int, val second: Int) {
 }
 
 /**
+ * Что было до последнего «Закончить подход»: позиция, счётчик упражнения и подходы в памяти.
+ * Список подходов хранится целиком: после сбоя записи нажатие заменяет последний, а не дописывает.
+ */
+data class UndoSet(
+    val exerciseIndex: Int,
+    val doneSetsBefore: Int,
+    val phase: WorkoutExecutionState.Active,
+    val recordedSetsBefore: List<RecordedSet>,
+    val finishPendingBefore: Boolean
+)
+
+/**
  * Один снимок на всю сессию: список, индекс и фаза меняются вместе, поэтому экран
  * не увидит «индекс уже новый, список ещё старый».
  */
@@ -41,7 +54,9 @@ sealed interface WorkoutSession {
         /** Active наступил сам по истечении отдыха: плашка пишет «Пора: подход N». */
         val restOver: Boolean = false,
         /** Пары суперсетов по индексам; список упражнений только дописывается, индексы не съезжают. */
-        val supersets: List<Superset> = emptyList()
+        val supersets: List<Superset> = emptyList(),
+        /** Последний закрытый подход можно вернуть; null — нечего (или уже ушло в БД). */
+        val undo: UndoSet? = null
     ) : WorkoutSession {
         fun supersetOf(index: Int): Superset? = supersets.firstOrNull { it.contains(index) }
     }
