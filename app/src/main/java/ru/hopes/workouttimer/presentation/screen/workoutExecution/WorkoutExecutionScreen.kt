@@ -1,5 +1,6 @@
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
+import android.content.res.Resources
 import android.os.SystemClock
 import ru.hopes.workouttimer.presentation.session.WorkoutExecutionState
 import ru.hopes.workouttimer.presentation.session.WorkoutSessionManager
@@ -54,7 +55,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -124,7 +125,7 @@ fun WorkoutExecutionScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val snackbarScope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val haptic = LocalHapticFeedback.current
     val finishError by viewModel.finishError.collectAsState()
     val finishErrorText = stringResource(R.string.execution_finish_error)
@@ -257,11 +258,11 @@ fun WorkoutExecutionScreen(
                             val eta = viewModel.workoutEta() ?: return@detectTapGestures
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             // Остаток округляется до минуты: «≈ 0 мин» на последнем подходе бессмысленно.
-                            val text = context.getString(
+                            val text = resources.getString(
                                 R.string.execution_eta,
-                                DateFormatter.formatDurationToString(context, eta.elapsedMillis),
-                                DateFormatter.formatDurationToString(context, eta.remainingMillis.roundUpToMinute()),
-                                context.resources.getQuantityString(
+                                resources.durationText(eta.elapsedMillis),
+                                resources.durationText(eta.remainingMillis.roundUpToMinute()),
+                                resources.getQuantityString(
                                     R.plurals.preview_sets, eta.remainingSets, eta.remainingSets
                                 )
                             )
@@ -339,7 +340,7 @@ fun WorkoutExecutionScreen(
                                     snackbarScope.launch {
                                         snackbarHostState.currentSnackbarData?.dismiss()
                                         snackbarHostState.showSnackbar(
-                                            context.getString(R.string.execution_undo_set_done, undoSet)
+                                            resources.getString(R.string.execution_undo_set_done, undoSet)
                                         )
                                     }
                                 }
@@ -582,6 +583,16 @@ fun WorkoutExecutionScreen(
 }
 
 private fun Long.roundUpToMinute(): Long = (this + 59_999L) / 60_000L * 60_000L
+
+/** «1 ч 5 мин» или «42 мин» — как [DateFormatter.formatDurationToString], но из Resources. */
+private fun Resources.durationText(millis: Long): String {
+    val (hours, minutes) = DateFormatter.hoursMinutesOf(millis)
+    return if (hours > 0) {
+        getString(R.string.duration_hours_minutes, hours, minutes)
+    } else {
+        getString(R.string.duration_minutes, minutes)
+    }
+}
 
 @Composable
 private fun ExerciseChip(
