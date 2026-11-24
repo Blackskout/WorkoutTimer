@@ -166,6 +166,7 @@ class TimerNotificationService : Service() {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
+            .setRequestPromotedOngoing(true)
             .setWhen(finishAtMillis)
             .setShowWhen(true)
             .setUsesChronometer(true)
