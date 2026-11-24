@@ -68,6 +68,8 @@
     <string name="execution_retry">Повторить</string>
     <string name="execution_finish_set">Закончить подход</string>
     <string name="execution_skip_rest">Пропустить отдых</string>
+    <string name="execution_open_rest_viewer">На весь экран</string>
+    <string name="execution_rest_viewer_title">Отдых</string>
     <string name="execution_undo_set">Вернуть подход %1$d</string>
     <string name="execution_undo_set_done">Подход %1$d возвращён</string>
     <string name="execution_eta">Прошло %1$s · осталось ≈ %2$s (%3$s)</string>

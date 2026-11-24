@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -158,6 +159,37 @@ class WorkoutExecutionViewModelTest {
 
         session.value = WorkoutSession.None
         assertTrue(vm.uiState.value is WorkoutExecutionState.Active)
+    }
+
+    @Test
+    fun `fullscreen launches only for a live rest owned by the screen`() {
+        every { manager.start(1) } returns 7L
+        val vm = viewModel()
+        val rest = WorkoutExecutionState.Rest(push, 2, restTimeMillis = 12_000L)
+        session.value = present(7L, rest)
+        assertNull(vm.restViewerSessionId())
+
+        vm.start(1)
+        assertEquals(7L, vm.restViewerSessionId())
+
+        session.value = WorkoutSession.None
+        assertTrue(vm.uiState.value is WorkoutExecutionState.Rest)
+        assertNull(vm.restViewerSessionId())
+
+        session.value = present(8L, rest)
+        assertNull(vm.restViewerSessionId())
+    }
+
+    @Test
+    fun `fullscreen reads updated rest and stops at expiry skip or workout end`() {
+        val rest = WorkoutExecutionState.Rest(push, 2, restTimeMillis = 12_000L)
+        assertEquals(12_000L, present(7L, rest).restViewerMillis(7L))
+        assertEquals(42_000L, present(7L, rest.copy(restTimeMillis = 42_000L)).restViewerMillis(7L))
+        assertEquals(0L, present(7L, rest.copy(restTimeMillis = 0L)).restViewerMillis(7L))
+        assertEquals(0L, present(7L, rest.copy(isTransition = true)).restViewerMillis(7L))
+        assertEquals(0L, present(7L, WorkoutExecutionState.Active(push, 2)).restViewerMillis(7L))
+        assertEquals(0L, present(7L, WorkoutExecutionState.Finished(30_000L)).restViewerMillis(7L))
+        assertEquals(0L, WorkoutSession.None.restViewerMillis(7L))
     }
 
     @Test

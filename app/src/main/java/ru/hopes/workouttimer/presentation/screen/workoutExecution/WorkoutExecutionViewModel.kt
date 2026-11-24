@@ -73,6 +73,9 @@ class WorkoutExecutionViewModel @Inject constructor(
 
     fun skipRest() = manager.skipRest()
 
+    internal fun restViewerSessionId(): Long? =
+        ownedSessionId?.takeIf { manager.session.value.restViewerMillis(it) > 0L }
+
     fun onExerciseFinished() = manager.onExerciseFinished()
 
     fun undoLastSet() = manager.undoLastSet()

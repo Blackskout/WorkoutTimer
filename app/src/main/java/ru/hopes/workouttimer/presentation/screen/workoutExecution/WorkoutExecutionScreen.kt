@@ -56,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
@@ -138,6 +139,7 @@ fun WorkoutExecutionScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val snackbarScope = rememberCoroutineScope()
     val resources = LocalResources.current
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val finishError by viewModel.finishError.collectAsState()
     val finishErrorText = stringResource(R.string.execution_finish_error)
@@ -327,6 +329,11 @@ fun WorkoutExecutionScreen(
 
                         is WorkoutExecutionState.Rest -> RestContent(
                             state = currentState,
+                            onOpenViewer = {
+                                viewModel.restViewerSessionId()?.let { sessionId ->
+                                    context.startActivity(RestViewerActivity.intent(context, sessionId))
+                                }
+                            },
                             onEditNote = { noteIndex = chrome.exerciseIndex },
                             onEditWeightAndReps = { focus ->
                                 weightSheetFocus = focus
@@ -720,6 +727,7 @@ internal fun ActiveContent(
 @Composable
 private fun RestContent(
     state: WorkoutExecutionState.Rest,
+    onOpenViewer: () -> Unit,
     onEditNote: (Exercise) -> Unit,
     /** Тап по плитке веса или повторов: шторка подсвечивает свои барабаны. */
     onEditWeightAndReps: (WeightRepsFocus) -> Unit
@@ -743,6 +751,11 @@ private fun RestContent(
             totalTimeMillis = state.totalRestTimeMillis,
             modifier = Modifier.padding(top = 14.dp)
         )
+        if (state.canOpenRestViewer) {
+            TextButton(onClick = onOpenViewer) {
+                Text(stringResource(R.string.execution_open_rest_viewer))
+            }
+        }
         Text(
             text = state.exercise.name,
             style = MaterialTheme.typography.headlineMedium,
@@ -943,6 +956,7 @@ private fun RestContentPreview() {
                 restTimeMillis = 45_000L,
                 totalRestTimeMillis = 90_000L
             ),
+            onOpenViewer = {},
             onEditNote = {},
             onEditWeightAndReps = {}
         )

@@ -13,7 +13,11 @@ plugins {
 
 android {
     namespace = "ru.hopes.workouttimer"
-    compileSdk = 36
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 0
+        }
+    }
 
     defaultConfig {
         applicationId = "ru.hopes.workouttimer"
