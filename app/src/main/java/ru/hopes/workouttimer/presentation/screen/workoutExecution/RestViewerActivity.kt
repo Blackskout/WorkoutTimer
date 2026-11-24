@@ -1,13 +1,18 @@
 package ru.hopes.workouttimer.presentation.screen.workoutExecution
 
+import android.app.KeyguardManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -36,6 +41,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
@@ -56,15 +62,19 @@ class RestViewerActivity : ComponentActivity() {
     @Inject
     lateinit var sessionManager: WorkoutSessionManager
 
+    private var unlockReceiver: BroadcastReceiver? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val sessionId = intent.getLongExtra(EXTRA_SESSION_ID, 0L)
-        val initialMillis = sessionManager.session.value.restViewerMillis(sessionId)
-        if (initialMillis <= 0L) {
+        val autoRestGeneration = intent.getLongExtra(EXTRA_AUTO_REST_GENERATION, 0L)
+        val initialMillis = restMillis(sessionManager.session.value, sessionId, autoRestGeneration)
+        if (initialMillis <= 0L || autoRestGeneration > 0 && isInteractiveAndUnlocked()) {
             finish()
             return
         }
 
+        if (autoRestGeneration > 0L) observeAutomaticViewerExit(autoRestGeneration)
         showViewerWhenLocked()
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
@@ -76,17 +86,56 @@ class RestViewerActivity : ComponentActivity() {
         var restTimeMillis by mutableLongStateOf(initialMillis)
         setContent {
             WorkoutTimerTheme {
-                RestViewerContent(DateFormatter.formatDurationCompact(restTimeMillis))
+                val displayMillis = ((restTimeMillis + 999L) / 1_000L) * 1_000L
+                RestViewerContent(DateFormatter.formatDurationCompact(displayMillis))
             }
         }
         // Закрываемся и в STOPPED, чтобы по возврате не показать уже закончившийся отдых.
         lifecycleScope.launch {
             sessionManager.session
-                .map { it.restViewerMillis(sessionId) }
+                .map { restMillis(it, sessionId, autoRestGeneration) }
                 .takeWhile { it > 0L }
                 .collect { restTimeMillis = it }
             finish()
         }
+    }
+
+    private fun restMillis(session: WorkoutSession, sessionId: Long, autoRestGeneration: Long): Long {
+        if (autoRestGeneration > 0L && autoRestGeneration != sessionManager.restGeneration) return 0L
+        return session.restViewerMillis(sessionId)
+    }
+
+    private fun isInteractiveAndUnlocked(): Boolean =
+        getSystemService(PowerManager::class.java)?.isInteractive == true &&
+            getSystemService(KeyguardManager::class.java)?.isKeyguardLocked != true
+
+    private fun observeAutomaticViewerExit(generation: Long) {
+        onBackPressedDispatcher.addCallback(this) {
+            sessionManager.dismissAutoRestViewer(generation)
+            finish()
+        }
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == Intent.ACTION_USER_PRESENT || isInteractiveAndUnlocked()) finish()
+            }
+        }
+        ContextCompat.registerReceiver(
+            this,
+            receiver,
+            IntentFilter(Intent.ACTION_SCREEN_ON).apply { addAction(Intent.ACTION_USER_PRESENT) },
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        unlockReceiver = receiver
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && unlockReceiver != null && isInteractiveAndUnlocked()) finish()
+    }
+
+    override fun onDestroy() {
+        unlockReceiver?.let(::unregisterReceiver)
+        super.onDestroy()
     }
 
     // Только это окно может быть поверх блокировки. Под ним остаётся обычный экран приложения.
@@ -102,8 +151,12 @@ class RestViewerActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_SESSION_ID = "session_id"
 
-        internal fun intent(context: Context, sessionId: Long): Intent =
-            Intent(context, RestViewerActivity::class.java).putExtra(EXTRA_SESSION_ID, sessionId)
+        private const val EXTRA_AUTO_REST_GENERATION = "auto_rest_generation"
+
+        internal fun intent(context: Context, sessionId: Long, autoRestGeneration: Long = 0L): Intent =
+            Intent(context, RestViewerActivity::class.java)
+                .putExtra(EXTRA_SESSION_ID, sessionId)
+                .putExtra(EXTRA_AUTO_REST_GENERATION, autoRestGeneration)
     }
 }
 

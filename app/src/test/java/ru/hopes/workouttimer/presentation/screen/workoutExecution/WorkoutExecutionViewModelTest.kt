@@ -162,6 +162,45 @@ class WorkoutExecutionViewModelTest {
     }
 
     @Test
+    fun `dismissal of automatic viewer does not affect manual viewer`() {
+        every { manager.start(1) } returns 7L
+        every { manager.isRestTimerActive } returns true
+        every { manager.restGeneration } returns 1L
+        val vm = viewModel()
+        vm.start(1)
+        val rest = WorkoutExecutionState.Rest(push, 2, restTimeMillis = 12_000L)
+        session.value = present(7L, rest)
+
+        assertEquals(AutoRestViewerTarget(7L, 1L), vm.autoRestViewerTarget())
+        every { manager.isAutoRestViewerDismissed } returns true
+        session.value = present(7L, rest.copy(restTimeMillis = 42_000L))
+        assertNull(vm.autoRestViewerTarget())
+        assertEquals(7L, vm.restViewerSessionId())
+
+        every { manager.restGeneration } returns 2L
+        session.value = present(7L, rest)
+        every { manager.isAutoRestViewerDismissed } returns false
+        assertEquals(AutoRestViewerTarget(7L, 2L), vm.autoRestViewerTarget())
+    }
+
+    @Test
+    fun `automatic viewer ignores inactive timers and transitions`() {
+        every { manager.start(1) } returns 7L
+        every { manager.restGeneration } returns 1L
+        val vm = viewModel()
+        vm.start(1)
+        val rest = WorkoutExecutionState.Rest(push, 2, restTimeMillis = 12_000L)
+        session.value = present(7L, rest)
+
+        assertNull(vm.autoRestViewerTarget())
+        every { manager.isRestTimerActive } returns true
+        session.value = present(7L, rest.copy(isTransition = true))
+        assertNull(vm.autoRestViewerTarget())
+        session.value = present(7L, rest.copy(restTimeMillis = 0L))
+        assertNull(vm.autoRestViewerTarget())
+    }
+
+    @Test
     fun `fullscreen launches only for a live rest owned by the screen`() {
         every { manager.start(1) } returns 7L
         val vm = viewModel()

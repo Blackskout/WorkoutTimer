@@ -40,6 +40,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -62,6 +63,10 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -140,6 +145,13 @@ fun WorkoutExecutionScreen(
     val snackbarScope = rememberCoroutineScope()
     val resources = LocalResources.current
     val context = LocalContext.current
+    val autoRestViewerPreferences = remember(context) {
+        context.getSharedPreferences(AUTO_REST_VIEWER_PREFS, android.content.Context.MODE_PRIVATE)
+    }
+    var autoRestViewer by remember(autoRestViewerPreferences) {
+        mutableStateOf(autoRestViewerPreferences.getBoolean(AUTO_REST_VIEWER_ENABLED, false))
+    }
+    AutoRestViewerOnLock(autoRestViewer, viewModel)
     val haptic = LocalHapticFeedback.current
     val finishError by viewModel.finishError.collectAsState()
     val finishErrorText = stringResource(R.string.execution_finish_error)
@@ -223,6 +235,21 @@ fun WorkoutExecutionScreen(
                                 )
                             }
                             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.execution_auto_rest_viewer)) },
+                                    trailingIcon = { Switch(checked = autoRestViewer, onCheckedChange = null) },
+                                    modifier = Modifier.semantics {
+                                        role = Role.Switch
+                                        toggleableState = ToggleableState(autoRestViewer)
+                                    },
+                                    onClick = {
+                                        autoRestViewer = !autoRestViewer
+                                        autoRestViewerPreferences.edit()
+                                            .putBoolean(AUTO_REST_VIEWER_ENABLED, autoRestViewer)
+                                            .apply()
+                                        menuExpanded = false
+                                    }
+                                )
                                 // Откат случайного «Закончить подход» — в меню, а не рядом с главной
                                 // кнопкой: там по нему легко промахнуться, целясь в «Закончить подход».
                                 val undoSet = chrome.undoSetNumber

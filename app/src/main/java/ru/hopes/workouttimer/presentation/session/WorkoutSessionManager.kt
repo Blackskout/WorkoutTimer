@@ -87,6 +87,17 @@ class WorkoutSessionManager @Inject constructor(
 
     private var timerJob: Job? = null
     private var restFinishAt = 0L
+    internal var restGeneration = 0L
+        private set
+    private var dismissedAutoRestGeneration = 0L
+
+    internal val isAutoRestViewerDismissed: Boolean
+        get() = dismissedAutoRestGeneration == restGeneration
+
+    internal fun dismissAutoRestViewer(generation: Long) {
+        if (generation == restGeneration) dismissedAutoRestGeneration = generation
+    }
+
     private var idleReminderJob: Job? = null
 
     internal val isIdleReminderJobActive: Boolean
@@ -229,6 +240,7 @@ class WorkoutSessionManager @Inject constructor(
 
     private fun startRestTimer() {
         val rest = present?.phase as? WorkoutExecutionState.Rest ?: return
+        restGeneration++
         runRestTimer(rest, System.currentTimeMillis() + rest.restTimeMillis, isExtension = false)
     }
 

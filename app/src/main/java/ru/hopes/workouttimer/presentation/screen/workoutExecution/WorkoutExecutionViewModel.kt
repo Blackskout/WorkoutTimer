@@ -76,6 +76,16 @@ class WorkoutExecutionViewModel @Inject constructor(
     internal fun restViewerSessionId(): Long? =
         ownedSessionId?.takeIf { manager.session.value.restViewerMillis(it) > 0L }
 
+    internal fun autoRestViewerTarget(): AutoRestViewerTarget? {
+        val sessionId = restViewerSessionId() ?: return null
+        val generation = manager.restGeneration
+        return if (manager.isRestTimerActive && generation > 0 && !manager.isAutoRestViewerDismissed) {
+            AutoRestViewerTarget(sessionId, generation)
+        } else {
+            null
+        }
+    }
+
     fun onExerciseFinished() = manager.onExerciseFinished()
 
     fun undoLastSet() = manager.undoLastSet()
