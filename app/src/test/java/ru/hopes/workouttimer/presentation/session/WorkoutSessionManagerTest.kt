@@ -101,31 +101,6 @@ class WorkoutSessionManagerTest {
     }
 
     @Test
-    fun `dismissing automatic viewer lasts through extensions and ends at the next rest`() = runTest {
-        val exercise = singleSetWorkout().exercises.single().copy(sets = 3)
-        val workout = singleSetWorkout().copy(exercises = listOf(exercise))
-        val getWorkoutById = mockk<GetWorkoutByIdUseCase>()
-        coEvery { getWorkoutById(1) } returns workout
-        val manager = buildManager(getWorkoutById, mockk(relaxed = true), mockk(relaxed = true))
-
-        manager.start(1)
-        manager.onExerciseFinished()
-        val firstRest = manager.restGeneration
-        assertTrue(firstRest > 0)
-        assertFalse(manager.isAutoRestViewerDismissed)
-        manager.dismissAutoRestViewer(firstRest)
-        manager.addRestTime(2_000L)
-        assertEquals(firstRest, manager.restGeneration)
-        assertTrue(manager.isAutoRestViewerDismissed)
-
-        manager.skipRest()
-        manager.onExerciseFinished()
-        assertNotEquals(firstRest, manager.restGeneration)
-        manager.dismissAutoRestViewer(firstRest)
-        assertFalse(manager.isAutoRestViewerDismissed)
-    }
-
-    @Test
     fun `finishing the only exercise saves a session and exposes its duration`() = runTest {
         val exercise = Exercise(id = 1, name = "Push", weight = 10.0, sets = 1, reps = 5, timeMillis = 1_000, order = 1)
         val workout = Workout(id = 1, name = "Test", exercises = listOf(exercise), lastUseAt = 0L)

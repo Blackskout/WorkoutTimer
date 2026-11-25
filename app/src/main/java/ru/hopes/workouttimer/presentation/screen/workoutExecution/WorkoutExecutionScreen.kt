@@ -40,7 +40,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -57,16 +56,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.toggleableState
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -144,14 +138,6 @@ fun WorkoutExecutionScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val snackbarScope = rememberCoroutineScope()
     val resources = LocalResources.current
-    val context = LocalContext.current
-    val autoRestViewerPreferences = remember(context) {
-        context.getSharedPreferences(AUTO_REST_VIEWER_PREFS, android.content.Context.MODE_PRIVATE)
-    }
-    var autoRestViewer by remember(autoRestViewerPreferences) {
-        mutableStateOf(autoRestViewerPreferences.getBoolean(AUTO_REST_VIEWER_ENABLED, false))
-    }
-    AutoRestViewerOnLock(autoRestViewer, viewModel)
     val haptic = LocalHapticFeedback.current
     val finishError by viewModel.finishError.collectAsState()
     val finishErrorText = stringResource(R.string.execution_finish_error)
@@ -235,21 +221,6 @@ fun WorkoutExecutionScreen(
                                 )
                             }
                             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.execution_auto_rest_viewer)) },
-                                    trailingIcon = { Switch(checked = autoRestViewer, onCheckedChange = null) },
-                                    modifier = Modifier.semantics {
-                                        role = Role.Switch
-                                        toggleableState = ToggleableState(autoRestViewer)
-                                    },
-                                    onClick = {
-                                        autoRestViewer = !autoRestViewer
-                                        autoRestViewerPreferences.edit()
-                                            .putBoolean(AUTO_REST_VIEWER_ENABLED, autoRestViewer)
-                                            .apply()
-                                        menuExpanded = false
-                                    }
-                                )
                                 // Откат случайного «Закончить подход» — в меню, а не рядом с главной
                                 // кнопкой: там по нему легко промахнуться, целясь в «Закончить подход».
                                 val undoSet = chrome.undoSetNumber
@@ -356,11 +327,6 @@ fun WorkoutExecutionScreen(
 
                         is WorkoutExecutionState.Rest -> RestContent(
                             state = currentState,
-                            onOpenViewer = {
-                                viewModel.restViewerSessionId()?.let { sessionId ->
-                                    context.startActivity(RestViewerActivity.intent(context, sessionId))
-                                }
-                            },
                             onEditNote = { noteIndex = chrome.exerciseIndex },
                             onEditWeightAndReps = { focus ->
                                 weightSheetFocus = focus
@@ -754,7 +720,6 @@ internal fun ActiveContent(
 @Composable
 private fun RestContent(
     state: WorkoutExecutionState.Rest,
-    onOpenViewer: () -> Unit,
     onEditNote: (Exercise) -> Unit,
     /** Тап по плитке веса или повторов: шторка подсвечивает свои барабаны. */
     onEditWeightAndReps: (WeightRepsFocus) -> Unit
@@ -778,11 +743,6 @@ private fun RestContent(
             totalTimeMillis = state.totalRestTimeMillis,
             modifier = Modifier.padding(top = 14.dp)
         )
-        if (state.canOpenRestViewer) {
-            TextButton(onClick = onOpenViewer) {
-                Text(stringResource(R.string.execution_open_rest_viewer))
-            }
-        }
         Text(
             text = state.exercise.name,
             style = MaterialTheme.typography.headlineMedium,
@@ -983,7 +943,6 @@ private fun RestContentPreview() {
                 restTimeMillis = 45_000L,
                 totalRestTimeMillis = 90_000L
             ),
-            onOpenViewer = {},
             onEditNote = {},
             onEditWeightAndReps = {}
         )

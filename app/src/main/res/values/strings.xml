@@ -68,9 +68,6 @@
     <string name="execution_retry">Повторить</string>
     <string name="execution_finish_set">Закончить подход</string>
     <string name="execution_skip_rest">Пропустить отдых</string>
-    <string name="execution_open_rest_viewer">На весь экран</string>
-    <string name="execution_rest_viewer_title">Отдых</string>
-    <string name="execution_auto_rest_viewer">Крупный таймер при блокировке</string>
     <string name="execution_undo_set">Вернуть подход %1$d</string>
     <string name="execution_undo_set_done">Подход %1$d возвращён</string>
     <string name="execution_eta">Прошло %1$s · осталось ≈ %2$s (%3$s)</string>
@@ -294,12 +291,9 @@
     <string name="notification_channel_rest_finished_description">Уведомление о завершении отдыха между подходами</string>
     <string name="notification_channel_idle">Напоминание о тренировке</string>
     <string name="notification_channel_idle_description">Напоминание вернуться в приложение, если подход давно не завершён</string>
-    <string name="notification_rest_title">Отдых</string>
     <string name="notification_set_content">%1$s — Подход %2$d из %3$d</string>
+    <string name="notification_remaining_sets">Осталось %1$d из %2$d</string>
     <string name="notification_rest_finished_title">Отдых завершён!</string>
-    <string name="notification_transition_title">Переход</string>
-    <string name="notification_action_skip">Пропустить</string>
-    <string name="notification_action_add_rest">+30 с</string>
     <string name="notification_transition_finished_title">Пора: следующее упражнение суперсета</string>
     <string name="notification_idle_title">Вы всё ещё тренируетесь?</string>
     <string name="notification_idle_content">%1$s — Подход %2$d из %3$d. Не забудьте закончить подход.</string>

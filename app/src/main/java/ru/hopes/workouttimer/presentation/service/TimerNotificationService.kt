@@ -39,10 +39,9 @@ class TimerNotificationService : Service() {
                 val currentSet = intent.getIntExtra(EXTRA_CURRENT_SET, 1)
                 val totalSets = intent.getIntExtra(EXTRA_TOTAL_SETS, 1)
                 val finishAt = intent.getLongExtra(EXTRA_FINISH_AT, 0L)
-                val isTransition = intent.getBooleanExtra(EXTRA_TRANSITION, false)
                 startForeground(
                     notificationId,
-                    createNotification(exerciseName, currentSet, totalSets, finishAt, isTransition)
+                    createNotification(exerciseName, currentSet, totalSets, finishAt)
                 )
             }
             ACTION_UPDATE -> {
@@ -50,10 +49,9 @@ class TimerNotificationService : Service() {
                 val currentSet = intent.getIntExtra(EXTRA_CURRENT_SET, 1)
                 val totalSets = intent.getIntExtra(EXTRA_TOTAL_SETS, 1)
                 val finishAt = intent.getLongExtra(EXTRA_FINISH_AT, 0L)
-                val isTransition = intent.getBooleanExtra(EXTRA_TRANSITION, false)
                 notificationManager.notify(
                     notificationId,
-                    createNotification(exerciseName, currentSet, totalSets, finishAt, isTransition)
+                    createNotification(exerciseName, currentSet, totalSets, finishAt)
                 )
             }
             ACTION_STOP -> {
@@ -121,8 +119,7 @@ class TimerNotificationService : Service() {
         exerciseName: String,
         currentSet: Int,
         totalSets: Int,
-        finishAtMillis: Long,
-        isTransition: Boolean
+        finishAtMillis: Long
     ): Notification {
         val intent = Intent(this, MainActivity::class.java).apply {
             // Свой action: при идущей сессии тап возвращает в неё с любого экрана.
@@ -137,17 +134,18 @@ class TimerNotificationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = getString(
-            if (isTransition) R.string.notification_transition_title else R.string.notification_rest_title
+        val progress = getString(
+            R.string.notification_remaining_sets,
+            remainingRestSets(currentSet, totalSets),
+            totalSets
         )
-        val content = getString(R.string.notification_set_content, exerciseName, currentSet, totalSets)
         val remainingMillis = (finishAtMillis - System.currentTimeMillis()).coerceAtLeast(0L)
 
         // Обратный отсчёт ведёт сама система (хронометр до finishAt): уведомление не
         // перевыкладывается каждую секунду.
         val notification = NotificationCompat.Builder(this, channelId)
-            .setContentTitle(title)
-            .setContentText(content)
+            .setContentTitle(exerciseName)
+            .setContentText(progress)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
@@ -167,7 +165,11 @@ class TimerNotificationService : Service() {
             .build()
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN) {
-            withTimerMetric(notification, title, finishAtMillis)
+            withTimerMetric(
+                notification,
+                metricLabel = progress,
+                finishAtMillis = finishAtMillis
+            )
         } else {
             notification
         }
@@ -176,7 +178,7 @@ class TimerNotificationService : Service() {
     @RequiresApi(Build.VERSION_CODES.CINNAMON_BUN)
     private fun withTimerMetric(
         notification: Notification,
-        title: String,
+        metricLabel: String,
         finishAtMillis: Long
     ): Notification {
         val countdown = Notification.Metric.TimeDifference.forTimer(
@@ -184,7 +186,13 @@ class TimerNotificationService : Service() {
             Notification.Metric.TimeDifference.FORMAT_CHRONOMETER
         )
         return Notification.Builder.recoverBuilder(this, notification)
-            .setStyle(Notification.MetricStyle().addMetric(Notification.Metric(countdown, title)))
+            .setShowWhen(false)
+            .setUsesChronometer(false)
+            .setStyle(
+                Notification.MetricStyle()
+                    .addMetric(Notification.Metric(countdown, metricLabel))
+                    .setCriticalMetric(0)
+            )
             .build()
     }
 
@@ -299,3 +307,7 @@ class TimerNotificationService : Service() {
         const val IDLE_REMINDER_NOTIFICATION_ID = 3
     }
 }
+
+// The rest phase already points at the next set, which is still outstanding.
+internal fun remainingRestSets(nextSet: Int, totalSets: Int): Int =
+    (totalSets.coerceAtLeast(0) - (nextSet.coerceAtLeast(1) - 1)).coerceAtLeast(0)

@@ -87,17 +87,6 @@ class WorkoutSessionManager @Inject constructor(
 
     private var timerJob: Job? = null
     private var restFinishAt = 0L
-    internal var restGeneration = 0L
-        private set
-    private var dismissedAutoRestGeneration = 0L
-
-    internal val isAutoRestViewerDismissed: Boolean
-        get() = dismissedAutoRestGeneration == restGeneration
-
-    internal fun dismissAutoRestViewer(generation: Long) {
-        if (generation == restGeneration) dismissedAutoRestGeneration = generation
-    }
-
     private var idleReminderJob: Job? = null
 
     internal val isIdleReminderJobActive: Boolean
@@ -240,7 +229,6 @@ class WorkoutSessionManager @Inject constructor(
 
     private fun startRestTimer() {
         val rest = present?.phase as? WorkoutExecutionState.Rest ?: return
-        restGeneration++
         runRestTimer(rest, System.currentTimeMillis() + rest.restTimeMillis, isExtension = false)
     }
 
@@ -266,9 +254,9 @@ class WorkoutSessionManager @Inject constructor(
         wakeLockHelper.acquire(finishTime - System.currentTimeMillis())
 
         if (isExtension) {
-            updateNotification(rest.exercise.name, rest.currentSet, rest.totalSets, finishTime, rest.isTransition)
+            updateNotification(rest.exercise.name, rest.currentSet, rest.totalSets, finishTime)
         } else {
-            startNotification(rest.exercise.name, rest.currentSet, rest.totalSets, finishTime, rest.isTransition)
+            startNotification(rest.exercise.name, rest.currentSet, rest.totalSets, finishTime)
         }
 
         timerJob = sessionScope.launch {
@@ -736,8 +724,7 @@ class WorkoutSessionManager @Inject constructor(
         exerciseName: String,
         currentSet: Int,
         totalSets: Int,
-        finishAtMillis: Long,
-        isTransition: Boolean
+        finishAtMillis: Long
     ) {
         val intent = Intent(context, TimerNotificationService::class.java).apply {
             action = TimerNotificationService.ACTION_START
@@ -745,7 +732,6 @@ class WorkoutSessionManager @Inject constructor(
             putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
             putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
             putExtra(TimerNotificationService.EXTRA_FINISH_AT, finishAtMillis)
-            putExtra(TimerNotificationService.EXTRA_TRANSITION, isTransition)
         }
         context.startService(intent)
     }
@@ -754,8 +740,7 @@ class WorkoutSessionManager @Inject constructor(
         exerciseName: String,
         currentSet: Int,
         totalSets: Int,
-        finishAtMillis: Long,
-        isTransition: Boolean
+        finishAtMillis: Long
     ) {
         val intent = Intent(context, TimerNotificationService::class.java).apply {
             action = TimerNotificationService.ACTION_UPDATE
@@ -763,7 +748,6 @@ class WorkoutSessionManager @Inject constructor(
             putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
             putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
             putExtra(TimerNotificationService.EXTRA_FINISH_AT, finishAtMillis)
-            putExtra(TimerNotificationService.EXTRA_TRANSITION, isTransition)
         }
         context.startService(intent)
     }
