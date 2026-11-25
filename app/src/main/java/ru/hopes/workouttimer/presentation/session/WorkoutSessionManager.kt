@@ -254,9 +254,9 @@ class WorkoutSessionManager @Inject constructor(
         wakeLockHelper.acquire(finishTime - System.currentTimeMillis())
 
         if (isExtension) {
-            updateNotification(rest.exercise.name, rest.currentSet, rest.totalSets, finishTime, rest.isTransition)
+            updateNotification(rest.exercise.name, rest.currentSet, rest.totalSets, finishTime)
         } else {
-            startNotification(rest.exercise.name, rest.currentSet, rest.totalSets, finishTime, rest.isTransition)
+            startNotification(rest.exercise.name, rest.currentSet, rest.totalSets, finishTime)
         }
 
         timerJob = sessionScope.launch {
@@ -724,8 +724,7 @@ class WorkoutSessionManager @Inject constructor(
         exerciseName: String,
         currentSet: Int,
         totalSets: Int,
-        finishAtMillis: Long,
-        isTransition: Boolean
+        finishAtMillis: Long
     ) {
         val intent = Intent(context, TimerNotificationService::class.java).apply {
             action = TimerNotificationService.ACTION_START
@@ -733,7 +732,6 @@ class WorkoutSessionManager @Inject constructor(
             putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
             putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
             putExtra(TimerNotificationService.EXTRA_FINISH_AT, finishAtMillis)
-            putExtra(TimerNotificationService.EXTRA_TRANSITION, isTransition)
         }
         context.startService(intent)
     }
@@ -742,8 +740,7 @@ class WorkoutSessionManager @Inject constructor(
         exerciseName: String,
         currentSet: Int,
         totalSets: Int,
-        finishAtMillis: Long,
-        isTransition: Boolean
+        finishAtMillis: Long
     ) {
         val intent = Intent(context, TimerNotificationService::class.java).apply {
             action = TimerNotificationService.ACTION_UPDATE
@@ -751,7 +748,6 @@ class WorkoutSessionManager @Inject constructor(
             putExtra(TimerNotificationService.EXTRA_CURRENT_SET, currentSet)
             putExtra(TimerNotificationService.EXTRA_TOTAL_SETS, totalSets)
             putExtra(TimerNotificationService.EXTRA_FINISH_AT, finishAtMillis)
-            putExtra(TimerNotificationService.EXTRA_TRANSITION, isTransition)
         }
         context.startService(intent)
     }

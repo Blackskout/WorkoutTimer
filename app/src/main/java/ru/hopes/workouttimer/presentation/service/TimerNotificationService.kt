@@ -1,25 +1,20 @@
 package ru.hopes.workouttimer.presentation.service
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
-import dagger.hilt.android.AndroidEntryPoint
 import ru.hopes.workouttimer.R
 import ru.hopes.workouttimer.presentation.MainActivity
-import ru.hopes.workouttimer.presentation.session.WorkoutSessionManager
-import javax.inject.Inject
+import java.time.Instant
 
-@AndroidEntryPoint
 class TimerNotificationService : Service() {
-
-    @Inject
-    lateinit var sessionManager: WorkoutSessionManager
 
     private val channelId = "timer_notification_channel"
     private val notificationId = 1
@@ -44,10 +39,9 @@ class TimerNotificationService : Service() {
                 val currentSet = intent.getIntExtra(EXTRA_CURRENT_SET, 1)
                 val totalSets = intent.getIntExtra(EXTRA_TOTAL_SETS, 1)
                 val finishAt = intent.getLongExtra(EXTRA_FINISH_AT, 0L)
-                val isTransition = intent.getBooleanExtra(EXTRA_TRANSITION, false)
                 startForeground(
                     notificationId,
-                    createNotification(exerciseName, currentSet, totalSets, finishAt, isTransition)
+                    createNotification(exerciseName, currentSet, totalSets, finishAt)
                 )
             }
             ACTION_UPDATE -> {
@@ -55,22 +49,10 @@ class TimerNotificationService : Service() {
                 val currentSet = intent.getIntExtra(EXTRA_CURRENT_SET, 1)
                 val totalSets = intent.getIntExtra(EXTRA_TOTAL_SETS, 1)
                 val finishAt = intent.getLongExtra(EXTRA_FINISH_AT, 0L)
-                val isTransition = intent.getBooleanExtra(EXTRA_TRANSITION, false)
                 notificationManager.notify(
                     notificationId,
-                    createNotification(exerciseName, currentSet, totalSets, finishAt, isTransition)
+                    createNotification(exerciseName, currentSet, totalSets, finishAt)
                 )
-            }
-            // Кнопки уведомления: менеджер сам остановит или продлит отсчёт и уведомление.
-            // Запоздалое нажатие (отдых уже кончился) сервис заново поднимает — тогда гасим его.
-            ACTION_SKIP_REST, ACTION_ADD_REST -> {
-                if (!sessionManager.isRestTimerActive) {
-                    stopSelf()
-                } else if (intent.action == ACTION_SKIP_REST) {
-                    sessionManager.skipRest()
-                } else {
-                    sessionManager.addRestTime()
-                }
             }
             ACTION_STOP -> {
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -137,9 +119,8 @@ class TimerNotificationService : Service() {
         exerciseName: String,
         currentSet: Int,
         totalSets: Int,
-        finishAtMillis: Long,
-        isTransition: Boolean
-    ): android.app.Notification {
+        finishAtMillis: Long
+    ): Notification {
         val intent = Intent(this, MainActivity::class.java).apply {
             // Свой action: при идущей сессии тап возвращает в неё с любого экрана.
             action = MainActivity.ACTION_OPEN_ACTIVE_WORKOUT
@@ -153,37 +134,65 @@ class TimerNotificationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = getString(
-            if (isTransition) R.string.notification_transition_title else R.string.notification_rest_title
+        val progress = getString(
+            R.string.notification_remaining_sets,
+            remainingRestSets(currentSet, totalSets),
+            totalSets
         )
-        val content = getString(R.string.notification_set_content, exerciseName, currentSet, totalSets)
+        val remainingMillis = (finishAtMillis - System.currentTimeMillis()).coerceAtLeast(0L)
 
         // Обратный отсчёт ведёт сама система (хронометр до finishAt): уведомление не
         // перевыкладывается каждую секунду.
-        return NotificationCompat.Builder(this, channelId)
-            .setContentTitle(title)
-            .setContentText(content)
+        val notification = NotificationCompat.Builder(this, channelId)
+            .setContentTitle(exerciseName)
+            .setContentText(progress)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
+            .setRequestPromotedOngoing(true)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .setAllowSystemGeneratedContextualActions(false)
             .setWhen(finishAtMillis)
             .setShowWhen(true)
             .setUsesChronometer(true)
             .setChronometerCountDown(true)
             // Если менеджер не успел снять уведомление, отрицательного отсчёта не будет.
-            .setTimeoutAfter((finishAtMillis - System.currentTimeMillis()).coerceAtLeast(0L) + 1_000L)
-            .addAction(
-                0,
-                getString(if (isTransition) R.string.execution_skip_transition else R.string.notification_action_skip),
-                actionIntent(ACTION_SKIP_REST)
-            )
-            .apply {
-                if (!isTransition) addAction(0, getString(R.string.notification_action_add_rest), actionIntent(ACTION_ADD_REST))
-            }
+            .setTimeoutAfter(remainingMillis + 1_000L)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN) {
+            withTimerMetric(
+                notification,
+                metricLabel = progress,
+                finishAtMillis = finishAtMillis
+            )
+        } else {
+            notification
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.CINNAMON_BUN)
+    private fun withTimerMetric(
+        notification: Notification,
+        metricLabel: String,
+        finishAtMillis: Long
+    ): Notification {
+        val countdown = Notification.Metric.TimeDifference.forTimer(
+            Instant.ofEpochMilli(finishAtMillis),
+            Notification.Metric.TimeDifference.FORMAT_CHRONOMETER
+        )
+        return Notification.Builder.recoverBuilder(this, notification)
+            .setShowWhen(false)
+            .setUsesChronometer(false)
+            .setStyle(
+                Notification.MetricStyle()
+                    .addMetric(Notification.Metric(countdown, metricLabel))
+                    .setCriticalMetric(0)
+            )
             .build()
     }
 
@@ -275,13 +284,6 @@ class TimerNotificationService : Service() {
             .build()
     }
 
-    private fun actionIntent(action: String): PendingIntent = PendingIntent.getService(
-        this,
-        action.hashCode(),
-        Intent(this, TimerNotificationService::class.java).setAction(action),
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-    )
-
     private val notificationManager: NotificationManager
         get() = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
@@ -293,8 +295,6 @@ class TimerNotificationService : Service() {
         const val ACTION_STOP = "STOP"
         const val ACTION_SHOW_FINISHED = "SHOW_FINISHED"
         const val ACTION_SHOW_IDLE_REMINDER = "SHOW_IDLE_REMINDER"
-        const val ACTION_SKIP_REST = "SKIP_REST"
-        const val ACTION_ADD_REST = "ADD_REST"
 
         const val EXTRA_EXERCISE_NAME = "exercise_name"
         const val EXTRA_CURRENT_SET = "current_set"
@@ -307,3 +307,7 @@ class TimerNotificationService : Service() {
         const val IDLE_REMINDER_NOTIFICATION_ID = 3
     }
 }
+
+// The rest phase already points at the next set, which is still outstanding.
+internal fun remainingRestSets(nextSet: Int, totalSets: Int): Int =
+    (totalSets.coerceAtLeast(0) - (nextSet.coerceAtLeast(1) - 1)).coerceAtLeast(0)
